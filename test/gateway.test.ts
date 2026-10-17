@@ -22,6 +22,15 @@ test('gateway rejects writes until a separate validator is configured',async()=>
 test('cross-origin writes are rejected',async()=>{
   const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array(),{origin:'https://attacker.example'});await gateway({VALIDATOR_URL:'https://validator.example'})(req,res,()=>{});assert.equal(res.statusCode,403);
 });
+test('browser configuration exposes gateway paths rather than upstream endpoints',async()=>{
+  const {req,res}=await request('/api/config');
+  await gateway({NEXT_PUBLIC_HUBURL:'https://private-read.example',VALIDATOR_URL:'https://private-write.example'})(req,res,()=>{});
+  const config=JSON.parse(String(res.body));
+  assert.equal(config.readUrl,'/api/read');
+  assert.equal(config.validatorUrl,'/api/write');
+  assert.ok(!String(res.body).includes('private-read.example'));
+  assert.ok(!String(res.body).includes('private-write.example'));
+});
 test('protobuf write goes only to the configured validator',async()=>{
   const original=globalThis.fetch;let seen='',payload:unknown;
   globalThis.fetch=async(input,init)=>{seen=String(input);payload=init?.body;assert.equal((init?.headers as Record<string,string>)['Content-Type'],'application/octet-stream');return Response.json({hash:'0x123'});};

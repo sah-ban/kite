@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:network": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "start": "node server.mjs",
     "test": "tsx --test test/*.test.ts",

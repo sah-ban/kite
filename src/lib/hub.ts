@@ -1,6 +1,6 @@
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
 export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string };
-export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string };
+export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
 export function onlyCastAdds(messages: unknown[]): Cast[] {
@@ -11,11 +11,27 @@ export function onlyCastAdds(messages: unknown[]): Cast[] {
 }
 export const localOrigin = () => ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 export async function getConfig(): Promise<Config> {
-  if (localOrigin()) { const r = await fetch('/api/config'); if (!r.ok) throw new Error('Local client configuration is unavailable.'); const config:Config=await r.json();for(const [label,value] of Object.entries(config)){if(!value&&label==='validatorUrl')continue;try{const url=new URL(value);if(!['http:','https:'].includes(url.protocol))throw new Error();}catch{throw new Error(`Invalid ${label} in local .env. Use a complete HTTP or HTTPS URL and restart.`);}}return config; }
-  throw new Error('Run the client locally and configure NEXT_PUBLIC_HUBURL in .env to connect your own read node.');
+  const response = await fetch('/api/config');
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Start the Freecast server and configure your read node in its local .env.');
+  }
+  const config: Config = await response.json();
+  for (const label of ['readUrl', 'validatorUrl', 'optimismRpcUrl'] as const) {
+    const value = config[label];
+    if (!value && label === 'validatorUrl') continue;
+    try {
+      if (typeof value !== 'string' || !value) throw new Error();
+      const url = new URL(value, window.location.origin);
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+      config[label] = url.href;
+    } catch {
+      throw new Error(`Invalid ${label} in server configuration. Use an HTTP or HTTPS URL and restart.`);
+    }
+  }
+  return { ...config, useGateway: true };
 }
 export async function hub<T>(config: Config, endpoint: string, params: Record<string, string | number> = {}, signal?: AbortSignal): Promise<T> {
-  const base = localOrigin() ? '/api/read' : config.readUrl.replace(/\/$/, '');
+  const base = config.useGateway || localOrigin() ? '/api/read' : config.readUrl.replace(/\/$/, '');
   const response = await fetch(`${base}/v1/${endpoint}?${new URLSearchParams(Object.entries(params).map(([k,v]) => [k,String(v)]))}`, { signal: signal || AbortSignal.timeout(25_000) });
   if (!response.ok) throw new Error(`Node returned ${response.status}: ${(await response.text()).slice(0,250)}`);
   const result = await response.json();

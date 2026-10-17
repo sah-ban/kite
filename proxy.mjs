@@ -8,7 +8,7 @@ export function gateway(config) {
     const url = new URL(req.url || '/', 'http://localhost');
     if (url.pathname === '/api/config') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ readUrl, validatorUrl, optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io' })); return;
+      res.end(JSON.stringify({ readUrl: '/api/read', validatorUrl: validatorUrl ? '/api/write' : '', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io' })); return;
     }
     const read = url.pathname.startsWith('/api/read/v1/');
     const write = url.pathname === '/api/write/v1/submitMessage';
