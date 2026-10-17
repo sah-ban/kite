@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.freecast/
+.sites-runtime/
+.sites-config/
+.openai/
+*.tfstate*
+*.tfplan
+__pycache__/
+.terraform/
+*.tfvars
+!*.example.tfvars
+*.tsbuildinfo
