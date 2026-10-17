@@ -11,6 +11,42 @@ function requireLocal() { if (!localOrigin()) throw new Error('Run Freecast on l
 const publicClient = (config: Config) => createPublicClient({ chain: optimism, transport: http(config.optimismRpcUrl) });
 function result<T>(r: { isErr: () => boolean; error?: unknown; value?: T }): T { if (r.isErr()) throw new Error(String(r.error)); return r.value!; }
 
+async function checkRegisteredSigner(config: Config, fid: number, key: Hex) {
+  const state = await publicClient(config).readContract({
+    address: KEY_REGISTRY_ADDRESS, abi: keyRegistryABI,
+    functionName: 'keys', args: [BigInt(fid), key],
+  });
+  if (Number(state[0]) !== 1 || Number(state[1]) !== 1) {
+    throw new Error('This Ed25519 key is not an active onchain signer for that FID. Check the FID and key, or register a new app key. Gasless-only signers are not supported by this import yet.');
+  }
+}
+
+export async function importExistingSigner(config: Config, fid: number, privateKey: string, password: string): Promise<Session> {
+  requireLocal();
+  if (!Number.isSafeInteger(fid) || fid <= 0) throw new Error('Enter a positive numeric FID.');
+  if (password.length < 12) throw new Error('Use a passphrase of at least 12 characters to encrypt your app key.');
+  const normalized = privateKey.trim().replace(/^0x/i, '');
+  if (!/^[0-9a-fA-F]{64}$/.test(normalized)) {
+    throw new Error('Enter a 32-byte Ed25519 signer private key: 64 hexadecimal digits, optionally prefixed with 0x.');
+  }
+  const bytes = hexToBytes(`0x${normalized}`);
+  try {
+    const key = bytesToHex(result(await new NobleEd25519Signer(bytes).getSignerKey()));
+    await checkRegisteredSigner(config, fid, key);
+    const address = await publicClient(config).readContract({
+      address: ID_REGISTRY_ADDRESS, abi: idRegistryABI,
+      functionName: 'custodyOf', args: [BigInt(fid)],
+    });
+    if (address === '0x0000000000000000000000000000000000000000') throw new Error('This FID has no custody address.');
+    const storage = await hub<{ units?: number }>(config, 'storageLimitsByFid', { fid });
+    if (!(Number(storage.units) > 0)) throw new Error('This account has no active storage. Rent storage before using this signer.');
+    await saveAppKey(password, bytes, { fid, address, key });
+    return { fid, address, key, signer: new NobleEd25519Signer(bytes.slice()) };
+  } finally {
+    bytes.fill(0);
+  }
+}
+
 export async function prepareKey(config: Config, phrase: string, password: string, accountIndex: number): Promise<PreparedKey> {
   requireLocal();
   if (!Number.isSafeInteger(accountIndex) || accountIndex < 0 || accountIndex > 100) throw new Error('Account index must be between 0 and 100.');
@@ -46,8 +82,7 @@ export async function unlockSession(config: Config, password: string): Promise<S
   const saved = await unlockAppKey(password);
   const signer = new NobleEd25519Signer(saved.privateKey);
   if (bytesToHex(result(await signer.getSignerKey())).toLowerCase() !== saved.key.toLowerCase()) throw new Error('Saved key does not match its public key.');
-  const state = await publicClient(config).readContract({address:KEY_REGISTRY_ADDRESS,abi:keyRegistryABI,functionName:'keys',args:[BigInt(saved.fid),saved.key]});
-  if (Number(state[0]) !== 1) throw new Error('This app key is not registered or was revoked. Import the custody phrase to register a new key.');
+  await checkRegisteredSigner(config, saved.fid, saved.key);
   return {fid:saved.fid,address:saved.address,key:saved.key,signer};
 }
 export function encodeForSnapchain(message: Message): Uint8Array {

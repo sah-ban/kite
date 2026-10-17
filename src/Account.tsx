@@ -1,20 +1,138 @@
 import { useState, useEffect } from 'react';
 import { KeyRound, Lock, ArrowRight, ExternalLink } from 'lucide-react';
 import { type Config, localOrigin } from './lib/hub';
-import { prepareKey, unlockSession, type PreparedKey, type Session } from './lib/signing';
+import { importExistingSigner, prepareKey, unlockSession, type PreparedKey, type Session } from './lib/signing';
 import { storedAccount, forgetAppKey } from './lib/vault';
 import { Modal, Code } from './components';
 
-export function Account({config,onSession,onClose}:{config:Config;onSession:(s:Session)=>void;onClose:()=>void}) {
-  const [saved,setSaved]=useState(storedAccount),[importing,setImporting]=useState(!saved),[phrase,setPhrase]=useState(''),[password,setPassword]=useState(''),[index,setIndex]=useState('0'),[pending,setPending]=useState<PreparedKey|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  useEffect(()=>()=>{pending?.discard();},[pending]);
-  const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
-  if(!localOrigin())return <Modal title="Your account stays local" onClose={onClose}><div className="account-icon"><Lock size={26}/></div><p>Seed phrase import is available only in a client running on your own machine. The hosted site is for the guide and public reads.</p><Code>{'./freecast client'}</Code><p className="muted">Open http://127.0.0.1:5173 after starting the local client.</p></Modal>;
-  return <Modal title={pending?'Review app key registration':importing?'Connect your account':'Unlock your app key'} onClose={()=>{if(!busy)onClose();}}><div className="account-icon"><KeyRound size={26}/></div>
-  {pending?<><p>One Optimism transaction will authorize this app key to sign Farcaster messages for your account.</p><dl className="registration-details"><dt>FID</dt><dd>{pending.fid}</dd><dt>Custody address</dt><dd className="mono">{pending.address}</dd><dt>App public key</dt><dd className="mono">{pending.key}</dd><dt>Estimated execution gas</dt><dd>{pending.estimatedFee} ETH + L1 data fee</dd></dl><p className="small muted">The custody wallet must hold ETH on Optimism. The encrypted app key is saved before submission so you can recover it if confirmation is interrupted.</p><button className="button primary full" disabled={busy} onClick={()=>run(async()=>{const session=await pending.register();setPassword('');onSession(session);onClose();})}>{busy?'Waiting for transaction…':'Register app key'} <ArrowRight size={16}/></button></>:<form onSubmit={e=>{e.preventDefault();run(async()=>{if(importing){const prepared=await prepareKey(config,phrase,password,Number(index));setPhrase('');setPending(prepared);}else{const session=await unlockSession(config,password);setPassword('');onSession(session);onClose();}});}}>
-  {importing?<><p>Use the seed phrase that controls an existing Farcaster FID with active storage. It stays in this browser's memory during setup.</p><label>Custody seed phrase<textarea autoComplete="off" spellCheck={false} value={phrase} onChange={e=>setPhrase(e.target.value)} required rows={3} placeholder="Enter your 12 or 24 words"/></label><label>Address derivation index<input type="number" min={0} max={100} value={index} onChange={e=>setIndex(e.target.value)} required/></label></>:<p>Unlock the encrypted app key for <strong>FID {saved?.fid}</strong>. Your custody phrase is not needed.</p>}
-  <label>{importing?'App key encryption passphrase':'Encryption passphrase'}<input type="password" autoComplete={importing?'new-password':'current-password'} minLength={importing?12:undefined} value={password} onChange={e=>setPassword(e.target.value)} required placeholder={importing?'At least 12 characters':'Your local passphrase'}/></label><button className="button primary full" disabled={busy}>{busy?'Checking account…':importing?'Prepare registration':'Unlock app key'} <ArrowRight size={16}/></button></form>}
-  {error&&<div className="error" role="alert">{error}</div>}
-  {saved&&!pending&&<div className="account-alternatives"><button className="text-button" onClick={()=>{setImporting(!importing);setError('');}}>{importing?'Use saved app key':'Register a replacement key'}</button><button className="text-button danger" onClick={()=>{forgetAppKey();setSaved(null);setImporting(true);setPassword('');}}>Forget local app key</button><p className="small muted">Forgetting removes only the encrypted browser copy. To revoke access, remove the key onchain.</p><a className="small" href="https://optimistic.etherscan.io/address/0x00000000fc1237824fb747abde0ff18990e59b7e#writeContract" target="_blank" rel="noreferrer">Key Registry on Optimism <ExternalLink size={12}/></a></div>}
-  </Modal>;
+type Mode = 'signer' | 'seed' | 'unlock';
+
+export function Account({ config, onSession, onClose }: {
+  config: Config; onSession: (s: Session) => void; onClose: () => void;
+}) {
+  const [saved, setSaved] = useState(storedAccount);
+  const [mode, setMode] = useState<Mode>(saved ? 'unlock' : 'signer');
+  const [phrase, setPhrase] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
+  const [fid, setFid] = useState(saved ? String(saved.fid) : '');
+  const [password, setPassword] = useState('');
+  const [index, setIndex] = useState('0');
+  const [pending, setPending] = useState<PreparedKey | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => () => { pending?.discard(); }, [pending]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError('');
+    try { await action(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  function changeMode(next: Mode) {
+    setMode(next);
+    setError('');
+    setPhrase('');
+    setPrivateKey('');
+    setPassword('');
+  }
+
+  if (!localOrigin()) return (
+    <Modal title="Your account stays local" onClose={onClose}>
+      <div className="account-icon"><Lock size={26} /></div>
+      <p>Private signer keys and custody phrases can be imported only through a localhost client. This network view supports the guide and public reads.</p>
+      <Code>{'./freecast client'}</Code>
+      <p className="muted">Open http://127.0.0.1:5173 after starting the local client.</p>
+    </Modal>
+  );
+
+  return (
+    <Modal
+      title={pending ? 'Review app key registration' : mode === 'unlock' ? 'Unlock your app key' : 'Connect your account'}
+      onClose={() => { if (!busy) onClose(); }}
+    >
+      <div className="account-icon"><KeyRound size={26} /></div>
+      {pending ? <>
+        <p>One Optimism transaction will authorize this app key to sign Farcaster messages for your account.</p>
+        <dl className="registration-details">
+          <dt>FID</dt><dd>{pending.fid}</dd>
+          <dt>Custody address</dt><dd className="mono">{pending.address}</dd>
+          <dt>App public key</dt><dd className="mono">{pending.key}</dd>
+          <dt>Estimated execution gas</dt><dd>{pending.estimatedFee} ETH + L1 data fee</dd>
+        </dl>
+        <p className="small muted">The custody wallet must hold ETH on Optimism. The encrypted app key is saved before submission so you can recover it if confirmation is interrupted.</p>
+        <button className="button primary full" disabled={busy} onClick={() => run(async () => {
+          const session = await pending.register();
+          setPassword('');
+          onSession(session);
+          onClose();
+        })}>
+          {busy ? 'Waiting for transaction…' : 'Register app key'} <ArrowRight size={16} />
+        </button>
+      </> : <form onSubmit={e => {
+        e.preventDefault();
+        run(async () => {
+          if (mode === 'seed') {
+            const prepared = await prepareKey(config, phrase, password, Number(index));
+            setPhrase('');
+            setPending(prepared);
+            return;
+          }
+          const session = mode === 'signer'
+            ? await importExistingSigner(config, Number(fid), privateKey, password)
+            : await unlockSession(config, password);
+          setPrivateKey('');
+          setPassword('');
+          onSession(session);
+          onClose();
+        });
+      }}>
+        <label>Connection method
+          <select disabled={busy} value={mode} onChange={e => changeMode(e.target.value as Mode)}>
+            <option value="signer">Import existing signer</option>
+            <option value="seed">Register a new key with a custody phrase</option>
+            {saved && <option value="unlock">Unlock saved app key</option>}
+          </select>
+        </label>
+        {mode === 'signer' && <>
+          <p>Reuse an Ed25519 signer already registered to your account. This checks its public key, FID, and active storage before saving an encrypted local copy. No registration transaction is sent.</p>
+          <label>Account FID
+            <input disabled={busy} type="number" min={1} step={1} value={fid} onChange={e => setFid(e.target.value)} required placeholder="Your numeric FID" />
+          </label>
+          <label>Private signer key
+            <input disabled={busy} type="password" autoComplete="off" spellCheck={false} value={privateKey} onChange={e => setPrivateKey(e.target.value)} required placeholder="32-byte Ed25519 key, optionally starting with 0x" />
+          </label>
+          <p className="small muted">Use the delegated Farcaster signer, not an Ethereum wallet or payout-signing key. This version checks onchain registration; gasless-only signers are not supported yet.</p>
+        </>}
+        {mode === 'seed' && <>
+          <p>Use the seed phrase that controls an existing Farcaster FID with active storage. It stays in this browser's memory during setup.</p>
+          <label>Custody seed phrase
+            <textarea disabled={busy} autoComplete="off" spellCheck={false} value={phrase} onChange={e => setPhrase(e.target.value)} required rows={3} placeholder="Enter your 12 or 24 words" />
+          </label>
+          <label>Address derivation index
+            <input disabled={busy} type="number" min={0} max={100} value={index} onChange={e => setIndex(e.target.value)} required />
+          </label>
+        </>}
+        {mode === 'unlock' && <p>Unlock the encrypted app key for <strong>FID {saved?.fid}</strong>. Your custody phrase is not needed.</p>}
+        <label>{mode === 'unlock' ? 'Encryption passphrase' : 'App key encryption passphrase'}
+          <input disabled={busy} type="password" autoComplete={mode === 'unlock' ? 'current-password' : 'new-password'} minLength={mode === 'unlock' ? undefined : 12} value={password} onChange={e => setPassword(e.target.value)} required placeholder={mode === 'unlock' ? 'Your local passphrase' : 'At least 12 characters'} />
+        </label>
+        <button className="button primary full" disabled={busy}>
+          {busy ? 'Checking account…' : mode === 'seed' ? 'Prepare registration' : mode === 'signer' ? 'Verify and import signer' : 'Unlock app key'} <ArrowRight size={16} />
+        </button>
+      </form>}
+      {error && <div className="error" role="alert">{error}</div>}
+      {saved && !pending && <div className="account-alternatives">
+        <button disabled={busy} className="text-button danger" onClick={() => {
+          forgetAppKey();
+          setSaved(null);
+          changeMode('signer');
+        }}>Forget local app key</button>
+        <p className="small muted">Forgetting removes only the encrypted browser copy. To revoke access, remove the key onchain.</p>
+        <a className="small" href="https://optimistic.etherscan.io/address/0x00000000fc1237824fb747abde0ff18990e59b7e#writeContract" target="_blank" rel="noreferrer">Key Registry on Optimism <ExternalLink size={12} /></a>
+      </div>}
+    </Modal>
+  );
 }

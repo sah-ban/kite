@@ -70,6 +70,10 @@ To stop charges when finished, review a Terraform destroy plan before applying i
 
 ## Account import and app keys
 
+If you already have a registered delegated Farcaster signer, choose **Import existing signer**, enter its FID and 32-byte Ed25519 private key in the localhost client, and set an encryption passphrase. The client derives its public key, checks active Ed25519 registration in the Optimism Key Registry, reads the custody address, and checks active storage before saving an encrypted local copy. This sends only public read requests; it does not require the custody phrase, a new registration transaction, or ETH for gas. Gasless-only signer imports are not yet supported. An Ethereum wallet key or payout-signing key is a different key type.
+
+The **Register a new key with a custody phrase** option remains available for the contest's complete onboarding flow:
+
 An existing FID must have active storage. The imported phrase must derive its current custody address; a verified wallet or recovery address may be different. Default derivation is `m/44'/60'/0'/0/0`, with an adjustable final address index.
 
 1. Choose **Connect account** on localhost.
