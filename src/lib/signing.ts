@@ -5,8 +5,10 @@ import { optimism } from 'viem/chains';
 import { hub, localOrigin, type Config, type Cast } from './hub';
 import { saveAppKey, unlockAppKey } from './vault';
 
-export type Session = { fid: number; address: Hex; key: Hex; signer: NobleEd25519Signer };
-export type PreparedKey = { fid: number; address: Hex; key: Hex; estimatedFee: string; register: () => Promise<Session>; discard: () => void };
+export type LocalSession = { fid: number; address: Hex; key: Hex; signer: NobleEd25519Signer; remote?: false };
+export type RemoteSession = { fid: number; address: Hex; key: Hex; remote: true };
+export type Session = LocalSession | RemoteSession;
+export type PreparedKey = { fid: number; address: Hex; key: Hex; estimatedFee: string; register: () => Promise<LocalSession>; discard: () => void };
 function requireLocal() { if (!localOrigin()) throw new Error('Run Freecast on localhost to import or use an account.'); }
 const publicClient = (config: Config) => createPublicClient({ chain: optimism, transport: http(config.optimismRpcUrl) });
 function result<T>(r: { isErr: () => boolean; error?: unknown; value?: T }): T { if (r.isErr()) throw new Error(String(r.error)); return r.value!; }
@@ -21,7 +23,7 @@ async function checkRegisteredSigner(config: Config, fid: number, key: Hex) {
   }
 }
 
-export async function importExistingSigner(config: Config, fid: number, privateKey: string, password: string): Promise<Session> {
+export async function importExistingSigner(config: Config, fid: number, privateKey: string, password: string): Promise<LocalSession> {
   requireLocal();
   if (!Number.isSafeInteger(fid) || fid <= 0) throw new Error('Enter a positive numeric FID.');
   if (password.length < 12) throw new Error('Use a passphrase of at least 12 characters to encrypt your app key.');
@@ -77,7 +79,7 @@ export async function prepareKey(config: Config, phrase: string, password: strin
     return {fid,address:account.address,key,signer:new NobleEd25519Signer(privateKey.slice())};
   }};
 }
-export async function unlockSession(config: Config, password: string): Promise<Session> {
+export async function unlockSession(config: Config, password: string): Promise<LocalSession> {
   requireLocal();
   const saved = await unlockAppKey(password);
   const signer = new NobleEd25519Signer(saved.privateKey);
@@ -103,8 +105,13 @@ export async function submit(config: Config, message: Message): Promise<string> 
 export async function postCast(config: Config, session: Session, text: string, parent?: Cast): Promise<string> {
   const length = new TextEncoder().encode(text).length;
   if (!text.trim() || length > 1024) throw new Error('Write between 1 and 1,024 UTF-8 bytes.');
-  const message = result(await makeCastAdd({text,mentions:[],mentionsPositions:[],embeds:[],embedsDeprecated:[],type:length<=320?CastType.CAST:CastType.LONG_CAST,...(parent ? {parentCastId:{fid:parent.data.fid,hash:hexToBytes(parent.hash as Hex)}} : {})},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
-  const hash = await submit(config,message);
+  let hash: string;
+  if (session.remote) {
+    hash = await serverAction({kind:'cast',text,...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{})});
+  } else {
+    const message = result(await makeCastAdd({text,mentions:[],mentionsPositions:[],embeds:[],embedsDeprecated:[],type:length<=320?CastType.CAST:CastType.LONG_CAST,...(parent ? {parentCastId:{fid:parent.data.fid,hash:hexToBytes(parent.hash as Hex)}} : {})},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
+    hash = await submit(config,message);
+  }
   // Acceptance is not inclusion. Poll our read node and never claim success early.
   for (let i=0;i<12;i++) {
     await new Promise(r=>setTimeout(r,2500));
@@ -113,12 +120,20 @@ export async function postCast(config: Config, session: Session, text: string, p
   throw new Error(`Accepted by validator; inclusion is not confirmed yet. Check FID ${session.fid}, hash ${hash} before retrying.`);
 }
 export async function react(config: Config, session: Session, cast: Cast, kind: 'like'|'recast', remove = false) {
+  if (session.remote) return serverAction({kind:'reaction',reaction:kind,targetFid:cast.data.fid,targetHash:cast.hash,remove});
   const body = {type:kind==='like'?ReactionType.LIKE:ReactionType.RECAST,targetCastId:{fid:cast.data.fid,hash:hexToBytes(cast.hash as Hex)}};
   const message = result<Message>(await (remove?makeReactionRemove:makeReactionAdd)(body,{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
   return submit(config,message);
 }
 export async function follow(config: Config, session: Session, fid: number, remove = false) {
   if (fid === session.fid) throw new Error('You cannot follow yourself.');
+  if (session.remote) return serverAction({kind:'follow',targetFid:fid,remove});
   const message = result<Message>(await (remove?makeLinkRemove:makeLinkAdd)({type:'follow',targetFid:fid},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
   return submit(config,message);
+}
+async function serverAction(action: Record<string,unknown>): Promise<string> {
+  const response = await fetch('/api/auth/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action),signal:AbortSignal.timeout(30_000)});
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Account action failed.');
+  return body.hash;
 }

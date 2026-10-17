@@ -3,15 +3,16 @@ import { KeyRound, Lock, ArrowRight, ExternalLink } from 'lucide-react';
 import { type Config, localOrigin } from './lib/hub';
 import { importExistingSigner, prepareKey, unlockSession, type PreparedKey, type Session } from './lib/signing';
 import { storedAccount, forgetAppKey } from './lib/vault';
-import { Modal, Code } from './components';
+import { Modal } from './components';
+import { Approval } from './Approval';
 
-type Mode = 'signer' | 'seed' | 'unlock';
+type Mode = 'approve' | 'signer' | 'seed' | 'unlock';
 
 export function Account({ config, onSession, onClose }: {
   config: Config; onSession: (s: Session) => void; onClose: () => void;
 }) {
   const [saved, setSaved] = useState(storedAccount);
-  const [mode, setMode] = useState<Mode>(saved ? 'unlock' : 'signer');
+  const [mode, setMode] = useState<Mode>(saved ? 'unlock' : config.approvalConfigured ? 'approve' : 'signer');
   const [phrase, setPhrase] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [fid, setFid] = useState(saved ? String(saved.fid) : '');
@@ -40,11 +41,10 @@ export function Account({ config, onSession, onClose }: {
   }
 
   if (!localOrigin()) return (
-    <Modal title="Your account stays local" onClose={onClose}>
+    <Modal title="Connect with Farcaster" onClose={onClose}>
       <div className="account-icon"><Lock size={26} /></div>
-      <p>Private signer keys and custody phrases can be imported only through a localhost client. This network view supports the guide and public reads.</p>
-      <Code>{'./freecast client'}</Code>
-      <p className="muted">Open http://127.0.0.1:5173 after starting the local client.</p>
+      <Approval configured={Boolean(config.approvalConfigured)} onSession={onSession} onClose={onClose}/>
+      <p className="small muted">Private-key and custody-phrase import remain available only on localhost.</p>
     </Modal>
   );
 
@@ -71,7 +71,14 @@ export function Account({ config, onSession, onClose }: {
         })}>
           {busy ? 'Waiting for transaction…' : 'Register app key'} <ArrowRight size={16} />
         </button>
-      </> : <form onSubmit={e => {
+      </> : <><label>Connection method
+        <select disabled={busy} value={mode} onChange={e => changeMode(e.target.value as Mode)}>
+          <option value="approve">Approve a fresh signer in Farcaster</option>
+          <option value="signer">Import existing signer</option>
+          <option value="seed">Register a new key with a custody phrase</option>
+          {saved && <option value="unlock">Unlock saved app key</option>}
+        </select>
+      </label>{mode==='approve'?<Approval configured={Boolean(config.approvalConfigured)} onSession={onSession} onClose={onClose}/>:<form onSubmit={e => {
         e.preventDefault();
         run(async () => {
           if (mode === 'seed') {
@@ -89,13 +96,6 @@ export function Account({ config, onSession, onClose }: {
           onClose();
         });
       }}>
-        <label>Connection method
-          <select disabled={busy} value={mode} onChange={e => changeMode(e.target.value as Mode)}>
-            <option value="signer">Import existing signer</option>
-            <option value="seed">Register a new key with a custody phrase</option>
-            {saved && <option value="unlock">Unlock saved app key</option>}
-          </select>
-        </label>
         {mode === 'signer' && <>
           <p>Reuse an Ed25519 signer already registered to your account. This checks its public key, FID, and active storage before saving an encrypted local copy. No registration transaction is sent.</p>
           <label>Account FID
@@ -122,7 +122,7 @@ export function Account({ config, onSession, onClose }: {
         <button className="button primary full" disabled={busy}>
           {busy ? 'Checking account…' : mode === 'seed' ? 'Prepare registration' : mode === 'signer' ? 'Verify and import signer' : 'Unlock app key'} <ArrowRight size={16} />
         </button>
-      </form>}
+      </form>}</>}
       {error && <div className="error" role="alert">{error}</div>}
       {saved && !pending && <div className="account-alternatives">
         <button disabled={busy} className="text-button danger" onClick={() => {

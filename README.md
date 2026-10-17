@@ -70,6 +70,12 @@ To stop charges when finished, review a Terraform destroy plan before applying i
 
 ## Account import and app keys
 
+For a fresh delegated signer without entering the user's custody phrase, choose **Approve a fresh signer in Farcaster**. Configure the server-only `FARCASTER_APP_FID` and `FARCASTER_APP_MNEMONIC`, or set `FARCASTER_APP_ENV_FILE` to an explicitly selected app configuration containing `DEVELOPER_FID` and `DEVELOPER_MNEMONIC`. Only those identity fields are read from that file; its database and hub settings are not imported. Never use a `NEXT_PUBLIC_` or `VITE_` prefix for developer credentials.
+
+Freecast generates a fresh Ed25519 key, signs a request with the developer identity, and displays the Farcaster approval link and a locally rendered QR code. The account owner approves in Farcaster. The server checks onchain registration and active storage, then binds the connection to that browser with an HttpOnly, SameSite cookie. The delegated private key stays in server memory and is never returned to the browser. No cast, reaction, or follow is sent during approval. Later actions require explicit client interaction.
+
+Approval sessions require localhost or HTTPS. For an HTTPS reverse proxy, set `FREECAST_PUBLIC_URL` to its exact public origin; HTTPS session cookies are Secure. The public HTTP network preview remains read-only. Sessions expire after eight hours and do not survive server restarts. Signing out discards the server's signer copy but does not revoke its onchain registration; manage old keys in Farcaster. Pending approval requests expire after ten minutes. This optional flow depends on the Farcaster client approval API; the custody-phrase path below remains available for the contest's independent onboarding flow.
+
 If you already have a registered delegated Farcaster signer, choose **Import existing signer**, enter its FID and 32-byte Ed25519 private key in the localhost client, and set an encryption passphrase. The client derives its public key, checks active Ed25519 registration in the Optimism Key Registry, reads the custody address, and checks active storage before saving an encrypted local copy. This sends only public read requests; it does not require the custody phrase, a new registration transaction, or ETH for gas. Gasless-only signer imports are not yet supported. An Ethereum wallet key or payout-signing key is a different key type.
 
 The **Register a new key with a custody phrase** option remains available for the contest's complete onboarding flow:
@@ -86,7 +92,7 @@ The phrase and custody key stay in browser memory. Public contract calls and the
 
 The encrypted key is saved **before** broadcasting registration so an interrupted confirmation does not lose it. If the transaction failed, unlocking reports the unregistered key; register a replacement after checking the transaction. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes the onchain key. Revoke through the Key Registry from your custody wallet. Onchain app keys are not scoped like current gasless signers: they authorize broad Farcaster message signing until revoked.
 
-No analytics, remote scripts, or third-party account services are used. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
+No analytics or remote scripts are used. The optional QR approval flow uses Farcaster's signed-key-request API. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
 
 ## Reading and writing
 
