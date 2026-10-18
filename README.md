@@ -145,7 +145,7 @@ This is an implementation to test, not a claim of contest qualification. Complet
 
 ## Profiles and conversations
 
-Open an author's name or avatar to view their profile, biography, Posts/Replies tabs, and paginated follower/following lists. My profile opens the connected account. Click a cast to open its conversation; Replies, Likes, and Recasts tabs show direct replies and the accounts behind reactions. Opening a reply opens its own thread, and parent links let you move back up a conversation. These pages have shareable URLs and support browser back/forward navigation.
+Open an author's name or avatar to view their profile, biography, Posts/Replies tabs, and paginated follower/following lists at `/profile/FID/followers` and `/profile/FID/following`. These lists open as dedicated pages with shareable URLs. My profile opens the connected account. Click a cast to open its conversation; Replies, Likes, and Recasts tabs show direct replies and the accounts behind reactions. Opening a reply opens its own thread, and parent links let you move back up a conversation. These pages have shareable URLs and support browser back/forward navigation.
 
 Counts come from the read node's current retained messages. A `+` means additional pages remain; it is a lower bound, not a complete total. Load more to read the remaining pages. An unavailable count is shown as `—`, never zero. Offscreen cast counts are deferred, and count requests are cached briefly and limited to three concurrent requests. No third-party engagement index is used.
 

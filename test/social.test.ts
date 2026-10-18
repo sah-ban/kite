@@ -68,3 +68,10 @@ test('client routes support home, public profiles, and shareable cast activity t
   assert.deepEqual(clientRoute(`/cast/37/${hash}`,'?tab=likes'),{kind:'cast',fid:37,hash,tab:'likes'});
   assert.deepEqual(clientRoute('/profile/0'),{kind:'home'});assert.deepEqual(clientRoute('/cast/37/0xshort'),{kind:'home'});
 });
+
+test('profile connection routes preserve FID and list type without changing the following feed route',()=>{
+  assert.deepEqual(clientRoute('/profile/37/followers'),{kind:'connections',fid:37,tab:'followers'});
+  assert.deepEqual(clientRoute('/profile/37/following/'),{kind:'connections',fid:37,tab:'following'});
+  assert.deepEqual(clientRoute('/following'),{kind:'following'});
+  for(const path of ['/profile/0/followers','/profile/9007199254740992/following','/profile/37/unknown'])assert.deepEqual(clientRoute(path),{kind:'home'});
+});
