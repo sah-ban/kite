@@ -62,16 +62,16 @@ export async function following(config: Config, fid: number): Promise<number[]> 
   return [...fids];
 }
 export function fullHash(value: string): boolean { return /^0x[0-9a-fA-F]{40}$/.test(value); }
-export async function resolveCast(config: Config, fid: number, hash: string): Promise<Cast> {
+export async function resolveCast(config: Config, fid: number, hash: string, signal?: AbortSignal): Promise<Cast> {
   if (!Number.isSafeInteger(fid) || fid <= 0) throw new Error('Use a positive numeric FID.');
   if (!/^0x[0-9a-fA-F]{8,40}$/.test(hash)) throw new Error('Use a Farcaster cast hash beginning with 0x.');
-  if (fullHash(hash)) return hub(config, 'castById', { fid, hash });
+  if (fullHash(hash)) return hub(config, 'castById', { fid, hash }, signal);
   let token = '';
   do {
-    const page = await hub<{ messages: Cast[]; nextPageToken?: string }>(config, 'castsByFid', {fid,pageSize:1000,reverse:'true',...(token ? {pageToken:token} : {})});
+    const page = await hub<{ messages: Cast[]; nextPageToken?: string }>(config, 'castsByFid', {fid,pageSize:1000,reverse:'true',...(token ? {pageToken:token} : {})}, signal);
     const matches = page.messages.filter(c => c.hash.toLowerCase().startsWith(hash.toLowerCase()));
     if (matches.length > 1) throw new Error('This hash prefix is ambiguous. Use the full hash.');
-    if (matches[0]) return hub(config,'castById',{fid,hash:matches[0].hash});
+    if (matches[0]) return hub(config,'castById',{fid,hash:matches[0].hash}, signal);
     token = page.nextPageToken || '';
   } while (token);
   throw new Error('Cast not found for that FID and hash.');

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { Radio, UserRound, Server, ArrowUpRight, RefreshCw, SlidersHorizontal, Search, ArrowRight, Users, Lock, KeyRound, AlertCircle } from 'lucide-react';
-import { hub, profile, following, resolveCast, filterBySigner, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
+import { hub, profile, following, filterBySigner, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
 import { attribute } from './lib/attribution';
 import type { Session } from './lib/signing';
 const Account=lazy(()=>import('./Account').then(m=>({default:m.Account})));
@@ -8,7 +8,8 @@ const postCast=async(...args:Parameters<typeof import('./lib/signing')['postCast
 const deleteCast=async(...args:Parameters<typeof import('./lib/signing')['deleteCast']>)=>(await import('./lib/signing')).deleteCast(...args);
 const react=async(...args:Parameters<typeof import('./lib/signing')['react']>)=>(await import('./lib/signing')).react(...args);
 const follow=async(...args:Parameters<typeof import('./lib/signing')['follow']>)=>(await import('./lib/signing')).follow(...args);
-import { Modal, Code } from './components';
+import { Modal } from './components';
+import { FindCast } from './FindCast';
 import { FeedControls } from './FeedControls';
 import { CastCard, type CastHandlers } from './CastCard';
 import { CastDetail } from './CastDetail';
@@ -22,7 +23,7 @@ import { castPath, type ActivityTab } from './lib/social';
 
 function Avatar({p}:{p?:Profile}) {const [broken,setBroken]=useState(false);return <div className="avatar">{p?.avatar&&!broken?<img src={p.avatar} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)}/>:<span>{(p?.name||'F').slice(0,1).toUpperCase()}</span>}</div>;}
 export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
-  const [info,setInfo]=useState<NodeInfo|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false),[lookupOpen,setLookupOpen]=useState(false),[lookupFid,setLookupFid]=useState('37'),[lookupHash,setLookupHash]=useState('0x50184b62'),[lookupResult,setLookupResult]=useState<Cast|null>(null),[lookupBusy,setLookupBusy]=useState(false);
+  const [info,setInfo]=useState<NodeInfo|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false),[lookupOpen,setLookupOpen]=useState(false);
   const [fid,setFid]=useState(37),[homeFid,setHomeFid]=useState(37),[fidInput,setFidInput]=useState('37'),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
   const [draftMentions,setDraftMentions]=useState<DraftMention[]>([]),[replyMentions,setReplyMentions]=useState<DraftMention[]>([]);
   const [deletePending,setDeletePending]=useState<Cast|null>(null),[deleting,setDeleting]=useState(false);
@@ -145,6 +146,6 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys}} onClose={()=>setControls(false)} onApply={filters=>{setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setControls(false);}}/>}
-  {lookupOpen&&<Modal title="Find a cast" onClose={()=>setLookupOpen(false)}><p>Use the author's FID and a full hash or a short URL prefix. We'll resolve the full hash against your read node.</p><form onSubmit={async e=>{e.preventDefault();setLookupBusy(true);setError('');try{const c=await resolveCast(config,Number(lookupFid),lookupHash);setLookupResult(c);const p=await profile(config,c.data.fid);setProfiles(v=>({...v,[p.fid]:p}));}catch(e){setError((e as Error).message);}finally{setLookupBusy(false);}}}><label>Author FID<input type="number" min="1" value={lookupFid} onChange={e=>setLookupFid(e.target.value)} required/></label><label>Cast hash<input value={lookupHash} onChange={e=>setLookupHash(e.target.value)} placeholder="0x50184b62…" required/></label><button className="button primary full" disabled={lookupBusy}>{lookupBusy?'Resolving hash…':'Find cast'}<Search size={16}/></button></form>{error&&<div className="error" role="alert">{error}</div>}{lookupResult&&<><Code label="FULL CAST HASH">{lookupResult.hash}</Code>{renderCast(lookupResult)}</>}</Modal>}
+  {lookupOpen&&<FindCast config={config} onClose={()=>setLookupOpen(false)} renderCast={renderCast}/>}
   </main>;
 }
