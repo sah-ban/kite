@@ -19,7 +19,7 @@ test('gateway blocks unsupported read endpoints and writes on read path',async()
 test('conversation and follower reads are allowed only on the configured read node',async()=>{
   const original=globalThis.fetch;const calls:string[]=[];
   globalThis.fetch=async input=>{calls.push(String(input));return Response.json({messages:[]});};
-  try{for(const endpoint of ['castsByParent','reactionsByCast','linksByTargetFid']){
+  try{for(const endpoint of ['castsByParent','reactionsByCast','linksByTargetFid','userNameProofByName']){
     const {req,res}=await request(`/api/read/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);
     await gateway({NEXT_PUBLIC_HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);
     assert.equal(calls.at(-1),`https://mine.example/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);

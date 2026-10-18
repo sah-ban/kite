@@ -87,7 +87,11 @@ async function buildAction(session, action) {
   const options = {fid:session.fid,network:FarcasterNetwork.MAINNET};
   if (action.kind === 'cast') {
     const bytes = typeof action.text === 'string' ? Buffer.byteLength(action.text) : 0;
-    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or attach a quoted cast.');
+    const mentions=action.mentions??[],mentionsPositions=action.mentionsPositions??[];
+    if(!Array.isArray(mentions)||!Array.isArray(mentionsPositions)||mentions.length>10||mentions.length!==mentionsPositions.length||mentions.some(fid=>!Number.isSafeInteger(fid)||fid<=0)||mentionsPositions.some((position,index)=>!Number.isSafeInteger(position)||position<0||position>bytes||(index>0&&position<mentionsPositions[index-1])))throw new Failure(400,'Invalid mentions.');
+    const boundaries=new Set([0]);let offset=0;for(const character of typeof action.text==='string'?action.text:''){offset+=Buffer.byteLength(character);boundaries.add(offset);}
+    if(mentionsPositions.some(position=>!boundaries.has(position)))throw new Failure(400,'Invalid mention position.');
+    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add a mention or quoted cast.');
     const embeds=[];
     if(action.quote){
       if(!Number.isSafeInteger(action.quote.fid)||action.quote.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(action.quote.hash))throw new Failure(400,'Invalid quoted cast.');
@@ -98,7 +102,7 @@ async function buildAction(session, action) {
       if (!Number.isSafeInteger(action.parent.fid) || action.parent.fid <= 0 || !/^0x[0-9a-fA-F]{40}$/.test(action.parent.hash)) throw new Failure(400, 'Invalid reply target.');
       parentCastId = {fid:action.parent.fid,hash:hexToBytes(action.parent.hash)};
     }
-    return unwrap(await makeCastAdd({text:action.text,mentions:[],mentionsPositions:[],embeds,embedsDeprecated:[],type:bytes<=320?CastType.CAST:CastType.LONG_CAST,parentCastId},options,signer));
+    return unwrap(await makeCastAdd({text:action.text,mentions,mentionsPositions,embeds,embedsDeprecated:[],type:bytes<=320?CastType.CAST:CastType.LONG_CAST,parentCastId},options,signer));
   }
   if (action.kind === 'deleteCast') {
     if(action.targetFid!==session.fid)throw new Failure(403,'You can only delete your own casts.');

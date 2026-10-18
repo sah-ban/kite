@@ -181,3 +181,20 @@ test('quotes encode a cast embed, allow optional commentary, and reject invalid 
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:''}})).status,400);
   assert.equal(h.submitted.length,2);
 });
+
+test('mentions are signed as FIDs and UTF-8 positions for casts, replies, and quotes',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);
+  h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const target={fid:37,hash:'0x'+'ab'.repeat(20)};
+  for(const context of [{},{parent:target},{quote:target}]){
+    assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'🤓  hi',mentions:[37],mentionsPositions:[5],...context}})).status,200);
+    const message=h.submitted.at(-1)!,data=MessageData.decode(message.dataBytes!);
+    assert.deepEqual(data.castAddBody?.mentions,[37]);assert.deepEqual(data.castAddBody?.mentionsPositions,[5]);
+    assert.ok((await validations.validateMessage({...message,data})).isOk());
+  }
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',mentions:[37],mentionsPositions:[0]}})).status,200);
+  for(const fields of [{mentions:[37],mentionsPositions:[]},{mentions:[0],mentionsPositions:[0]},{mentions:[37],mentionsPositions:[1]},{mentions:[37],mentionsPositions:[999]}]){
+    assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'🤓 hi',...fields}})).status,400);
+  }
+  assert.equal(h.submitted.length,4);
+});

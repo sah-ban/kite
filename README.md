@@ -160,3 +160,7 @@ Link cards use Open Graph/Twitter metadata fetched by the server through `/api/e
 The Node server can terminate TLS directly. Set `FREECAST_TLS_CERT` and `FREECAST_TLS_KEY` to local PEM files, `FREECAST_PUBLIC_URL` to the exact HTTPS origin (including a nonstandard port), `FREECAST_HOST=0.0.0.0`, and `PORT` to a free port. Run `npm run build` followed by `npm start` using Node 22.13 or newer. Certificates, private keys, and account credentials belong in ignored local configuration; `.freecast/` is ignored for runtime files.
 
 A self-signed test certificate produces a browser warning that must be accepted before opening the client. Use a trusted certificate for normal deployment. The HTTPS approval flow sets Secure cookies; direct HTTPS writes enforce the configured origin. Public HTTP previews remain available for reading.
+
+## Mentioning accounts
+
+Type `@` in the cast, reply, or quote composer and select an account. Suggestions include loaded profiles; enter a full username (including an ENS username such as `dwr.eth`) to look up another account. Use the arrow keys and Enter, or click a suggestion. Selected mentions are published as Farcaster FIDs, with correct positions even after emoji. Editing a selected username clears its old identity so it must be selected again. A cast supports up to ten mentions.
