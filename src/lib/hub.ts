@@ -48,7 +48,7 @@ export async function hub<T>(config: Config, endpoint: string, params: Record<st
   if (!response.ok) throw new HubError(response.status, await response.text());
   const result = await response.json();
   // castsByFid can contain CAST_REMOVE tombstones as well as visible casts.
-  if (['castsByFid','castsByParent'].includes(endpoint) && Array.isArray(result.messages)) result.messages=onlyCastAdds(result.messages);
+  if (['castsByFid','castsByParent','castsByMention'].includes(endpoint) && Array.isArray(result.messages)) result.messages=onlyCastAdds(result.messages);
   return result;
 }
 const profiles = new Map<number, Promise<Profile>>();
