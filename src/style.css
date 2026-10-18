@@ -138,3 +138,5 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 .cast-text .cast-permalink,.quote-text .cast-permalink{display:inline;color:inherit}.cast-mention{color:var(--link);font-weight:600;overflow-wrap:anywhere}.cast-mention:hover{text-decoration:underline}.cast-mention:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 /* A conversation uses the avatar column only for its author row. */
 .cast-expanded{display:grid;grid-template-columns:35px minmax(0,1fr);column-gap:12px;row-gap:0}.cast-expanded>.cast-main{display:contents}.cast-expanded>.cast-main>.cast-header{grid-column:2;min-height:35px}.cast-expanded>.cast-main>:not(.cast-header){grid-column:1/-1;min-width:0}
+
+.published-cast-link{display:inline-block;margin-left:12px;color:var(--link);font-weight:600;text-decoration:underline;text-underline-offset:3px}
