@@ -107,3 +107,8 @@ test('missing follow links are false while node failures and cancellation remain
     await assert.rejects(followsAccount(config,37,4242,controller.signal),{name:'AbortError'});
   }finally{globalThis.fetch=original;}
 });
+
+test('settings has a direct route and supports trailing slashes',()=>{
+  assert.deepEqual(clientRoute('/settings'),{kind:'settings'});
+  assert.deepEqual(clientRoute('/settings/'),{kind:'settings'});
+});
