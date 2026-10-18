@@ -23,6 +23,6 @@ export function ClientLabel({config, fid, signer, onProfile}: {config: Config; f
     ? `Registered signer requester: ${client.username ? `@${client.username}, ` : ''}FID ${client.fid}. This identifies the key requester, which may differ from the app brand.\nSigner: ${signer}`
     : `Signer: ${signer}`;
   return client.fid
-    ? <a className="signer" href={`/profile/${client.fid}`} onClick={event=>{event.preventDefault();onProfile(client.fid!);}} title={title}><span className="client-prefix-long">casted from </span><span className="client-prefix-short">via </span>{client.username?`@${client.username}`:`Client FID ${client.fid}`}</a>
+    ? <a className="signer" href={`/profile/${client.fid}`} onClick={event=>{event.preventDefault();onProfile(client.fid!);}} title={title}><span className="client-prefix-long">casted from </span><span className="client-prefix-short">via </span><span className="client-username">{client.username?`@${client.username}`:`Client FID ${client.fid}`}</span></a>
     : <span className="signer" title={title}>{label}</span>;
 }
