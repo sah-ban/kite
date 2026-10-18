@@ -1,15 +1,16 @@
-import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_GATEWAY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, ViemLocalEip712Signer, idRegistryABI, keyGatewayABI, keyRegistryABI, makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
-import { createPublicClient, createWalletClient, http, bytesToHex, hexToBytes, formatEther, type Hex } from 'viem';
+import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, idRegistryABI, keyRegistryABI, makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
+import { createPublicClient, http, bytesToHex, hexToBytes, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
 import { hub, localOrigin, type Config, type Cast } from './hub';
 import { encodeMentionText, type DraftMention } from './mentions';
 import { saveAppKey, unlockAppKey } from './vault';
+import { buildGaslessKey, checkGaslessSigner, gaslessState, GASLESS_TTL } from './gasless';
 
 export type LocalSession = { fid: number; address: Hex; key: Hex; signer: NobleEd25519Signer; remote?: false };
 export type RemoteSession = { fid: number; address: Hex; key: Hex; remote: true };
 export type Session = LocalSession | RemoteSession;
-export type PreparedKey = { fid: number; address: Hex; key: Hex; estimatedFee: string; register: () => Promise<LocalSession>; discard: () => void };
+export type PreparedKey = { fid: number; address: Hex; key: Hex; ttlSeconds: number; register: () => Promise<LocalSession>; discard: () => void };
 function requireLocal() { if (!localOrigin()) throw new Error('Run Freecast on localhost to import or use an account.'); }
 const publicClient = (config: Config) => createPublicClient({ chain: optimism, transport: http(config.optimismRpcUrl) });
 function result<T>(r: { isErr: () => boolean; error?: unknown; value?: T }): T { if (r.isErr()) throw new Error(String(r.error)); return r.value!; }
@@ -52,41 +53,62 @@ export async function importExistingSigner(config: Config, fid: number, privateK
 
 export async function prepareKey(config: Config, phrase: string, password: string, accountIndex: number): Promise<PreparedKey> {
   requireLocal();
+  if (password.length < 12) throw new Error('Use a passphrase of at least 12 characters to encrypt your app key.');
+  if (!config.validatorUrl) throw new Error('Set VALIDATOR_URL to a node accepting writes and restart before registering a gasless app key.');
   if (!Number.isSafeInteger(accountIndex) || accountIndex < 0 || accountIndex > 100) throw new Error('Account index must be between 0 and 100.');
   const account = mnemonicToAccount(phrase.trim().toLowerCase().replace(/\s+/g,' '), { addressIndex: accountIndex });
-  const client = publicClient(config);
-  const fid = Number(await client.readContract({address:ID_REGISTRY_ADDRESS,abi:idRegistryABI,functionName:'idOf',args:[account.address]}));
-  if (!fid) throw new Error(`No FID is owned by ${account.address}. Check the custody phrase and derivation index.`);
-  const storage = await hub<{ units?: number; unitDetails?: {unitSize: number}[] }>(config,'storageLimitsByFid',{fid});
+  const address = account.address;
+  const fid = Number(await publicClient(config).readContract({address:ID_REGISTRY_ADDRESS,abi:idRegistryABI,functionName:'idOf',args:[address]}));
+  if (!Number.isSafeInteger(fid) || fid <= 0) throw new Error(`No FID is owned by ${address}. Check the custody phrase and derivation index.`);
+  const storage = await hub<{ units?: number }>(config,'storageLimitsByFid',{fid});
   if (!(Number(storage.units) > 0)) throw new Error('This account has no active storage. Rent storage before registering an app key.');
+  const state = await gaslessState(config,fid);
+  if (!Number.isSafeInteger(state.gaslessSignerCount) || !Number.isSafeInteger(state.gaslessSignerLimit) || state.gaslessSignerLimit<=0) throw new Error('This node does not report its gasless signer capacity.');
+  if (state.gaslessSignerCount >= state.gaslessSignerLimit) throw new Error('This account has reached its gasless signer limit. Revoke an unused gasless key first.');
+  if (state.currentUserNonce >= 0xffffffff) throw new Error('This account has exhausted its gasless authorization nonce.');
   const privateKey = crypto.getRandomValues(new Uint8Array(32));
-  const signer = new NobleEd25519Signer(privateKey);
-  const key = bytesToHex(result(await signer.getSignerKey()));
-  const metadata = bytesToHex(result(await new ViemLocalEip712Signer(account).getSignedKeyRequestMetadata({requestFid:BigInt(fid),key:hexToBytes(key),deadline:BigInt(Math.floor(Date.now()/1000)+3600)})));
-  const args = [1,key,1,metadata] as const;
-  await client.simulateContract({address:KEY_GATEWAY_ADDRESS,abi:keyGatewayABI,functionName:'add',args,account});
-  const gas = await client.estimateContractGas({address:KEY_GATEWAY_ADDRESS,abi:keyGatewayABI,functionName:'add',args,account});
-  const gasPrice = await client.getGasPrice();
-  let used = false;
-  return { fid,address:account.address,key,estimatedFee:formatEther(gas*gasPrice),discard:()=>{used=true;privateKey.fill(0);},register:async()=>{
-    if (used) throw new Error('Prepare a fresh registration.');
-    // Save the encrypted signer before sending the transaction, so an interrupted confirmation does not lose it.
-    await saveAppKey(password,privateKey,{fid,address:account.address,key});
-    const wallet = createWalletClient({account,chain:optimism,transport:http(config.optimismRpcUrl)});
-    const hash = await wallet.writeContract({address:KEY_GATEWAY_ADDRESS,abi:keyGatewayABI,functionName:'add',args});
-    const receipt = await client.waitForTransactionReceipt({hash});
-    if (receipt.status !== 'success') throw new Error(`Registration reverted: ${hash}`);
-    used = true;
-    return {fid,address:account.address,key,signer:new NobleEd25519Signer(privateKey.slice())};
-  }};
+  try {
+    const {message,key,deadline} = await buildGaslessKey(account,fid,privateKey,state.currentUserNonce+1);
+    let used=false,registering=false;
+    return {fid,address,key,ttlSeconds:GASLESS_TTL,discard:()=>{used=true;privateKey.fill(0);},register:async()=>{
+      requireLocal();
+      if (used) throw new Error('Prepare a fresh registration.');
+      if (registering) throw new Error('Registration is already in progress.');
+      if (Date.now()/1000 >= deadline+1609459200) throw new Error('This authorization expired. Prepare a fresh registration.');
+      registering=true;
+      try {
+        // Persist before submission, so an interrupted confirmation is recoverable.
+        await saveAppKey(password,privateKey,{fid,address,key,registration:'gasless'});
+        if (used) throw new Error('Registration was cancelled. Prepare a fresh registration.');
+        if (!(await checkGaslessSigner(config,fid,key))) await submit(config,message);
+        for (let i=0;i<12;i++) {
+          if (used) throw new Error('Registration was cancelled.');
+          try {
+            if (await checkGaslessSigner(config,fid,key)) {
+              const session={fid,address,key,signer:new NobleEd25519Signer(privateKey.slice())};
+              used=true;privateKey.fill(0);return session;
+            }
+          }catch{/* Acceptance is not inclusion; wait for the read node. */}
+          if(i<11)await new Promise(resolve=>setTimeout(resolve,1500));
+        }
+        throw new Error('Gasless registration submitted, but inclusion is not confirmed yet. Your encrypted key is saved; try Unlock saved app key after your read node catches up.');
+      }finally{registering=false;}
+    }};
+  }catch(error){privateKey.fill(0);throw error;}
 }
 export async function unlockSession(config: Config, password: string): Promise<LocalSession> {
   requireLocal();
   const saved = await unlockAppKey(password);
-  const signer = new NobleEd25519Signer(saved.privateKey);
-  if (bytesToHex(result(await signer.getSignerKey())).toLowerCase() !== saved.key.toLowerCase()) throw new Error('Saved key does not match its public key.');
-  await checkRegisteredSigner(config, saved.fid, saved.key);
-  return {fid:saved.fid,address:saved.address,key:saved.key,signer};
+  try {
+    const signer = new NobleEd25519Signer(saved.privateKey.slice());
+    if (bytesToHex(result(await signer.getSignerKey())).toLowerCase() !== saved.key.toLowerCase()) throw new Error('Saved key does not match its public key.');
+    if (saved.registration === 'gasless') {
+      if (!(await checkGaslessSigner(config,saved.fid,saved.key))) throw new Error('This gasless app key is missing, expired, revoked, or lacks the required permissions. Wait for registration to sync or register a replacement.');
+      const storage=await hub<{units?:number}>(config,'storageLimitsByFid',{fid:saved.fid});
+      if (!(Number(storage.units)>0)) throw new Error('This account has no active storage.');
+    } else await checkRegisteredSigner(config, saved.fid, saved.key);
+    return {fid:saved.fid,address:saved.address,key:saved.key,signer};
+  }finally{saved.privateKey.fill(0);}
 }
 export function encodeForSnapchain(message: Message): Uint8Array {
   if (!message.dataBytes?.length) {

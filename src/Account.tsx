@@ -55,21 +55,23 @@ export function Account({ config, onSession, onClose }: {
     >
       <div className="account-icon"><KeyRound size={26} /></div>
       {pending ? <>
-        <p>One Optimism transaction will authorize this app key to sign Farcaster messages for your account.</p>
+        <p>Authorize this app key with a gasless signature. Registration is submitted to your configured node; no Optimism transaction or ETH is required.</p>
         <dl className="registration-details">
           <dt>FID</dt><dd>{pending.fid}</dd>
           <dt>Custody address</dt><dd className="mono">{pending.address}</dd>
           <dt>App public key</dt><dd className="mono">{pending.key}</dd>
-          <dt>Estimated execution gas</dt><dd>{pending.estimatedFee} ETH + L1 data fee</dd>
+          <dt>Registration fee</dt><dd>No gas required</dd>
+          <dt>Key expiry</dt><dd>{pending.ttlSeconds / 86400} days of inactivity</dd>
+          <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow and unfollow</dd>
         </dl>
-        <p className="small muted">The custody wallet must hold ETH on Optimism. The encrypted app key is saved before submission so you can recover it if confirmation is interrupted.</p>
+        <p className="small muted">The encrypted app key is saved before submission so you can unlock it if confirmation is interrupted. Active use refreshes its expiry.</p>
         <button className="button primary full" disabled={busy} onClick={() => run(async () => {
           const session = await pending.register();
           setPassword('');
           onSession(session);
           onClose();
         })}>
-          {busy ? 'Waiting for transaction…' : 'Register app key'} <ArrowRight size={16} />
+          {busy ? 'Confirming registration…' : 'Register app key (gasless)'} <ArrowRight size={16} />
         </button>
       </> : <><label>Connection method
         <select disabled={busy} value={mode} onChange={e => changeMode(e.target.value as Mode)}>
@@ -130,8 +132,8 @@ export function Account({ config, onSession, onClose }: {
           setSaved(null);
           changeMode('signer');
         }}>Forget local app key</button>
-        <p className="small muted">Forgetting removes only the encrypted browser copy. To revoke access, remove the key onchain.</p>
-        <a className="small" href="https://optimistic.etherscan.io/address/0x00000000fc1237824fb747abde0ff18990e59b7e#writeContract" target="_blank" rel="noreferrer">Key Registry on Optimism <ExternalLink size={12} /></a>
+        <p className="small muted">Forgetting removes only the encrypted browser copy.{saved.registration==='gasless'?' It does not revoke the gasless key.':' To revoke access, remove the key onchain.'}</p>
+        <a className="small" href={saved.registration==='gasless'?'https://snapchain.farcaster.xyz/guides/writing-messages':'https://optimistic.etherscan.io/address/0x00000000fc1237824fb747abde0ff18990e59b7e#writeContract'} target="_blank" rel="noreferrer">{saved.registration==='gasless'?'Gasless signer documentation':'Key Registry on Optimism'} <ExternalLink size={12} /></a>
       </div>}
     </Modal>
   );

@@ -84,13 +84,15 @@ An existing FID must have active storage. The imported phrase must derive its cu
 
 1. Choose **Connect account** on localhost.
 2. Enter the custody seed phrase and an app-key encryption passphrase of at least 12 characters.
-3. Review the derived address, FID, Ed25519 public key, and estimated execution gas.
-4. Choose **Register app key** to sign and broadcast one `KeyGateway.add` transaction on Optimism. The custody wallet needs ETH for gas. The displayed execution estimate does not include all L1 data fees.
-5. Wait for confirmation and for the validator to observe the signer, then publish.
+3. Review the derived address, FID, Ed25519 public key, permissions, and 30-day inactivity expiry.
+4. Choose **Register app key (gasless)**. The browser submits a custody-authorized `KEY_ADD` message to the configured write node. Signer registration requires no ETH or Optimism transaction.
+5. Wait for the key to appear in the read node's unified signer list, then publish.
 
-The phrase and custody key stay in browser memory. Public contract calls and the signed Ethereum transaction go to the configured Optimism RPC. Only the Ed25519 app key is persisted, encrypted with AES-256-GCM, PBKDF2-SHA256 (310,000 iterations), a random salt, and a random IV. Account metadata is authenticated as additional data. The encryption passphrase is not persisted.
+The account must already exist and have active storage; gasless signer registration does not create an FID or buy storage. This key can publish/delete casts, add/remove likes and recasts, and follow/unfollow accounts. It cannot create other keys or change custody. Its 30-day sliding expiry refreshes when it signs merged messages. The node must support gasless signers and report its current user nonce and capacity through `signersByFid`.
 
-The encrypted key is saved **before** broadcasting registration so an interrupted confirmation does not lose it. If the transaction failed, unlocking reports the unregistered key; register a replacement after checking the transaction. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes the onchain key. Revoke through the Key Registry from your custody wallet. Onchain app keys are not scoped like current gasless signers: they authorize broad Farcaster message signing until revoked.
+The phrase and custody key stay in browser memory. Public custody lookup calls go to the configured Optimism RPC; the node receives signed Farcaster authorization, never the phrase or custody private key. Only the Ed25519 app key is persisted, encrypted with AES-256-GCM and PBKDF2-SHA256 (310,000 iterations). The registration type is authenticated with the other account metadata. The encryption passphrase is not persisted.
+
+The encrypted key is saved **before** submission. If confirmation is interrupted, select **Unlock saved app key** after the read node catches up; unlocking checks that the gasless key is still active, unexpired, and has the required scopes. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes authorization. Gasless revocation uses a `KEY_REMOVE` message, not the Optimism Key Registry; see the [official signer documentation](https://snapchain.farcaster.xyz/guides/writing-messages).
 
 No analytics are added. The optional QR approval flow uses Farcaster's signed-key-request API. Images and videos load from their original hosts; YouTube and Vimeo players load only after Play. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
 
@@ -120,7 +122,7 @@ npm start
 
 `npm start` serves `dist` and the same local gateway on loopback. Tests cover signed protobuf round-trips, signature rejection after tampering, paginated full-hash resolution, attribution metadata, encryption and wrong-password/tampering failures, and enforced read/write routing. They do not send casts, spend gas, or create infrastructure.
 
-`@farcaster/core` is pinned to 0.15.3, the release recommended by npm audit that avoids the vulnerable fixture dependency in later releases. The client uses its stable onchain signer and message APIs with explicit Snapchain `dataBytes` encoding. This version publishes casts up to 1,024 UTF-8 bytes and reads longer casts returned as JSON. The tutorial and client are separate chunks. Gasless signers and 10K-cast publishing require a newer SDK integration.
+`@farcaster/core` is pinned to 0.15.3, the release recommended by npm audit that avoids the vulnerable fixture dependency in later releases. The client uses its stable onchain signer and message APIs with explicit Snapchain `dataBytes` encoding. This version publishes casts up to 1,024 UTF-8 bytes and reads longer casts returned as JSON. The tutorial and client are separate chunks. Custody-phrase registration uses an isolated `@farcaster/core-gasless` alias pinned to official core 0.20.0; the existing QR approval and onchain signer paths retain core 0.15.3. The gasless SDK bundles legacy Faker fixture initialization, so a small loader bridges those removed APIs to patched Faker 10.6.0. 10K-cast publishing remains unsupported.
 
 ## Before entering the contest
 
