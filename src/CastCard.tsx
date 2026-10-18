@@ -6,6 +6,7 @@ import { ClientLabel } from './ClientLabel';
 import { Avatar, useProfile } from './social-ui';
 import { QuotedCast } from './QuotedCast';
 import { CastEmbeds } from './CastEmbeds';
+import { CastText } from './CastText';
 
 export type CastHandlers = {
   onProfile:(fid:number)=>void;
@@ -28,15 +29,14 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   const liked=Boolean(sessionFid&&activity?.likes?.items.some(m=>m.data.fid===sessionFid));
   const recast=Boolean(sessionFid&&activity?.recasts?.items.some(m=>m.data.fid===sessionFid));
   const count=(tab:ActivityTab)=>activity?countLabel(activity[tab]):'…';
-  const characters=Array.from(cast.data.castAddBody.text),truncated=!detailed&&characters.length>600;
   return <article ref={root} className={`cast${detailed?' cast-expanded':''}`}>
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
       <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></a><a aria-label="Open cast on Farcaster" href={`https://farcaster.xyz/${person?.username||cast.data.fid}/${cast.hash}`} target="_blank" rel="noreferrer"><ArrowUpRight size={15}/></a></div>
       {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
-      {detailed?<p className="cast-text">{cast.data.castAddBody.text}</p>:<a className="cast-text cast-permalink" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}>{truncated?characters.slice(0,600).join('').trimEnd()+'…':cast.data.castAddBody.text}{truncated&&<span className="read-full">Read full cast →</span>}</a>}
+      <CastText config={config} cast={cast} visible={visible} onProfile={handlers.onProfile} onOpen={detailed?undefined:handlers.onOpen} limit={detailed?undefined:600}/>
       <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>
-      {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen}/>)}
+      {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen} onProfile={handlers.onProfile}/>)}
       {detailed&&<div className="cast-timestamp">{castDate(cast.data.timestamp).toLocaleString()}</div>}
       <div className="cast-actions">
         <button title="View replies" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}><MessageCircle size={17}/><span>{count('replies')}</span></button>
