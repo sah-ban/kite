@@ -18,6 +18,7 @@ import { MentionComposer } from './MentionComposer';
 import type { DraftMention } from './lib/mentions';
 import { ConnectionsPage } from './ConnectionsPage';
 import { ProfileHeader } from './ProfileHeader';
+import { readLikedCasts } from './lib/profile-likes';
 import { clientRoute } from './lib/routes';
 import { castPath, type ActivityTab } from './lib/social';
 
@@ -39,8 +40,9 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   useEffect(()=>{const pop=()=>setView(clientRoute(location.pathname,location.search));window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
   useEffect(()=>{if(view.kind==='profile'){setFid(view.fid);}},[view]);
   const [order,setOrder]=useState<'newest'|'oldest'>('newest');
-  const [profileCastType,setCastType]=useState<'posts'|'replies'>('posts');
+  const [profileCastType,setCastType]=useState<'posts'|'replies'|'likes'>('posts');
   const castType=feed==='profile'?profileCastType:'posts';
+  const likesView=castType==='likes';
   const autoPages=useRef(0);
   const profileOrder=feed==='profile'?order:'newest';
   const requestId=useRef(0), reading=useRef(false), replyComposer=useRef<HTMLTextAreaElement>(null);
@@ -67,26 +69,26 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
       setCasts(successes.flatMap(r=>r.value.messages).sort((a,b)=>b.data.timestamp-a.data.timestamp));setFollowPage(12);setHasMore(fids.length>12);
       if(successes.length<results.length)setError('Some profile requests failed. Refresh to retry missing authors.');
     } else {
-      const page=await hub<{messages:Cast[];nextPageToken?:string}>(config,'castsByFid',{fid,pageSize:30,reverse:String(profileOrder==='newest')});if(id!==requestId.current)return;
+      const page=likesView?await readLikedCasts(config,fid,profileOrder):await hub<{messages:Cast[];nextPageToken?:string}>(config,'castsByFid',{fid,pageSize:30,reverse:String(profileOrder==='newest')});if(id!==requestId.current)return;
       setCasts(page.messages);setPageToken(page.nextPageToken||'');setHasMore(!!page.nextPageToken);
     }
-  })().catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current){reading.current=false;setBusy(false);}});return()=>{requestId.current++;};},[fid,feed,feedFid,config,refresh,profileOrder,view.kind]);
+  })().catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current){reading.current=false;setBusy(false);}});return()=>{requestId.current++;};},[fid,feed,feedFid,config,refresh,profileOrder,view.kind,likesView]);
   useEffect(()=>{const fids=[...new Set([fid,feedFid,...casts.map(c=>c.data.fid)])];let active=true;(async()=>{for(let i=0;i<fids.length;i+=5)await Promise.all(fids.slice(i,i+5).map(async f=>{try{const p=await profile(config,f);if(active)setProfiles(v=>({...v,[f]:p}));}catch{/* FID remains usable without profile data */}}));})();return()=>{active=false;};},[casts,fid,feedFid,config]);
   useEffect(()=>{if(mode==='all'||!clientFids.trim()){setAttributing(false);return;}let active=true;setAttributing(true);attribute(config,casts).then(map=>{if(active)setAttribution(map);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setAttributing(false);});return()=>{active=false;};},[casts,mode,clientFids,config]);
   const keys=signerKeys.split(/[\s,]+/).filter(Boolean), appFids=clientFids.split(/[\s,]+/).filter(Boolean).map(Number);
   const matchingKeys=[...new Set([...keys,...[...attribution].filter(([,requestFid])=>appFids.includes(requestFid)).map(([key])=>key)])];
-  const typedCasts=casts.filter(c=>Boolean(c.data.castAddBody.parentCastId)===(castType==='replies'));
-  let filtered=filterBySigner([...typedCasts].sort((a,b)=>(order==='newest'?-1:1)*(a.data.timestamp-b.data.timestamp)||a.hash.localeCompare(b.hash)),matchingKeys,mode);
+  const typedCasts=likesView?casts:casts.filter(c=>Boolean(c.data.castAddBody.parentCastId)===(castType==='replies'));
+  let filtered=filterBySigner(likesView?typedCasts:[...typedCasts].sort((a,b)=>(order==='newest'?-1:1)*(a.data.timestamp-b.data.timestamp)||a.hash.localeCompare(b.hash)),matchingKeys,mode);
   if(mode==='include'&&(keys.length||appFids.length)&&!matchingKeys.length)filtered=[];
   useEffect(()=>{
     if(view.kind==='cast'||view.kind==='connections'||reading.current||busy||error||attributing||!hasMore||filtered.length||autoPages.current>=3)return;
     autoPages.current++;
     void loadMore(true);
   },[busy,error,attributing,hasMore,filtered.length,casts,castType,view.kind]);
-  function selectCastType(next:'posts'|'replies'){autoPages.current=0;setCastType(next);}
+  function selectCastType(next:'posts'|'replies'|'likes'){autoPages.current=0;setCastType(next);}
   async function loadMore(automatic=false){if(reading.current)return;reading.current=true;if(!automatic)autoPages.current=0;const id=requestId.current;setBusy(true);setError('');try{
     if(feed==='profile'){
-      const page=await hub<{messages:Cast[];nextPageToken?:string}>(config,'castsByFid',{fid,pageSize:30,reverse:String(profileOrder==='newest'),pageToken});if(id!==requestId.current)return;setCasts(v=>[...v,...page.messages.filter(c=>!v.some(old=>old.hash===c.hash))]);setPageToken(page.nextPageToken||'');setHasMore(!!page.nextPageToken);
+      const page=likesView?await readLikedCasts(config,fid,profileOrder,pageToken):await hub<{messages:Cast[];nextPageToken?:string}>(config,'castsByFid',{fid,pageSize:30,reverse:String(profileOrder==='newest'),pageToken});if(id!==requestId.current)return;setCasts(v=>[...v,...page.messages.filter(c=>!v.some(old=>old.hash===c.hash))]);setPageToken(page.nextPageToken||'');setHasMore(!!page.nextPageToken);
     }else{
       const batch=followFids.slice(followPage,followPage+12);const pages=await Promise.all(batch.map(f=>hub<{messages:Cast[]}>(config,'castsByFid',{fid:f,pageSize:15,reverse:'true'})));if(id!==requestId.current)return;setCasts(v=>[...v,...pages.flatMap(p=>p.messages)].sort((a,b)=>b.data.timestamp-a.data.timestamp));setFollowPage(v=>v+12);setHasMore(followPage+12<followFids.length);
     }
@@ -107,20 +109,22 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {view.kind==='profile'&&<ProfileHeader key={fid} config={config} fid={fid} viewerFid={session?.fid} onConnections={kind=>navigate(`/profile/${fid}/${kind}`)} onFollow={toggleFollow} followed={followed.has(fid)} busy={Boolean(actionBusy)} ownProfile={session?.fid===fid} revision={refresh}/>}
   {(view.kind!=='profile'||session?.fid===fid)&&<div className="composer"><Avatar p={session?profiles[session.fid]:undefined}/><div><MentionComposer config={config} value={text} mentions={draftMentions} candidates={Object.values(profiles)} onChange={(value,mentions)=>{setText(value);setDraftMentions(mentions);}} placeholder={session?'What would you like to put into the world?':'Your next cast starts here.'} label="Cast text" rows={3}/><div className="composer-bottom"><span>{session?<><span className="live-dot"/> Signing as FID {session.fid}</>:<><Lock size={12}/> Connect your account to publish</>}</span><button className="button primary small-button" disabled={publishing} onClick={async()=>{if(!session){setAccountOpen(true);return;}setPublishing(true);setError('');try{const hash=await postCast(config,session,text,undefined,undefined,draftMentions);setText('');setDraftMentions([]);published(session.fid,hash);setRefresh(v=>v+1);}catch(e){setError((e as Error).message);}finally{setPublishing(false);}}}>{publishing?'Confirming inclusion…':'Publish cast'}<ArrowUpRight size={14}/></button></div></div></div>}
   {error&&<div className="feed-message error" role="alert"><AlertCircle size={17}/><span>{error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}>×</button></div>}{notice&&<div className="feed-message notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={()=>setNotice('')}>×</button></div>}
-  {feed==='profile'&&<div className="cast-type-tabs" role="tablist" aria-label="Posts and replies" onKeyDown={e=>{
+  {feed==='profile'&&<div className="cast-type-tabs" role="tablist" aria-label="Posts, replies and likes" onKeyDown={e=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
     e.preventDefault();
-    const next=e.key==='Home'?'posts':e.key==='End'?'replies':castType==='posts'?'replies':'posts';
+    const tabs=['posts','replies','likes'] as const;
+    const next=e.key==='Home'?'posts':e.key==='End'?'likes':tabs[(tabs.indexOf(castType)+(e.key==='ArrowRight'?1:2))%3];
     selectCastType(next);
     e.currentTarget.querySelector<HTMLButtonElement>(`#${next}-tab`)?.focus();
   }}>
     <button role="tab" id="posts-tab" aria-controls="cast-feed" aria-selected={castType==='posts'} tabIndex={castType==='posts'?0:-1} onClick={()=>selectCastType('posts')}>Posts</button>
     <button role="tab" id="replies-tab" aria-controls="cast-feed" aria-selected={castType==='replies'} tabIndex={castType==='replies'?0:-1} onClick={()=>selectCastType('replies')}>Replies</button>
+    <button role="tab" id="likes-tab" aria-controls="cast-feed" aria-selected={castType==='likes'} tabIndex={castType==='likes'?0:-1} onClick={()=>selectCastType('likes')}>Likes</button>
   </div>}
-  <div className="feed-count"><span>{busy&&!filtered.length?'READING FROM YOUR NODE':`${filtered.length} ${castType.toUpperCase()}${mode!=='all'?' · FILTERED':''}`}</span>{attributing&&<span role="status">Resolving client keys…</span>}<select className="feed-order" aria-label="Chronological order" value={order} onChange={e=>setOrder(e.target.value as 'newest'|'oldest')}><option value="newest">Newest first</option><option value="oldest">{feed==='following'?'Oldest loaded first':'Oldest first'}</option></select></div>
+  <div className="feed-count"><span>{busy&&!filtered.length?'READING FROM YOUR NODE':`${filtered.length} ${castType.toUpperCase()}${mode!=='all'?' · FILTERED':''}`}</span>{attributing&&<span role="status">Resolving client keys…</span>}<select className="feed-order" aria-label={likesView?'Like order':'Chronological order'} value={order} onChange={e=>setOrder(e.target.value as 'newest'|'oldest')}><option value="newest">{likesView?'Recently liked':'Newest first'}</option><option value="oldest">{likesView?'Oldest likes first':feed==='following'?'Oldest loaded first':'Oldest first'}</option></select></div>
   <div id="cast-feed" role={feed==='profile'?'tabpanel':'region'} aria-labelledby={feed==='profile'?`${castType}-tab`:undefined} aria-label={feed==='following'?'Following posts':undefined} aria-busy={busy}>
   {busy&&!filtered.length?<div className="loading"><span className="loader"/><p>Reading the network…</p></div>:filtered.length?filtered.map(renderCast):<div className="empty"><Radio size={30}/><h3>{error?'The feed is unavailable':`No ${castType} in this view`}</h3><p>{error?'Check your node connection and refresh.':hasMore?`No ${castType} match the loaded pages. Load more or adjust your client filter.`:feed==='following'?(session?'Follow some accounts to fill your home feed, or adjust your client filter.':'Try another public FID or connect your account to see casts from accounts you follow.'):`Try another FID or adjust your client filter.`}</p></div>}
-  {hasMore&&<button className="load-more" disabled={busy} onClick={()=>loadMore()}>{busy?'Reading…':feed==='following'?'Load next 12 followed profiles':order==='newest'?'Load older casts':'Load newer casts'} <ArrowRight size={15}/></button>}{feed==='following'&&<p className="feed-limit">Showing up to 15 recent casts per followed account, loaded in batches of 12 accounts.</p>}
+  {hasMore&&<button className="load-more" disabled={busy} onClick={()=>loadMore()}>{busy?'Reading…':feed==='following'?'Load next 12 followed profiles':likesView?(order==='newest'?'Load older likes':'Load newer likes'):order==='newest'?'Load older casts':'Load newer casts'} <ArrowRight size={15}/></button>}{feed==='following'&&<p className="feed-limit">Showing up to 15 recent casts per followed account, loaded in batches of 12 accounts.</p>}
   </div>
   </>}
 
