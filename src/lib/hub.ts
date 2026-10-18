@@ -1,5 +1,5 @@
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
-export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string };
+export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string };
 export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
@@ -46,7 +46,7 @@ const profiles = new Map<number, Promise<Profile>>();
 export function profile(config: Config, fid: number): Promise<Profile> {
   if (!profiles.has(fid)) profiles.set(fid, hub<{ messages: HubMessage[] }>(config,'userDataByFid',{fid}).then(({messages}) => {
     const value = (type: string, n: number) => messages.find(m => m.data.userDataBody?.type === type || m.data.userDataBody?.type === n)?.data.userDataBody?.value || '';
-    return {fid, name: value('USER_DATA_TYPE_DISPLAY',2) || `FID ${fid}`, username: value('USER_DATA_TYPE_USERNAME',6), avatar: value('USER_DATA_TYPE_PFP',1), bio: value('USER_DATA_TYPE_BIO',3)};
+    return {fid, name: value('USER_DATA_TYPE_DISPLAY',2) || `FID ${fid}`, username: value('USER_DATA_TYPE_USERNAME',6), avatar: value('USER_DATA_TYPE_PFP',1), bio: value('USER_DATA_TYPE_BIO',3), banner: value('USER_DATA_TYPE_BANNER',10)};
   }).catch(e => { profiles.delete(fid); throw e; }));
   return profiles.get(fid)!;
 }
