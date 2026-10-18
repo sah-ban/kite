@@ -142,3 +142,5 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 .published-cast-link{display:inline-block;margin-left:12px;color:var(--link);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 
 .reply-modal-composer{padding:0;border:0;background:transparent}.reply-modal-composer>div{width:100%}.reply-modal-composer textarea{font-size:15px;min-height:120px}.cast-actions .reply-action.button{padding:8px 12px;font-size:11px}
+
+.cast-interactive{cursor:pointer;transition:background-color .15s}.cast-interactive:hover,.cast-interactive:focus-visible{background:var(--surface-hover)}.cast-interactive:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}

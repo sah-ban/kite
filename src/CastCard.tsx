@@ -29,7 +29,15 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   const liked=Boolean(sessionFid&&activity?.likes?.items.some(m=>m.data.fid===sessionFid));
   const recast=Boolean(sessionFid&&activity?.recasts?.items.some(m=>m.data.fid===sessionFid));
   const count=(tab:ActivityTab)=>activity?countLabel(activity[tab]):'…';
-  return <article ref={root} className={`cast${detailed?' cast-expanded':''}`}>
+  return <article ref={root} className={`cast${detailed?' cast-expanded':' cast-interactive'}`} tabIndex={detailed?undefined:0} aria-label={detailed?undefined:`Cast by ${person?.name||`FID ${cast.data.fid}`}. Press Enter to open conversation.`} onClick={event=>{
+    if(detailed||event.defaultPrevented||event.button!==0)return;
+    const target=event.target as HTMLElement;
+    if(target.closest('a,button,input,textarea,select,video,audio,iframe,[role="button"],[role="link"],[contenteditable],.quote-preview,.modal-backdrop'))return;
+    if(window.getSelection()?.toString())return;
+    handlers.onOpen(cast);
+  }} onKeyDown={event=>{
+    if(!detailed&&event.target===event.currentTarget&&event.key==='Enter'){event.preventDefault();handlers.onOpen(cast);}
+  }}>
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
       <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></a><a aria-label="Open cast on Farcaster" href={`https://farcaster.xyz/${person?.username||cast.data.fid}/${cast.hash}`} target="_blank" rel="noreferrer"><ArrowUpRight size={15}/></a></div>
