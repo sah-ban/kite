@@ -3,6 +3,9 @@ export type Profile = { fid: number; name: string; username: string; avatar: str
 export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
+export class HubError extends Error {
+  constructor(public status: number, body: string) { super(`Node returned ${status}: ${body.slice(0,250)}`); }
+}
 export function onlyCastAdds(messages: unknown[]): Cast[] {
   return messages.filter((message): message is Cast => {
     const m=message as Partial<Cast>;
@@ -33,7 +36,7 @@ export async function getConfig(): Promise<Config> {
 export async function hub<T>(config: Config, endpoint: string, params: Record<string, string | number> = {}, signal?: AbortSignal): Promise<T> {
   const base = config.useGateway || localOrigin() ? '/api/read' : config.readUrl.replace(/\/$/, '');
   const response = await fetch(`${base}/v1/${endpoint}?${new URLSearchParams(Object.entries(params).map(([k,v]) => [k,String(v)]))}`, { signal: signal || AbortSignal.timeout(25_000) });
-  if (!response.ok) throw new Error(`Node returned ${response.status}: ${(await response.text()).slice(0,250)}`);
+  if (!response.ok) throw new HubError(response.status, await response.text());
   const result = await response.json();
   // castsByFid can contain CAST_REMOVE tombstones as well as visible casts.
   if (['castsByFid','castsByParent'].includes(endpoint) && Array.isArray(result.messages)) result.messages=onlyCastAdds(result.messages);

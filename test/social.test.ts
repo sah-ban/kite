@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readActivity, readConnections, readReactions, readReplies, mergePage, countLabel } from '../src/lib/social';
+import { readActivity, readConnections, followsAccount, readReactions, readReplies, mergePage, countLabel } from '../src/lib/social';
 import { clientRoute } from '../src/lib/routes';
 import type { Cast, Config } from '../src/lib/hub';
 
@@ -74,4 +74,36 @@ test('profile connection routes preserve FID and list type without changing the 
   assert.deepEqual(clientRoute('/profile/37/following/'),{kind:'connections',fid:37,tab:'following'});
   assert.deepEqual(clientRoute('/following'),{kind:'following'});
   for(const path of ['/profile/0/followers','/profile/9007199254740992/following','/profile/37/unknown'])assert.deepEqual(clientRoute(path),{kind:'home'});
+});
+
+
+test('follows you checks the viewed profile as source and connected account as target',async()=>{
+  const original=globalThis.fetch;let calls=0;
+  globalThis.fetch=async(input,init)=>{
+    calls++;const url=new URL(String(input));
+    assert.equal(url.pathname,'/v1/linkById');assert.equal(url.searchParams.get('fid'),'37');assert.equal(url.searchParams.get('target_fid'),'4242');assert.equal(url.searchParams.get('link_type'),'follow');
+    return Response.json({data:{fid:37,type:5,linkBody:{type:'follow',targetFid:4242}}});
+  };
+  try {
+    assert.equal(await followsAccount(config,37,4242),true);
+    assert.equal(await followsAccount(config,37,37),false);
+    assert.equal(await followsAccount(config,37,0),false);
+    assert.equal(calls,1);
+    for(const data of [{fid:4242,type:5,linkBody:{type:'follow',targetFid:37}},{fid:37,type:6,linkBody:{type:'follow',targetFid:4242}},{fid:37,type:5,linkBody:{type:'other',targetFid:4242}}]){
+      globalThis.fetch=async()=>Response.json({data});assert.equal(await followsAccount(config,37,4242),false);
+    }
+  }finally{globalThis.fetch=original;}
+});
+
+test('missing follow links are false while node failures and cancellation remain errors',async()=>{
+  const original=globalThis.fetch;
+  try{
+    globalThis.fetch=async()=>new Response('not found',{status:404});
+    assert.equal(await followsAccount(config,37,4242),false);
+    globalThis.fetch=async()=>new Response('unavailable',{status:503});
+    await assert.rejects(followsAccount(config,37,4242),/503/);
+    const controller=new AbortController();controller.abort();
+    globalThis.fetch=async(_input,init)=>{assert.equal(init?.signal,controller.signal);throw init.signal.reason;};
+    await assert.rejects(followsAccount(config,37,4242,controller.signal),{name:'AbortError'});
+  }finally{globalThis.fetch=original;}
 });

@@ -1,4 +1,4 @@
-import { hub, type Cast, type Config } from './hub';
+import { hub, HubError, type Cast, type Config } from './hub';
 
 export type Page<T> = { items: T[]; next: string };
 export type Reaction = { hash: string; data: { fid: number; timestamp: number; type: string | number; reactionBody: { type: string | number; targetCastId?: {fid: number; hash: string} } } };
@@ -59,6 +59,16 @@ export function readActivity(config: Config, cast: Cast, revision: number|string
   return value;
 }
 type Link = {data:{fid:number;type:string|number;linkBody?:{type:string;targetFid:number}}};
+export async function followsAccount(config:Config, sourceFid:number, targetFid:number, signal?:AbortSignal):Promise<boolean> {
+  if (!Number.isSafeInteger(sourceFid)||sourceFid<=0||!Number.isSafeInteger(targetFid)||targetFid<=0||sourceFid===targetFid) return false;
+  try {
+    const link=await hub<Link>(config,'linkById',{fid:sourceFid,target_fid:targetFid,link_type:'follow'},signal);
+    return (link.data?.type==='MESSAGE_TYPE_LINK_ADD'||link.data?.type===5)&&link.data.fid===sourceFid&&link.data.linkBody?.type==='follow'&&link.data.linkBody.targetFid===targetFid;
+  } catch (error) {
+    if (error instanceof HubError&&error.status===404) return false;
+    throw error;
+  }
+}
 export async function readConnections(config:Config,fid:number,kind:'followers'|'following',token=''):Promise<Page<number>> {
   const data=await hub<{messages:Link[];nextPageToken?:string}>(config,kind==='followers'?'linksByTargetFid':'linksByFid',{
     ...(kind==='followers'?{target_fid:fid}:{fid}),link_type:'follow',pageSize:1000,...(token?{pageToken:token}:{}),
