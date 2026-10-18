@@ -16,6 +16,15 @@ test('gateway fixes read destination and preserves opaque query parameters',asyn
 test('gateway blocks unsupported read endpoints and writes on read path',async()=>{
   for(const [url,method] of [['/api/read/v1/submitMessage','GET'],['/api/read/v1/castsByFid','POST']]){const {req,res}=await request(url,method);await gateway({})(req,res,()=>{});assert.equal(res.statusCode,405);}
 });
+test('conversation and follower reads are allowed only on the configured read node',async()=>{
+  const original=globalThis.fetch;const calls:string[]=[];
+  globalThis.fetch=async input=>{calls.push(String(input));return Response.json({messages:[]});};
+  try{for(const endpoint of ['castsByParent','reactionsByCast','linksByTargetFid']){
+    const {req,res}=await request(`/api/read/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);
+    await gateway({NEXT_PUBLIC_HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);
+    assert.equal(calls.at(-1),`https://mine.example/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);
+  }}finally{globalThis.fetch=original;}
+});
 test('gateway rejects writes until a separate validator is configured',async()=>{
   const {req,res}=await request('/api/write/v1/submitMessage','POST');await gateway({})(req,res,()=>{});assert.equal(res.statusCode,503);
 });

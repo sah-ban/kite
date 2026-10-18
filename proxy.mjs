@@ -1,6 +1,6 @@
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
-const readPaths = new Set(['info', 'castsByFid', 'castById', 'userDataByFid', 'linksByFid', 'reactionsByFid', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress']);
+const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'userDataByFid', 'linksByFid', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress']);
 export function gateway(config) {
   const readUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
   const validatorUrl = config.VALIDATOR_URL || '';

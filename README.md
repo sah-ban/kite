@@ -2,7 +2,7 @@
 
 A local Farcaster client and a responsive tutorial for running your own Snapchain read node. MIT licensed.
 
-The tutorial lives at `/`; the client lives at `/client`. The client reads directly from a configured node through a small local gateway. It signs protocol messages in the browser and submits them to a separately configured validator.
+The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. It signs protocol messages in the browser and submits them to a separately configured validator.
 
 ## Try it on this machine
 
@@ -13,11 +13,11 @@ cd /root/projects/freecast
 ./freecast client
 ```
 
-Open http://127.0.0.1:5173 for the guide or http://127.0.0.1:5173/client for the client. The first run creates `.env` pointing at a node on localhost. This development machine needs an existing remote node: configure `NEXT_PUBLIC_HUBURL` in your local `.env` before starting. Existing `.env` files are never overwritten. Endpoint URLs belong in local configuration, not in source control. `VALIDATOR_URL` is empty by default: configure a real validator HTTP endpoint to enable posting. No seed phrase is needed for reads.
+Open http://127.0.0.1:5173 for the client or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` pointing at a node on localhost. This development machine needs an existing remote node: configure `NEXT_PUBLIC_HUBURL` in your local `.env` before starting. Existing `.env` files are never overwritten. Endpoint URLs belong in local configuration, not in source control. `VALIDATOR_URL` is empty by default: configure a real validator HTTP endpoint to enable posting. No seed phrase is needed for reads.
 
 ## Three-command quickstart on suitable existing compute
 
-To access the guide and read-only client through this server's IP address, run `npm run dev:network` and open `http://SERVER_IP:5173/client`. This listens on all interfaces; the normal `npm run dev` remains localhost-only. Account import and signing still require a localhost browser origin. The browser uses the server's read gateway, and the upstream read-node URL stays in the server's local configuration.
+To access the guide and read-only client through this server's IP address, run `npm run dev:network` and open `http://SERVER_IP:5173/`. This listens on all interfaces; the normal `npm run dev` remains localhost-only. Account import and signing still require a localhost browser origin. The browser uses the server's read gateway, and the upstream read-node URL stays in the server's local configuration.
 
 First clone this repository. The node host needs Ubuntu 22.04/24.04, Python 3, curl, a public IP, four cores, at least 16 GB RAM, and at least 1.5 TB free SSD. The script allows 15 GiB reported physical RAM to accommodate a nominal 16 GB VM. The client machine needs Node.js 22.13+ and npm 10+.
 
@@ -142,3 +142,9 @@ This is an implementation to test, not a claim of contest qualification. Complet
 - [Farcaster core SDK](https://github.com/farcasterxyz/hub-monorepo/tree/main/packages/core)
 - [Farcaster contracts](https://github.com/farcasterxyz/contracts)
 - [Original contest cast](https://farcaster.xyz/balajis.eth/0x50184b62)
+
+## Profiles and conversations
+
+Open an author's name or avatar to view their profile, biography, Posts/Replies tabs, and paginated follower/following lists. My profile opens the connected account. Click a cast to open its conversation; Replies, Likes, and Recasts tabs show direct replies and the accounts behind reactions. Opening a reply opens its own thread, and parent links let you move back up a conversation. These pages have shareable URLs and support browser back/forward navigation.
+
+Counts come from the read node's current retained messages. A `+` means additional pages remain; it is a lower bound, not a complete total. Load more to read the remaining pages. An unavailable count is shown as `—`, never zero. Offscreen cast counts are deferred, and count requests are cached briefly and limited to three concurrent requests. No third-party engagement index is used.
