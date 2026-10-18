@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Heart, MessageCircle, Repeat2 } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, Quote } from 'lucide-react';
 import { castDate, type Cast, type Config } from './lib/hub';
 import { castPath, countLabel, readActivity, type Activity, type ActivityTab } from './lib/social';
 import { ClientLabel } from './ClientLabel';
@@ -43,13 +43,14 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   }}>
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
-      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete} onQuote={handlers.onQuote}/></div>
+      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete}/></div>
       {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
       <CastText config={config} cast={cast} visible={visible} onProfile={handlers.onProfile} onOpen={detailed?undefined:handlers.onOpen} limit={detailed?undefined:600}/>
       <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>
       {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen} onProfile={handlers.onProfile}/>)}
       <div className="cast-actions">
         <div className="reaction-group"><button title="Reply to cast" aria-label="Reply to cast" onClick={()=>handlers.onReply(cast)}><MessageCircle size={17}/></button><button className="reaction-count" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}>{count('replies')}</button></div>
+        <button title="Quote cast" aria-label="Quote cast" onClick={()=>handlers.onQuote(cast)}><Quote size={17}/></button>
         <div className="reaction-group"><button title={recast?'Undo recast':'Recast'} aria-label={recast?'Undo recast':'Recast cast'} aria-pressed={recast} disabled={busy} onClick={()=>handlers.onReact(cast,'recast',recast)}><Repeat2 size={17}/></button><button className="reaction-count" aria-label={`View recasts (${count('recasts')})`} onClick={()=>handlers.onOpen(cast,'recasts')}>{count('recasts')}</button></div>
         <div className="reaction-group"><button title={liked?'Unlike':'Like'} aria-label={liked?'Unlike cast':'Like cast'} aria-pressed={liked} disabled={busy} onClick={()=>handlers.onReact(cast,'like',liked)}><Heart size={17}/></button><button className="reaction-count" aria-label={`View likes (${count('likes')})`} onClick={()=>handlers.onOpen(cast,'likes')}>{count('likes')}</button></div>
         <ClientLabel config={config} fid={cast.data.fid} signer={cast.signer}/>

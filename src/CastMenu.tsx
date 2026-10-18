@@ -1,8 +1,8 @@
 import {useEffect,useId,useRef,useState} from 'react';
-import {ArrowUpRight,MoreHorizontal,Trash2,Quote} from 'lucide-react';
+import {ArrowUpRight,MoreHorizontal,Trash2} from 'lucide-react';
 import type {Cast} from './lib/hub';
 
-export function CastMenu({cast,username,own,busy,onDelete,onQuote}:{cast:Cast;username?:string;own:boolean;busy:boolean;onDelete:(cast:Cast)=>void;onQuote:(cast:Cast)=>void}) {
+export function CastMenu({cast,username,own,busy,onDelete}:{cast:Cast;username?:string;own:boolean;busy:boolean;onDelete:(cast:Cast)=>void}) {
   const [open,setOpen]=useState(false),id=useId();
   const root=useRef<HTMLDivElement>(null),toggle=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
@@ -26,7 +26,6 @@ export function CastMenu({cast,username,own,busy,onDelete,onQuote}:{cast:Cast;us
   }}>
     <button ref={toggle} className="cast-menu-toggle" aria-label="Cast options" title="Cast options" aria-haspopup="menu" aria-expanded={open} aria-controls={open?id:undefined} onClick={()=>setOpen(value=>!value)}><MoreHorizontal size={18}/></button>
     {open&&<div className="cast-menu-items" id={id} role="menu" aria-label="Cast options">
-      <button role="menuitem" className="quote-cast" onClick={()=>{setOpen(false);onQuote(cast);}}><Quote size={15}/>Quote cast</button>
       <a role="menuitem" href={`https://farcaster.xyz/${encodeURIComponent(username||String(cast.data.fid))}/${cast.hash}`} target="_blank" rel="noreferrer" onClick={()=>setOpen(false)}><ArrowUpRight size={15}/>Open in Farcaster</a>
       {own&&<button role="menuitem" className="delete-cast" disabled={busy} onClick={()=>{setOpen(false);onDelete(cast);}}><Trash2 size={15}/>Delete cast</button>}
     </div>}
