@@ -155,3 +155,4 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 
 .profile-handle .follows-you{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:4px;background:var(--surface-active);color:var(--muted);font-size:10px;line-height:1.4;vertical-align:middle}
 .profile-cover{position:relative;height:auto;aspect-ratio:3/1;padding:0;overflow:hidden}.profile-cover>img{display:block;width:100%;height:100%;object-fit:cover}.profile-cover>span{padding:20px 25px}
+.signer .client-prefix-short{display:none}@media(max-width:700px){.cast-interactive .signer .client-prefix-long{display:none}.cast-interactive .signer .client-prefix-short{display:inline}}

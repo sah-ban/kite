@@ -18,11 +18,11 @@ export function ClientLabel({config, fid, signer, onProfile}: {config: Config; f
     return () => { active = false; };
   }, [config, fid, signer]);
 
-  const label = client.username ? `casted from @${client.username}` : client.fid ? `casted from Client FID ${client.fid}` : client.loading ? 'Resolving client…' : 'Unknown client';
+  const label = client.loading ? 'Resolving client…' : 'Unknown client';
   const title = client.fid
     ? `Registered signer requester: ${client.username ? `@${client.username}, ` : ''}FID ${client.fid}. This identifies the key requester, which may differ from the app brand.\nSigner: ${signer}`
     : `Signer: ${signer}`;
   return client.fid
-    ? <a className="signer" href={`/profile/${client.fid}`} onClick={event=>{event.preventDefault();onProfile(client.fid!);}} title={title} aria-label={label}>{label}</a>
+    ? <a className="signer" href={`/profile/${client.fid}`} onClick={event=>{event.preventDefault();onProfile(client.fid!);}} title={title}><span className="client-prefix-long">casted from </span><span className="client-prefix-short">via </span>{client.username?`@${client.username}`:`Client FID ${client.fid}`}</a>
     : <span className="signer" title={title}>{label}</span>;
 }
