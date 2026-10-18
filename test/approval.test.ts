@@ -296,3 +296,12 @@ test('approved signer publishes image-only casts and quote images with valid sig
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image,image],quote}})).status,400);
   assert.equal(h.submitted.length,2);
 });
+
+test('approved signer accepts direct Tenor GIF embeds and rejects other Tenor media',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const gif='https://media.tenor.com/fixture/hello.gif';
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[gif]}})).status,200);
+  const message=h.submitted[0],data=MessageData.decode(message.dataBytes!);assert.equal(data.castAddBody?.embeds[0].url,gif);assert.ok((await validations.validateMessage({...message,data})).isOk());
+  for(const url of ['https://media.tenor.com/fixture/video.mp4','https://media.tenor.com.evil.example/a.gif'])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[url]}})).status,400);
+  assert.equal(h.submitted.length,1);
+});

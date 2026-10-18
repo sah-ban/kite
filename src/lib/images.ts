@@ -3,8 +3,8 @@ export const IMAGE_TYPES=['image/jpeg','image/png','image/gif','image/webp'];
 export function imageEmbeds(images:string[],quoted=false):{url:string}[] {
   if(!Array.isArray(images)||images.length>(quoted?1:2))throw new Error(`Attach up to ${quoted?1:2} images${quoted?' with a quote':''}.`);
   return images.map(value=>{
-    let url:URL;try{url=new URL(value);}catch{throw new Error('Invalid uploaded image URL.');}
-    if(url.protocol!=='https:'||url.hostname!=='i.ibb.co'||url.username||url.password||url.port||new TextEncoder().encode(url.href).length>256)throw new Error('Invalid uploaded image URL.');
+    let url:URL;try{url=new URL(value);}catch{throw new Error('Invalid image attachment URL.');}
+    if(url.protocol!=='https:'||!(url.hostname==='i.ibb.co'||(/^media(?:\d+)?\.tenor\.com$/.test(url.hostname)&&url.pathname.endsWith('.gif')))||url.username||url.password||url.port||new TextEncoder().encode(url.href).length>256)throw new Error('Invalid image attachment URL.');
     return {url:url.href};
   });
 }

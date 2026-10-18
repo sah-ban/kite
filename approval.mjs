@@ -99,7 +99,7 @@ async function buildAction(session, action) {
     if(!Array.isArray(images)||images.length>(action.quote?1:2))throw new Failure(400,'Too many image attachments.');
     const attachments=images.map(value=>{
       let url;try{url=new URL(value);}catch{throw new Failure(400,'Invalid image URL.');}
-      if(url.protocol!=='https:'||url.hostname!=='i.ibb.co'||url.username||url.password||url.port||Buffer.byteLength(url.href)>256)throw new Failure(400,'Invalid image URL.');
+      if(url.protocol!=='https:'||!(url.hostname==='i.ibb.co'||(/^media(?:\d+)?\.tenor\.com$/.test(url.hostname)&&url.pathname.endsWith('.gif')))||url.username||url.password||url.port||Buffer.byteLength(url.href)>256)throw new Failure(400,'Invalid image URL.');
       return {url:url.href};
     });
     if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length&&!attachments.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add an image, mention or quoted cast.');
