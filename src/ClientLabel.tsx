@@ -18,11 +18,11 @@ export function ClientLabel({config, fid, signer}: {config: Config; fid: number;
     return () => { active = false; };
   }, [config, fid, signer]);
 
-  const label = client.username ? `@${client.username}` : client.fid ? `Client FID ${client.fid}` : client.loading ? 'Resolving client…' : 'Unknown client';
+  const label = client.username ? `casted from @${client.username}` : client.fid ? `casted from Client FID ${client.fid}` : client.loading ? 'Resolving client…' : 'Unknown client';
   const title = client.fid
     ? `Registered signer requester: ${client.username ? `@${client.username}, ` : ''}FID ${client.fid}. This identifies the key requester, which may differ from the app brand.\nSigner: ${signer}`
     : `Signer: ${signer}`;
   return client.username
-    ? <a className="signer" href={`https://farcaster.xyz/${encodeURIComponent(client.username)}`} target="_blank" rel="noreferrer" title={title} aria-label={`Signer requester ${label}`}>{label}</a>
+    ? <a className="signer" href={`https://farcaster.xyz/${encodeURIComponent(client.username)}`} target="_blank" rel="noreferrer" title={title} aria-label={label}>{label}</a>
     : <span className="signer" title={title}>{label}</span>;
 }
