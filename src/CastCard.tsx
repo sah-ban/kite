@@ -47,10 +47,9 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
       {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen} onProfile={handlers.onProfile}/>)}
       {detailed&&<div className="cast-timestamp">{castDate(cast.data.timestamp).toLocaleString()}</div>}
       <div className="cast-actions">
-        <button title="View replies" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}><MessageCircle size={17}/><span>{count('replies')}</span></button>
+        <div className="reaction-group"><button title="Reply to cast" aria-label="Reply to cast" onClick={()=>handlers.onReply(cast)}><MessageCircle size={17}/></button><button className="reaction-count" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}>{count('replies')}</button></div>
         <div className="reaction-group"><button title={recast?'Undo recast':'Recast'} aria-label={recast?'Undo recast':'Recast cast'} aria-pressed={recast} disabled={busy} onClick={()=>handlers.onReact(cast,'recast',recast)}><Repeat2 size={17}/></button><button className="reaction-count" aria-label={`View recasts (${count('recasts')})`} onClick={()=>handlers.onOpen(cast,'recasts')}>{count('recasts')}</button></div>
         <div className="reaction-group"><button title={liked?'Unlike':'Like'} aria-label={liked?'Unlike cast':'Like cast'} aria-pressed={liked} disabled={busy} onClick={()=>handlers.onReact(cast,'like',liked)}><Heart size={17}/></button><button className="reaction-count" aria-label={`View likes (${count('likes')})`} onClick={()=>handlers.onOpen(cast,'likes')}>{count('likes')}</button></div>
-        <button className={`reply-action${detailed?' button small-button':''}`} onClick={()=>handlers.onReply(cast)}>{detailed?'Reply to cast':'Reply'}</button>
         <ClientLabel config={config} fid={cast.data.fid} signer={cast.signer}/>
       </div>
     </div>
