@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { profile, type Config } from './lib/hub';
 import { signerRequester } from './lib/attribution';
 
-export function ClientLabel({config, fid, signer}: {config: Config; fid: number; signer: string}) {
+export function ClientLabel({config, fid, signer, onProfile}: {config: Config; fid: number; signer: string; onProfile:(fid:number)=>void}) {
   const [client, setClient] = useState<{fid?: number; username?: string; loading: boolean}>({loading: true});
   useEffect(() => {
     let active = true;
@@ -22,7 +22,7 @@ export function ClientLabel({config, fid, signer}: {config: Config; fid: number;
   const title = client.fid
     ? `Registered signer requester: ${client.username ? `@${client.username}, ` : ''}FID ${client.fid}. This identifies the key requester, which may differ from the app brand.\nSigner: ${signer}`
     : `Signer: ${signer}`;
-  return client.username
-    ? <a className="signer" href={`https://farcaster.xyz/${encodeURIComponent(client.username)}`} target="_blank" rel="noreferrer" title={title} aria-label={label}>{label}</a>
+  return client.fid
+    ? <a className="signer" href={`/profile/${client.fid}`} onClick={event=>{event.preventDefault();onProfile(client.fid!);}} title={title} aria-label={label}>{label}</a>
     : <span className="signer" title={title}>{label}</span>;
 }

@@ -53,7 +53,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
         <button title="Quote cast" aria-label="Quote cast" onClick={()=>handlers.onQuote(cast)}><Quote size={17}/></button>
         <div className="reaction-group"><button title={recast?'Undo recast':'Recast'} aria-label={recast?'Undo recast':'Recast cast'} aria-pressed={recast} disabled={busy} onClick={()=>handlers.onReact(cast,'recast',recast)}><Repeat2 size={17}/></button><button className="reaction-count" aria-label={`View recasts (${count('recasts')})`} onClick={()=>handlers.onOpen(cast,'recasts')}>{count('recasts')}</button></div>
         <div className="reaction-group"><button title={liked?'Unlike':'Like'} aria-label={liked?'Unlike cast':'Like cast'} aria-pressed={liked} disabled={busy} onClick={()=>handlers.onReact(cast,'like',liked)}><Heart size={17}/></button><button className="reaction-count" aria-label={`View likes (${count('likes')})`} onClick={()=>handlers.onOpen(cast,'likes')}>{count('likes')}</button></div>
-        <ClientLabel config={config} fid={cast.data.fid} signer={cast.signer}/>
+        <ClientLabel config={config} fid={cast.data.fid} signer={cast.signer} onProfile={handlers.onProfile}/>
       </div>
     </div>
   </article>;
