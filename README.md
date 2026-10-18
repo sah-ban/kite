@@ -154,3 +154,9 @@ Counts come from the read node's current retained messages. A `+` means addition
 Regular casts and quoted casts render images with an enlarged viewer, click-to-play native videos and HLS streams, and YouTube/Vimeo players. Nothing starts playing automatically. HLS support is loaded only when needed, and playback depends on the host permitting browser access and the browser supporting the video's codec. Unavailable media keeps an original-source link.
 
 Link cards use Open Graph/Twitter metadata fetched by the server through `/api/embed`. The fetcher restricts destinations to public HTTP(S), pins validated DNS answers, checks redirects, and bounds response size, time, concurrency, and request rate. It forwards no browser credentials and does not execute webpage scripts or embed arbitrary player frames. Previews are cached briefly. Sites that require authentication or block previews fall back to a plain link card.
+
+## Direct HTTPS for testing
+
+The Node server can terminate TLS directly. Set `FREECAST_TLS_CERT` and `FREECAST_TLS_KEY` to local PEM files, `FREECAST_PUBLIC_URL` to the exact HTTPS origin (including a nonstandard port), `FREECAST_HOST=0.0.0.0`, and `PORT` to a free port. Run `npm run build` followed by `npm start` using Node 22.13 or newer. Certificates, private keys, and account credentials belong in ignored local configuration; `.freecast/` is ignored for runtime files.
+
+A self-signed test certificate produces a browser warning that must be accepted before opening the client. Use a trusted certificate for normal deployment. The HTTPS approval flow sets Secure cookies; direct HTTPS writes enforce the configured origin. Public HTTP previews remain available for reading.

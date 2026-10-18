@@ -14,7 +14,10 @@ export function gateway(config) {
     const write = url.pathname === '/api/write/v1/submitMessage';
     if (!read && !write) return next();
     if ((read && (req.method !== 'GET' || !readPaths.has(url.pathname.split('/').pop()))) || (write && req.method !== 'POST')) { res.statusCode = 405; res.end('Method or endpoint not allowed'); return; }
-    if (write && req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) { res.statusCode = 403; res.end('Origin mismatch'); return; }
+    if (write) {
+      const expected=config.FREECAST_PUBLIC_URL?new URL(config.FREECAST_PUBLIC_URL):new URL(`${req.socket?.encrypted?'https':'http'}://${req.headers.host}`);
+      if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch'); return; }
+    }
     if (write && !validatorUrl) { res.statusCode = 503; res.end('Set VALIDATOR_URL to a validator HTTP endpoint before posting.'); return; }
     try {
       const target = new URL(url.pathname.replace(/^\/api\/(read|write)/, '') + url.search, read ? readUrl : validatorUrl);

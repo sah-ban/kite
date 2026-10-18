@@ -46,3 +46,15 @@ test('protobuf write goes only to the configured validator',async()=>{
   try{const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1,2,3]),{origin:'http://127.0.0.1:5173'});await gateway({NEXT_PUBLIC_HUBURL:'https://read.example',VALIDATOR_URL:'https://validator.example'})(req,res,()=>{});assert.equal(seen,'https://validator.example/v1/submitMessage');assert.deepEqual([...payload as Uint8Array],[1,2,3]);assert.equal(res.statusCode,200);}
   finally{globalThis.fetch=original;}
 });
+test('HTTPS writes accept the configured origin and reject forged hosts and origins',async()=>{
+  const original=globalThis.fetch;let calls=0;
+  globalThis.fetch=async()=>{calls++;return Response.json({hash:'0x123'});};
+  const middleware=gateway({VALIDATOR_URL:'https://validator.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  try {
+    for(const [host,origin,status] of [['client.example:8443','https://client.example:8443',200],['client.example:8443','http://client.example:8443',403],['attacker.example','https://client.example:8443',403]] as const){
+      const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1]),{host,origin});
+      await middleware(req,res,()=>{});assert.equal(res.statusCode,status);
+    }
+    assert.equal(calls,1);
+  }finally{globalThis.fetch=original;}
+});
