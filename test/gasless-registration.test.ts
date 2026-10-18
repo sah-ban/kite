@@ -40,7 +40,7 @@ async function environment(options:Options,run:(env:{writes:GaslessSdk.Message[]
       const message=sdk.Message.decode(new Uint8Array(await new Response(init?.body).arrayBuffer()));
       message.data=sdk.MessageData.decode(message.dataBytes!);writes.push(message);
       if(options.submitFails)return new Response('node rejected registration',{status:400});
-      if(message.data.type===sdk.MessageType.KEY_ADD&&!options.delayMerge){const body=message.data.keyAddBody!;activeSigner={fid,key:bytesToHex(body.key),keyType:1,source:'SIGNER_SOURCE_OFFCHAIN',scopes:body.scopes,expiresAt:Math.floor(Date.now()/1000)+body.ttl};}
+      if(message.data.type===sdk.MessageType.KEY_ADD&&!options.delayMerge){const body=message.data.keyAddBody!;activeSigner={fid,key:bytesToHex(body.key),keyType:1,source:'SIGNER_SOURCE_OFFCHAIN',scopes:['MESSAGE_TYPE_CAST_ADD','MESSAGE_TYPE_CAST_REMOVE','MESSAGE_TYPE_REACTION_ADD','MESSAGE_TYPE_REACTION_REMOVE','MESSAGE_TYPE_LINK_ADD','MESSAGE_TYPE_LINK_REMOVE'],expiresAt:Math.floor(Date.now()/1000)+body.ttl};}
       return Response.json({hash:bytesToHex(message.hash)});
     }
     throw new Error('Unexpected request: '+url);
@@ -122,5 +122,21 @@ test('unconfirmed submission stays recoverable, and registration cannot run twic
     assert.equal(writes.length,1);assert.equal(storedAccount()?.key,prepared.key);
     setSigner({fid,key:prepared.key,keyType:1,source:2,scopes:GASLESS_SCOPES,expiresAt:Math.floor(Date.now()/1000)+GASLESS_TTL});
     const session=await prepared.register();assert.equal(session.key,prepared.key);assert.equal(writes.length,1,'retry after merge must not broadcast another key');
+  });
+});
+
+
+test('HTTP enum-name scopes unlock existing keys without re-registering and still require every permission',async()=>{
+  await environment({},async({setSigner,writes})=>{
+    const prepared=await prepareKey(config,phrase,password,0);await prepared.register();
+    const scopes=['MESSAGE_TYPE_CAST_ADD','MESSAGE_TYPE_CAST_REMOVE','MESSAGE_TYPE_REACTION_ADD','MESSAGE_TYPE_REACTION_REMOVE','MESSAGE_TYPE_LINK_ADD','MESSAGE_TYPE_LINK_REMOVE'];
+    const signer={fid,key:prepared.key,keyType:1,source:'SIGNER_SOURCE_OFFCHAIN',scopes,expiresAt:String(Math.floor(Date.now()/1000)+3600)};
+    setSigner(signer);assert.equal((await unlockSession(config,password)).key,prepared.key);assert.equal(writes.length,1);
+    for(let i=0;i<scopes.length;i++){
+      setSigner({...signer,scopes:scopes.filter((_,index)=>index!==i)});
+      assert.equal(await checkGaslessSigner(config,fid,prepared.key),false);
+    }
+    setSigner({...signer,scopes:[1,'MESSAGE_TYPE_CAST_REMOVE',3,'MESSAGE_TYPE_REACTION_REMOVE',5,'MESSAGE_TYPE_LINK_REMOVE']});
+    assert.equal(await checkGaslessSigner(config,fid,prepared.key),true);
   });
 });
