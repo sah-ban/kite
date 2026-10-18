@@ -4,6 +4,7 @@ import { castDate, type Cast, type Config } from './lib/hub';
 import { castPath, countLabel, readActivity, type Activity, type ActivityTab } from './lib/social';
 import { ClientLabel } from './ClientLabel';
 import { Avatar, useProfile } from './social-ui';
+import { QuotedCast } from './QuotedCast';
 
 export type CastHandlers = {
   onProfile:(fid:number)=>void;
@@ -34,7 +35,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
       {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
       {detailed?<p className="cast-text">{cast.data.castAddBody.text}</p>:<a className="cast-text cast-permalink" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}>{truncated?characters.slice(0,600).join('').trimEnd()+'…':cast.data.castAddBody.text}{truncated&&<span className="read-full">Read full cast →</span>}</a>}
       {cast.data.castAddBody.embeds?.filter(e=>e.url&&/^https?:\/\//.test(e.url)).map((e,i)=><a className="embed-link" href={e.url} key={i} target="_blank" rel="noreferrer">{e.url}</a>)}
-      {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><button key={i} className="quoted-cast" onClick={()=>handlers.onOpen({hash:e.castId!.hash,data:{fid:e.castId!.fid}} as Cast)}>View quoted cast <ArrowUpRight size={13}/></button>)}
+      {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen}/>)}
       {detailed&&<div className="cast-timestamp">{castDate(cast.data.timestamp).toLocaleString()}</div>}
       <div className="cast-actions">
         <button title="View replies" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}><MessageCircle size={17}/><span>{count('replies')}</span></button>
