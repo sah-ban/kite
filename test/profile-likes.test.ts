@@ -46,3 +46,25 @@ test('temporary failures remain retryable rather than silently dropping liked ca
   try{await assert.rejects(readLikedCasts(config,37,'newest'),/503/);}
   finally{globalThis.fetch=original;}
 });
+
+test('HTTP 400 wrapping gRPC NotFound skips unavailable liked casts and preserves pagination',async()=>{
+  const original=globalThis.fetch;
+  const missing={error:'Failed to get cast',error_detail:'status: NotFound, message: "cast not found", details: [], metadata: MetadataMap { headers: {} }'};
+  globalThis.fetch=async(input)=>{
+    const url=new URL(String(input),'https://client.example');
+    if(url.pathname.endsWith('reactionsByFid'))return Response.json({messages:[reaction(1),reaction(2)],nextPageToken:'older+/='});
+    return url.searchParams.get('fid')==='1'?Response.json(missing,{status:400}):Response.json(cast(2));
+  };
+  try{const page=await readLikedCasts(config,37,'newest');assert.deepEqual(page.messages.map(c=>c.data.fid),[2]);assert.equal(page.nextPageToken,'older+/=');}
+  finally{globalThis.fetch=original;}
+});
+
+test('unrelated HTTP 400 responses are not mistaken for unavailable liked casts',async()=>{
+  const original=globalThis.fetch;
+  try{
+    for(const body of ['invalid request',JSON.stringify({error:'Failed to get cast',error_detail:'status: InvalidArgument, message: "invalid hash"'}),JSON.stringify({error:'NotFound is not a recognized argument'})]){
+      globalThis.fetch=async(input)=>String(input).includes('reactionsByFid')?Response.json({messages:[reaction(1)]}):new Response(body,{status:400});
+      await assert.rejects(readLikedCasts(config,37,'newest'),/Node returned 400/);
+    }
+  }finally{globalThis.fetch=original;}
+});

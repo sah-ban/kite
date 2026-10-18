@@ -4,7 +4,16 @@ export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: st
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
 export class HubError extends Error {
-  constructor(public status: number, body: string) { super(`Node returned ${status}: ${body.slice(0,250)}`); }
+  readonly notFound: boolean;
+  constructor(public status: number, body: string) {
+    super(`Node returned ${status}: ${body.slice(0,250)}`);
+    this.notFound=status===404;
+    // Snapchain's HTTP gateway can wrap gRPC NotFound in HTTP 400.
+    if(status===400)try{
+      const detail=JSON.parse(body)?.error_detail;
+      this.notFound=typeof detail==='string'&&/^status:\s*NotFound(?:,|$)/.test(detail);
+    }catch{/* Other bad requests must remain errors. */}
+  }
 }
 export function onlyCastAdds(messages: unknown[]): Cast[] {
   return messages.filter((message): message is Cast => {

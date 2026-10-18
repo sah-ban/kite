@@ -18,7 +18,7 @@ export async function readLikedCasts(config:Config,fid:number,order:'newest'|'ol
       try {
         const cast=await hub<Cast>(config,'castById',target,signal);
         return onlyCastAdds([cast]).length&&cast.data.fid===target.fid&&cast.hash.toLowerCase()===target.hash.toLowerCase()?cast:undefined;
-      }catch(error){if(error instanceof HubError&&error.status===404)return;throw error;}
+      }catch(error){if(error instanceof HubError&&error.notFound)return;throw error;}
     }));
     messages.push(...casts.filter((cast):cast is Cast=>Boolean(cast)));
   }
