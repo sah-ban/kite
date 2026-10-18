@@ -1,20 +1,21 @@
 import {useEffect,useRef,useState} from 'react';
 import {AtSign,Bell,Heart,MessageCircle,RefreshCw,Repeat2,UserPlus} from 'lucide-react';
-import {castDate,type Cast,type Config} from './lib/hub';
+import {type Cast,type Config} from './lib/hub';
 import {hasMoreNotifications,mergeNotifications,readNotifications,type NotificationItem,type NotificationKind,type NotificationPage} from './lib/notifications';
 import {Avatar,useProfile} from './social-ui';
 import {CastText} from './CastText';
+import {CastTime} from './CastTime';
 
 const kinds=[['all','All'],['mention','Mentions'],['reply','Replies'],['like','Likes'],['recast','Recasts'],['follow','Follows']] as const;
 const labels:Record<NotificationKind,string>={mention:'mentioned you',reply:'replied to your cast',like:'liked your cast',recast:'recast your cast',follow:'followed you'};
 const icons={mention:AtSign,reply:MessageCircle,like:Heart,recast:Repeat2,follow:UserPlus};
 function NotificationRow({config,item,onProfile,onCast}:{config:Config;item:NotificationItem;onProfile:(fid:number)=>void;onCast:(cast:Cast)=>void}){
- const person=useProfile(config,item.actor),Icon=icons[item.kind],date=castDate(item.timestamp);
+ const person=useProfile(config,item.actor),Icon=icons[item.kind];
  return <article className={`notification-row notification-${item.kind}`}>
   <div className="notification-symbol"><Icon size={18}/></div>
   <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${item.actor}`} profile`} onClick={()=>onProfile(item.actor)}><Avatar person={person}/></button>
   <div className="notification-main"><div className="notification-title"><button className="author" onClick={()=>onProfile(item.actor)}>{person?.name||`FID ${item.actor}`}</button> <span>{labels[item.kind]}</span></div>
-   <time dateTime={date.toISOString()} title={date.toLocaleString()}>{date.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time>
+   <CastTime timestamp={item.timestamp}/>
    {item.cast&&<><CastText config={config} cast={item.cast} visible onProfile={onProfile} onOpen={onCast} limit={240} className="notification-cast-text"/><button className="text-button notification-open" onClick={()=>onCast(item.cast!)}>View cast →</button></>}
   </div>
  </article>;

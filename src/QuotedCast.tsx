@@ -1,6 +1,7 @@
+import {CastTime} from './CastTime';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import { castDate, fullHash, hub, onlyCastAdds, type Cast, type Config } from './lib/hub';
+import { fullHash, hub, onlyCastAdds, type Cast, type Config } from './lib/hub';
 import { Avatar, useProfile } from './social-ui';
 import { CastEmbeds } from './CastEmbeds';
 import { CastText } from './CastText';
@@ -37,7 +38,7 @@ export function QuotedCast({config,fid,hash,visible,onOpen,onProfile}:{config:Co
     <div className="quoted-cast">
     <div className="quoted-content">
       {cast?<>
-        <a href={`/cast/${fid}/${hash}`} aria-label={`Open quoted cast by ${person?.name||`FID ${fid}`}`} onClick={open}><div className="quote-author"><Avatar person={person}/><strong>{person?.name||`FID ${fid}`}</strong><span>{person?.username?`@${person.username}`:`FID ${fid}`}</span><time dateTime={castDate(cast.data.timestamp).toISOString()}>{castDate(cast.data.timestamp).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></div>
+        <a href={`/cast/${fid}/${hash}`} aria-label={`Open quoted cast by ${person?.name||`FID ${fid}`}`} onClick={open}><div className="quote-author"><Avatar person={person}/><strong>{person?.name||`FID ${fid}`}</strong><span>{person?.username?`@${person.username}`:`FID ${fid}`}</span><CastTime timestamp={cast.data.timestamp}/></div>
         {cast.data.castAddBody.parentCastId&&<span className="quote-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</span>}</a>
         <CastText config={config} cast={cast} visible={visible} onProfile={onProfile} onOpen={onOpen} limit={450} className="quote-text"/>
         <a href={`/cast/${fid}/${hash}`} onClick={open} className="quote-footer">{truncated?'Read full cast':cast.data.castAddBody.embeds?.some(e=>e.castId)?'Open conversation · includes another quote':'Open conversation'} <ArrowUpRight size={12}/></a>

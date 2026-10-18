@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, Repeat2, Quote } from 'lucide-react';
-import { castDate, type Cast, type Config } from './lib/hub';
+import { type Cast, type Config } from './lib/hub';
 import { castPath, countLabel, readActivity, type Activity, type ActivityTab } from './lib/social';
 import { ClientLabel } from './ClientLabel';
 import { Avatar, useProfile } from './social-ui';
@@ -8,6 +8,7 @@ import { QuotedCast } from './QuotedCast';
 import { CastEmbeds } from './CastEmbeds';
 import { CastText } from './CastText';
 import { CastMenu } from './CastMenu';
+import { CastTime } from './CastTime';
 
 export type CastHandlers = {
   onProfile:(fid:number)=>void;
@@ -45,7 +46,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   }}>
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
-      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete}/></div>
+      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><CastTime timestamp={cast.data.timestamp} full={detailed}/></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete}/></div>
       {parentFid&&<div className="reply-context">Replying to <button type="button" className="reply-profile" onClick={()=>handlers.onProfile(parentFid)}>{parentPerson?.username?`@${parentPerson.username}`:`FID ${parentFid}`}</button></div>}
       <CastText config={config} cast={cast} visible={visible} onProfile={handlers.onProfile} onOpen={detailed?undefined:handlers.onOpen} limit={detailed?undefined:600}/>
       <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>
