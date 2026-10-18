@@ -5,17 +5,19 @@ import { resolve, extname, sep } from 'node:path';
 import { gateway } from './proxy.mjs';
 import { approval } from './approval.mjs';
 import { embedPreviews } from './embeds.mjs';
+import { imageUploads } from './uploads.mjs';
 try { process.loadEnvFile('.env'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 const root = resolve('dist');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' };
 const middleware = gateway(process.env);
 const accountMiddleware = approval(process.env);
 const previewMiddleware = embedPreviews();
+const uploadMiddleware = imageUploads(process.env);
 const certPath=process.env.FREECAST_TLS_CERT,keyPath=process.env.FREECAST_TLS_KEY;
 if(Boolean(certPath)!==Boolean(keyPath))throw new Error('Configure both FREECAST_TLS_CERT and FREECAST_TLS_KEY for HTTPS.');
 const tls=certPath?{cert:await readFile(certPath),key:await readFile(keyPath)}:undefined;
 const createListener=tls?handler=>createHttpsServer(tls,handler):createServer;
-const server = createListener((req, res) => accountMiddleware(req,res,() => previewMiddleware(req,res,() => middleware(req, res, async () => {
+const server = createListener((req, res) => uploadMiddleware(req,res,() => accountMiddleware(req,res,() => previewMiddleware(req,res,() => middleware(req, res, async () => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (pathname.startsWith('/api/')) { res.statusCode = 404; res.end('Unknown endpoint'); return; }
@@ -28,6 +30,6 @@ const server = createListener((req, res) => accountMiddleware(req,res,() => prev
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.end(content);
   } catch { res.statusCode = 404; res.end('Not found'); }
-}))));
+})))));
 const host=process.env.FREECAST_HOST||'127.0.0.1',port=Number(process.env.PORT||5173);
 server.listen(port,host,()=>console.log(`Freecast ${tls?'HTTPS':'HTTP'} listener ready on port ${port}`));

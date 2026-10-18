@@ -95,8 +95,15 @@ async function buildAction(session, action) {
     if(!Array.isArray(mentions)||!Array.isArray(mentionsPositions)||mentions.length>10||mentions.length!==mentionsPositions.length||mentions.some(fid=>!Number.isSafeInteger(fid)||fid<=0)||mentionsPositions.some((position,index)=>!Number.isSafeInteger(position)||position<0||position>bytes||(index>0&&position<mentionsPositions[index-1])))throw new Failure(400,'Invalid mentions.');
     const boundaries=new Set([0]);let offset=0;for(const character of typeof action.text==='string'?action.text:''){offset+=Buffer.byteLength(character);boundaries.add(offset);}
     if(mentionsPositions.some(position=>!boundaries.has(position)))throw new Failure(400,'Invalid mention position.');
-    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add a mention or quoted cast.');
-    const embeds=[];
+    const images=action.images??[];
+    if(!Array.isArray(images)||images.length>(action.quote?1:2))throw new Failure(400,'Too many image attachments.');
+    const attachments=images.map(value=>{
+      let url;try{url=new URL(value);}catch{throw new Failure(400,'Invalid image URL.');}
+      if(url.protocol!=='https:'||url.hostname!=='i.ibb.co'||url.username||url.password||url.port||Buffer.byteLength(url.href)>256)throw new Failure(400,'Invalid image URL.');
+      return {url:url.href};
+    });
+    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length&&!attachments.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add an image, mention or quoted cast.');
+    const embeds=[...attachments];
     if(action.quote){
       if(!Number.isSafeInteger(action.quote.fid)||action.quote.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(action.quote.hash))throw new Failure(400,'Invalid quoted cast.');
       embeds.push({castId:{fid:action.quote.fid,hash:hexToBytes(action.quote.hash)}});

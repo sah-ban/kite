@@ -283,3 +283,16 @@ test('a failed active-session save can be retried without generating another sig
     assert.equal(retried.body.state,'active');assert.equal(retried.body.session.key,start.body.key);assert.equal(starts,1);
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('approved signer publishes image-only casts and quote images with valid signatures',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const image='https://i.ibb.co/fixture/image.png';
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image]}})).status,200);
+  const first=h.submitted[0],data=MessageData.decode(first.dataBytes!);assert.equal(data.castAddBody?.text,'');assert.equal(data.castAddBody?.embeds[0].url,image);assert.ok((await validations.validateMessage({...first,data})).isOk());
+  const quote={fid:37,hash:'0x'+'ab'.repeat(20)};
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image],quote}})).status,200);
+  assert.equal(MessageData.decode(h.submitted[1].dataBytes!).castAddBody?.embeds.length,2);
+  for(const images of [[image,image,image],['https://evil.example/image.png']])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images}})).status,400);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image,image],quote}})).status,400);
+  assert.equal(h.submitted.length,2);
+});

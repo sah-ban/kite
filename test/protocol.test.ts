@@ -81,3 +81,22 @@ test('local cast deletion signs the target and waits for the read node to report
     await deleteCast(config,session,target);assert.equal(submissions,1);assert.equal(reads,1);
   }finally{globalThis.fetch=originalFetch;}
 });
+
+test('local signer publishes image-only casts with valid URL embeds',async()=>{
+  const {postCast}=await import('../src/lib/signing');
+  const originalFetch=globalThis.fetch;
+  Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
+  const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
+  const session={fid:37,address:'0x0000000000000000000000000000000000000001' as const,key:'0x11' as const,signer};
+  let submissions=0;const image='https://i.ibb.co/fixture/image.png';
+  globalThis.fetch=async(input,init)=>{
+    if(String(input).includes('/api/write/')){
+      submissions++;const message=Message.decode(init!.body as Uint8Array),data=MessageData.decode(message.dataBytes!);
+      assert.equal(data.castAddBody?.text,'');assert.equal(data.castAddBody?.embeds[0].url,image);
+      assert.ok((await validations.validateMessage({...message,data})).isOk());return Response.json({});
+    }
+    return Response.json(cast('0x'+'ab'.repeat(20)));
+  };
+  try{await postCast(config,session,'',undefined,undefined,[],[image]);assert.equal(submissions,1);}
+  finally{globalThis.fetch=originalFetch;}
+});

@@ -179,3 +179,9 @@ After a restart, Freecast restores the same browser-bound signer and checks its 
 Client attribution reads `requestFid` for gasless keys from `signersByFid` and retains onchain signer metadata for existing clients and older nodes. Custody-phrase registration currently uses the account itself as requester, so its label resolves to that account's username rather than a separate Freecast app identity. Attribution caches expire so new keys can become visible.
 
 Notifications are available at `/notifications` for the connected account. Mentions and current follow events are paginated directly from the node. Replies, likes and recasts are checked on the latest ten authored casts first; **Load more activity** checks older casts and continues activity pages. The view deduplicates mentions that are also replies, excludes your own actions, and shows retry controls for partial failures. It is a read-on-demand view with manual refresh, not push notifications or a complete historical archive.
+
+### Image uploads
+
+Set `IMGBB_API_KEY` in the ignored server `.env` and restart Freecast. The API key stays on the server; do not prefix it with `VITE_` or `NEXT_PUBLIC_`. Both the development and production server expose the same image upload route.
+
+Use **Add image** in the composer, reply or quote dialog. JPEG, PNG, GIF and WebP files up to 10 MB are supported, with previews and removal before publishing. Casts and replies support two images; quotes support one image alongside the quoted cast. Image-only casts and replies are supported. Publishing waits until the upload finishes, and failed uploads preserve the draft. Images upload immediately to ImgBB without an expiration setting; removing an attachment from the draft or deleting a cast does not delete the hosted image. The upload endpoint enforces the app origin and limits each connecting IP to 20 attempts per hour (in-memory per server process).

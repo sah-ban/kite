@@ -1,7 +1,7 @@
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
 const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'castsByMention', 'userDataByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
-function writeOrigin(req, config) {
+export function writeOrigin(req, config) {
   const direct = new URL(`${req.socket?.encrypted?'https':'http'}://${req.headers.host}`);
   const localHost = ['localhost','127.0.0.1','[::1]'].includes(direct.hostname);
   const localPeer = ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress);
