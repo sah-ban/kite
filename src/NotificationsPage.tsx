@@ -1,3 +1,4 @@
+import { ProBadge } from './ProBadge';
 import {useEffect,useRef,useState} from 'react';
 import {AtSign,Bell,Heart,MessageCircle,RefreshCw,Repeat2,UserPlus} from 'lucide-react';
 import {type Cast,type Config} from './lib/hub';
@@ -14,7 +15,7 @@ function NotificationRow({config,item,onProfile,onCast}:{config:Config;item:Noti
  return <article className={`notification-row notification-${item.kind}`}>
   <div className="notification-symbol"><Icon size={18}/></div>
   <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${item.actor}`} profile`} onClick={()=>onProfile(item.actor)}><Avatar person={person}/></button>
-  <div className="notification-main"><div className="notification-title"><button className="author" onClick={()=>onProfile(item.actor)}>{person?.name||`FID ${item.actor}`}</button> <span>{labels[item.kind]}</span></div>
+  <div className="notification-main"><div className="notification-title"><button className="author" onClick={()=>onProfile(item.actor)}>{person?.name||`FID ${item.actor}`} <ProBadge config={config} fid={item.actor}/></button> <span>{labels[item.kind]}</span></div>
    <CastTime timestamp={item.timestamp}/>
    {item.cast&&<><CastText config={config} cast={item.cast} visible onProfile={onProfile} onOpen={onCast} limit={240} className="notification-cast-text"/><button className="text-button notification-open" onClick={()=>onCast(item.cast!)}>View cast →</button></>}
   </div>

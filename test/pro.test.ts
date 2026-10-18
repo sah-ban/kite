@@ -29,3 +29,29 @@ test('banner save rechecks Pro before any profile write and blocks expired, abse
     assert.equal(writes,0);
   }finally{globalThis.fetch=original;}
 });
+
+test('Pro expiry tooltip uses calendar months, clamped month ends and singular/plural days',async()=>{
+  const {proExpiryLabel,proSubscriptionExpiry}=await import('../src/lib/pro');
+  const label=(start:string,end:string)=>proExpiryLabel(Date.parse(end)/1000,Date.parse(start));
+  assert.equal(label('2026-01-15T12:00:00Z','2026-03-20T12:00:00Z'),'Expires in 2 months 5 days');
+  assert.equal(label('2026-01-31T12:00:00Z','2026-02-28T12:00:00Z'),'Expires in 1 month 0 days');
+  assert.equal(label('2024-01-31T12:00:00Z','2024-03-01T12:00:00Z'),'Expires in 1 month 1 day');
+  assert.equal(label('2026-10-18T12:00:00Z','2026-10-21T12:00:00Z'),'Expires in 0 months 3 days');
+  assert.equal(label('2026-10-18T12:00:00Z','2026-10-19T11:00:00Z'),'Expires in less than 1 day');
+  assert.equal(label('2026-10-18T12:00:00Z','2026-10-18T12:00:00Z'),'Subscription expired');
+  assert.equal(proSubscriptionExpiry({tier_subscriptions:[{tier_type:'Pro',expires_at:100},{tier_type:1,expires_at:'200'}]}),200);
+});
+test('badge lookups deduplicate per node/FID and limit request concurrency',async()=>{
+  const {cachedProExpiry}=await import('../src/lib/pro');const original=globalThis.fetch;
+  const config:Config={readUrl:'https://badge-fixture.example',validatorUrl:'',optimismRpcUrl:'https://rpc.example'};
+  let calls=0,active=0,maximum=0;const releases:(()=>void)[]=[];
+  globalThis.fetch=async()=>{calls++;active++;maximum=Math.max(maximum,active);await new Promise<void>(resolve=>releases.push(resolve));active--;return Response.json({tierSubscriptions:[{tierType:1,expiresAt:9999999999}]});};
+  try{
+    const reads=Array.from({length:8},(_,i)=>cachedProExpiry(config,90000+i));assert.equal(cachedProExpiry(config,90000),reads[0]);
+    await new Promise(resolve=>setTimeout(resolve,0));assert.equal(calls,4);
+    while(releases.length||active){releases.splice(0).forEach(release=>release());await new Promise(resolve=>setTimeout(resolve,0));}
+    assert.deepEqual(await Promise.all(reads),Array(8).fill(9999999999));assert.equal(maximum,4);assert.equal(calls,8);
+    await cachedProExpiry(config,90000);assert.equal(calls,8);
+    const other=cachedProExpiry({...config,readUrl:'https://other-badge-fixture.example'},90000);await new Promise(resolve=>setTimeout(resolve,0));releases.splice(0).forEach(release=>release());await other;assert.equal(calls,9);
+  }finally{globalThis.fetch=original;}
+});

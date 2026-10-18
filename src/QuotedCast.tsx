@@ -1,3 +1,4 @@
+import { ProBadge } from './ProBadge';
 import {CastTime} from './CastTime';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
@@ -38,7 +39,7 @@ export function QuotedCast({config,fid,hash,visible,onOpen,onProfile}:{config:Co
     <div className="quoted-cast">
     <div className="quoted-content">
       {cast?<>
-        <a href={`/cast/${fid}/${hash}`} aria-label={`Open quoted cast by ${person?.name||`FID ${fid}`}`} onClick={open}><div className="quote-author"><Avatar person={person}/><strong>{person?.name||`FID ${fid}`}</strong><span>{person?.username?`@${person.username}`:`FID ${fid}`}</span><CastTime timestamp={cast.data.timestamp}/></div>
+        <a href={`/cast/${fid}/${hash}`} aria-label={`Open quoted cast by ${person?.name||`FID ${fid}`}`} onClick={open}><div className="quote-author"><Avatar person={person}/><strong>{person?.name||`FID ${fid}`}</strong><ProBadge config={config} fid={fid} visible={visible}/><span>{person?.username?`@${person.username}`:`FID ${fid}`}</span><CastTime timestamp={cast.data.timestamp}/></div>
         {cast.data.castAddBody.parentCastId&&<span className="quote-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</span>}</a>
         <CastText config={config} cast={cast} visible={visible} onProfile={onProfile} onOpen={onOpen} limit={450} className="quote-text"/>
         <a href={`/cast/${fid}/${hash}`} onClick={open} className="quote-footer">{truncated?'Read full cast':cast.data.castAddBody.embeds?.some(e=>e.castId)?'Open conversation · includes another quote':'Open conversation'} <ArrowUpRight size={12}/></a>
