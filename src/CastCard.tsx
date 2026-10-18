@@ -14,6 +14,7 @@ export type CastHandlers = {
   onOpen:(cast:Cast,tab?:ActivityTab)=>void;
   onReply:(cast:Cast)=>void;
   onDelete:(cast:Cast)=>void;
+  onQuote:(cast:Cast)=>void;
   onReact:(cast:Cast,kind:'like'|'recast',remove:boolean)=>void;
 };
 export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,detailed=false,activity:provided}: {
@@ -42,7 +43,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   }}>
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
-      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete}/></div>
+      <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete} onQuote={handlers.onQuote}/></div>
       {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
       <CastText config={config} cast={cast} visible={visible} onProfile={handlers.onProfile} onOpen={detailed?undefined:handlers.onOpen} limit={detailed?undefined:600}/>
       <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>

@@ -165,3 +165,19 @@ test('cast deletion signs a valid removal for the session owner and rejects othe
   assert.equal(data.fid,123);assert.equal(data.type,2);assert.equal(bytesToHex(data.castRemoveBody!.targetHash),hash);
   assert.ok((await validations.validateMessage({...message,data})).isOk());
 });
+
+test('quotes encode a cast embed, allow optional commentary, and reject invalid targets',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);
+  h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const quote={fid:37,hash:'0x'+'ab'.repeat(20)};
+  for(const text of ['My thoughts','']){
+    assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text,quote}})).status,200);
+    const message=h.submitted.at(-1)!,data=MessageData.decode(message.dataBytes!);
+    assert.equal(data.fid,123);assert.equal(data.castAddBody?.text,text);assert.equal(data.castAddBody?.parentCastId,undefined);
+    const embed=data.castAddBody!.embeds[0].castId!;assert.equal(embed.fid,37);assert.equal(bytesToHex(embed.hash),quote.hash);
+    assert.ok((await validations.validateMessage({...message,data})).isOk());
+  }
+  for(const invalid of [{fid:0,hash:quote.hash},{fid:37,hash:'0x123'}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'quote',quote:invalid}})).status,400);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:''}})).status,400);
+  assert.equal(h.submitted.length,2);
+});

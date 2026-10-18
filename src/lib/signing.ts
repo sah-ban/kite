@@ -102,14 +102,15 @@ export async function submit(config: Config, message: Message): Promise<string> 
   if (!response.ok) throw new Error(`Validator returned ${response.status}: ${(await response.text()).slice(0,350)}`);
   return bytesToHex(message.hash);
 }
-export async function postCast(config: Config, session: Session, text: string, parent?: Cast): Promise<string> {
+export async function postCast(config: Config, session: Session, text: string, parent?: Cast, quote?: Cast): Promise<string> {
   const length = new TextEncoder().encode(text).length;
-  if (!text.trim() || length > 1024) throw new Error('Write between 1 and 1,024 UTF-8 bytes.');
+  if ((!text.trim()&&!quote) || length > 1024) throw new Error('Write up to 1,024 UTF-8 bytes or attach a quoted cast.');
+  if(quote&&(!Number.isSafeInteger(quote.data.fid)||quote.data.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(quote.hash)))throw new Error('Invalid quoted cast.');
   let hash: string;
   if (session.remote) {
-    hash = await serverAction({kind:'cast',text,...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{})});
+    hash = await serverAction({kind:'cast',text,...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{}),...(quote?{quote:{fid:quote.data.fid,hash:quote.hash}}:{})});
   } else {
-    const message = result(await makeCastAdd({text,mentions:[],mentionsPositions:[],embeds:[],embedsDeprecated:[],type:length<=320?CastType.CAST:CastType.LONG_CAST,...(parent ? {parentCastId:{fid:parent.data.fid,hash:hexToBytes(parent.hash as Hex)}} : {})},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
+    const message = result(await makeCastAdd({text,mentions:[],mentionsPositions:[],embeds:quote?[{castId:{fid:quote.data.fid,hash:hexToBytes(quote.hash as Hex)}}]:[],embedsDeprecated:[],type:length<=320?CastType.CAST:CastType.LONG_CAST,...(parent ? {parentCastId:{fid:parent.data.fid,hash:hexToBytes(parent.hash as Hex)}} : {})},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
     hash = await submit(config,message);
   }
   // Acceptance is not inclusion. Poll our read node and never claim success early.
