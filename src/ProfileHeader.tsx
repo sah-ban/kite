@@ -32,7 +32,7 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
       <div className="profile-top"><Avatar person={person}/>{ownProfile&&<button className="button small-button" onClick={onEdit}>Edit profile</button>}{!ownProfile&&<button className="button small-button" disabled={busy} onClick={onFollow}>{followed?'Unfollow':'Follow'}</button>}</div>
       <h2>{person?.name||`FID ${fid}`} <ProBadge config={config} fid={fid}/></h2><div className="profile-handle">{person?.username?`@${person.username}`:`FID ${fid}`} <span>· FID {fid}</span>{followsYou&&<span className="follows-you">Follows you</span>}</div>
       {person?.bio&&<p className="profile-bio">{person.bio}</p>}
-      <JoinedDate fid={fid} revision={revision}/>
+      <JoinedDate fid={fid} revision={revision} currentUsername={person?.username}/>
       <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}{(['following','followers'] as const).map(kind=><button key={kind} title={errors[kind]?'Count unavailable. Open list to retry.':undefined} onClick={()=>onConnections(kind)}><strong>{countLabel(pages[kind])}</strong> {kind[0].toUpperCase()+kind.slice(1)}</button>)}<a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
     </section>
 
