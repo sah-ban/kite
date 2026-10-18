@@ -3,21 +3,28 @@ import { ImagePlus } from 'lucide-react';
 import { Modal } from './components';
 import { profile, invalidateProfile, type Config } from './lib/hub';
 import type { Session } from './lib/signing';
+import { getProStatus } from './lib/pro';
 import { uploadImage } from './lib/images';
 import { canEditProfile, profileDraft, profileChanges, saveProfile, type ProfileDraft } from './lib/profile-edit';
 const empty:ProfileDraft={name:'',bio:'',avatar:'',banner:'',website:''};
 export function EditProfile({config,session,onClose,onSaved,onConnect}:{config:Config;session:Session;onClose:()=>void;onSaved:()=>void;onConnect:()=>void}) {
   const [draft,setDraft]=useState<ProfileDraft>(empty),[original,setOriginal]=useState<ProfileDraft>(empty),[username,setUsername]=useState('');
   const [loading,setLoading]=useState(true),[allowed,setAllowed]=useState(false),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(''),[error,setError]=useState(''),[progress,setProgress]=useState(''),[retry,setRetry]=useState(0);
+  const [pro,setPro]=useState<boolean|null>(null),[proError,setProError]=useState(''),[proRetry,setProRetry]=useState(0);
   const lifetime=useRef<AbortController|null>(null);
   useEffect(()=>{
     const abort=new AbortController();lifetime.current=abort;setLoading(true);setError('');setAllowed(false);invalidateProfile(session.fid);
     Promise.all([profile(config,session.fid),canEditProfile(config,session,abort.signal)]).then(([person,allowed])=>{if(abort.signal.aborted)return;const value=profileDraft(person);setDraft(value);setOriginal(value);setUsername(person.username);setAllowed(allowed);}).catch(e=>{if(!abort.signal.aborted)setError((e as Error).message);}).finally(()=>{if(!abort.signal.aborted)setLoading(false);});
     return()=>{abort.abort();};
   },[config,session.fid,session.key,session.remote,retry]);
+  useEffect(()=>{
+    const abort=new AbortController();setPro(null);setProError('');
+    getProStatus(config,session.fid,abort.signal).then(value=>{if(!abort.signal.aborted)setPro(value);}).catch(()=>{if(!abort.signal.aborted)setProError('Could not verify Farcaster Pro status.');});
+    return()=>abort.abort();
+  },[config,session.fid,proRetry]);
   const locked=loading||busy||Boolean(uploading);
   let changed=false,validation='';try{changed=profileChanges(original,draft).length>0;}catch(e){validation=(e as Error).message;}
-  function field(key:keyof ProfileDraft,value:string){setDraft(previous=>({...previous,[key]:value}));setError('');}
+  function field(key:keyof ProfileDraft,value:string){if(key==='banner'&&pro!==true)return;setDraft(previous=>({...previous,[key]:value}));setError('');}
   return <Modal title="Edit profile" className="edit-profile-modal" onClose={()=>{if(!busy&&!uploading)onClose();}}>
     {loading?<p role="status">Loading your profile…</p>:<>
       <p className="small muted">{username?`@${username}`:`FID ${session.fid}`}</p>
@@ -29,16 +36,17 @@ export function EditProfile({config,session,onClose,onSaved,onConnect}:{config:C
         finally{if(!lifetime.current?.signal.aborted){setBusy(false);setProgress('');}}
       }}>
         {(['banner','avatar'] as const).map(key=><div key={key} className={`profile-image-field profile-image-${key}`}>
-          <div className="profile-image-title"><strong>{key==='avatar'?'Profile picture':'Banner'}</strong>{draft[key]&&<button type="button" className="text-button" disabled={locked||!allowed} onClick={()=>field(key,'')}>Remove</button>}</div>
+          <div className="profile-image-title"><strong>{key==='avatar'?'Profile picture':'Banner'}</strong>{draft[key]&&<button type="button" className="text-button" disabled={locked||!allowed||(key==='banner'&&pro!==true)} onClick={()=>field(key,'')}>Remove</button>}</div>
+          {key==='banner'&&pro!==true&&<div className="banner-pro-note"><p className="small muted" role="status">{proError|| (pro===false?'Requires Farcaster Pro':'Checking Farcaster Pro…')}</p>{proError&&<button type="button" className="text-button" onClick={()=>setProRetry(value=>value+1)}>Retry Pro check</button>}</div>}
           {draft[key]&&<img key={draft[key]} src={draft[key]} alt={key==='avatar'?'Profile picture preview':'Banner preview'} referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display='none';}}/>}
-          <label className="profile-upload"><ImagePlus size={15}/>{uploading===key?'Uploading…':'Upload image'}<input type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={locked||!allowed} onChange={async event=>{
-            const file=event.target.files?.[0];event.target.value='';if(!file||locked||!allowed)return;setUploading(key);setError('');
+          <label className="profile-upload"><ImagePlus size={15}/>{uploading===key?'Uploading…':'Upload image'}<input type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={locked||!allowed||(key==='banner'&&pro!==true)} onChange={async event=>{
+            const file=event.target.files?.[0];event.target.value='';if(!file||locked||!allowed||(key==='banner'&&pro!==true))return;setUploading(key);setError('');
             const signal=AbortSignal.any([lifetime.current!.signal,AbortSignal.timeout(65_000)]);
             try{const url=await uploadImage(file,signal);if(!signal.aborted)field(key,url);}
             catch(e){if(!lifetime.current?.signal.aborted)setError(signal.aborted?'Image upload timed out. Please try again.':(e as Error).message);}
             finally{if(!lifetime.current?.signal.aborted)setUploading('');}
           }}/></label>
-          <label>{key==='avatar'?'Profile picture URL':'Banner URL'}<input type="url" value={draft[key]} disabled={locked||!allowed} placeholder="https://…" onChange={event=>field(key,event.target.value)}/></label>
+          <label>{key==='avatar'?'Profile picture URL':'Banner URL'}<input type="url" value={draft[key]} disabled={locked||!allowed||(key==='banner'&&pro!==true)} placeholder="https://…" onChange={event=>field(key,event.target.value)}/></label>
         </div>)}
         <label>Display name <span className="profile-field-count">{new TextEncoder().encode(draft.name).length}/32 bytes</span><input value={draft.name} disabled={locked||!allowed} onChange={event=>field('name',event.target.value)}/></label>
         <label>Bio <span className="profile-field-count">{new TextEncoder().encode(draft.bio).length}/256 bytes</span><textarea rows={4} value={draft.bio} disabled={locked||!allowed} onChange={event=>field('bio',event.target.value)}/></label>

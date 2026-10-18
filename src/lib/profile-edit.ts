@@ -1,4 +1,5 @@
 import { hub, invalidateProfile, type Config, type Profile } from './hub';
+import { getProStatus } from './pro';
 import type { Session } from './signing';
 // @ts-expect-error Shared validation for browser and server signing.
 import { PROFILE_FIELDS as fields, validateProfileField } from '../../profile-fields.mjs';
@@ -31,6 +32,7 @@ export async function canEditProfile(config:Config,session:Session,signal?:Abort
 export async function saveProfile(config:Config,session:Session,original:ProfileDraft,draft:ProfileDraft,onProgress:(message:string)=>void=()=>{},signal?:AbortSignal):Promise<void> {
   const changes=profileChanges(original,draft);if(!changes.length)return;
   if(!await canEditProfile(config,session,signal))throw new Error('This signer cannot edit profiles. Connect a fresh signer with profile editing permission.');
+  if(changes.some(change=>change.type===10)&&!await getProStatus(config,session.fid,signal))throw new Error('Banner editing requires Farcaster Pro.');
   const {updateProfileField}=await import('./signing');let confirmed=0;
   try{
     for(const change of changes){

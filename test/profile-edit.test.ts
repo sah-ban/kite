@@ -44,6 +44,7 @@ test('local profile messages support modern banner type and retain valid dataByt
 test('remote profile save sends only changed fields, confirms reads and invalidates cached profiles',async()=>{
   const fetch=globalThis.fetch;const values=new Map<number,string>([[2,'Tester'],[3,'Original']]);const writes:unknown[]=[];
   globalThis.fetch=async(input,init)=>{
+    if(String(input).includes('storageLimitsByFid'))return Response.json({tier_subscriptions:[{tier_type:'Pro',expires_at:Date.now()/1000+3600}]});
     if(String(input).endsWith('/action')){const body=JSON.parse(String(init?.body));writes.push(body);values.set(body.type,body.value);return Response.json({hash:'0x'+'ab'.repeat(20)});}
     return Response.json({messages:[...values].map(([type,value])=>({data:{userDataBody:{type,value}}}))});
   };

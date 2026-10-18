@@ -198,3 +198,5 @@ Open **My profile → Edit profile** to update your display name, bio, profile p
 Updates use signed `USER_DATA_ADD` messages for the connected FID, and the client waits for each field to appear on the read node before reporting success. Multi-field edits are separate messages; an interrupted save can partially succeed and the editor reports how many fields were confirmed. Profile caches refresh after edits. Display names allow 32 UTF-8 bytes; the other editable values allow 256.
 
 Existing gasless keys without `MESSAGE_TYPE_USER_DATA_ADD` (scope 11) retain their current posting access but cannot edit profiles. New gasless registrations include scope 11 and show profile editing in the permission review. Approved onchain signers support profile edits.
+
+Banner editing requires an active Farcaster Pro subscription. The editor checks `storageLimitsByFid` before enabling banner upload, URL changes, or removal, and rechecks before submitting any save that changes the banner. If Pro status cannot be verified, banner editing stays disabled with a retry option; other profile fields remain available. Existing banners remain visible after a subscription expires.
