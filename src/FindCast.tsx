@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { Modal, Code } from './components';
+import { Modal } from './components';
 import { resolveCast, type Cast, type Config } from './lib/hub';
 import { resolveCastUrl } from './lib/cast-url';
 
-export function FindCast({ config, onClose, renderCast }: { config: Config; onClose: () => void; renderCast: (cast: Cast) => ReactNode }) {
+export function FindCast({ config, onClose, onFound }: { config: Config; onClose: () => void; onFound: (cast: Cast) => void }) {
   const [mode, setMode] = useState<'url' | 'hash'>('url');
   const [url, setUrl] = useState(''), [fid, setFid] = useState('37'), [hash, setHash] = useState('');
-  const [result, setResult] = useState<Cast | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
-  function reset() { request.current?.abort(); setBusy(false); setResult(null); setError(''); }
+  function reset() { request.current?.abort(); setBusy(false); setError(''); }
   return <Modal title="Find a cast" onClose={onClose}>
     <p>Paste a Farcaster cast URL, or enter the author's FID and hash. Short hashes are resolved to the full cast hash using your read node.</p>
     <div className="cast-type-tabs" aria-label="Find cast using">
@@ -22,7 +22,7 @@ export function FindCast({ config, onClose, renderCast }: { config: Config; onCl
       const controller = new AbortController(); request.current = controller; setBusy(true);
       try {
         const cast = mode === 'url' ? await resolveCastUrl(config, url, controller.signal) : await resolveCast(config, Number(fid), hash.trim(), controller.signal);
-        if (!controller.signal.aborted) setResult(cast);
+        if (!controller.signal.aborted) onFound(cast);
       } catch (error) { if (!controller.signal.aborted) setError((error as Error).message); }
       finally { if (!controller.signal.aborted) setBusy(false); }
     }}>
@@ -33,6 +33,5 @@ export function FindCast({ config, onClose, renderCast }: { config: Config; onCl
       <button className="button primary full" disabled={busy}>{busy ? 'Finding cast…' : 'Find cast'}<Search size={16}/></button>
     </form>
     {error && <div className="error" role="alert">{error}</div>}
-    {result && <><Code label="FULL CAST HASH">{result.hash}</Code>{renderCast(result)}</>}
   </Modal>;
 }

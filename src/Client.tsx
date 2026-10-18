@@ -146,6 +146,6 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys}} onClose={()=>setControls(false)} onApply={filters=>{setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setControls(false);}}/>}
-  {lookupOpen&&<FindCast config={config} onClose={()=>setLookupOpen(false)} renderCast={renderCast}/>}
+  {lookupOpen&&<FindCast config={config} onClose={()=>setLookupOpen(false)} onFound={openCast}/>}
   </main>;
 }
