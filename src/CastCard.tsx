@@ -21,6 +21,8 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   config:Config;cast:Cast;handlers:CastHandlers;revision?:number;sessionFid?:number;busy?:boolean;detailed?:boolean;activity?:Activity;
 }) {
   const person=useProfile(config,cast.data.fid), root=useRef<HTMLElement>(null);
+  const parentFid=cast.data.castAddBody.parentCastId?.fid;
+  const parentPerson=useProfile(config,parentFid||0);
   const [visible,setVisible]=useState(detailed),[loaded,setLoaded]=useState<Activity>();
   useEffect(()=>{
     if(visible||!root.current)return;
@@ -44,7 +46,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
     <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${cast.data.fid}`} profile`} onClick={()=>handlers.onProfile(cast.data.fid)}><Avatar person={person}/></button>
     <div className="cast-main">
       <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time></a><CastMenu cast={cast} username={person?.username} own={sessionFid===cast.data.fid} busy={busy} onDelete={handlers.onDelete}/></div>
-      {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
+      {parentFid&&<div className="reply-context">Replying to <button type="button" className="reply-profile" onClick={()=>handlers.onProfile(parentFid)}>{parentPerson?.username?`@${parentPerson.username}`:`FID ${parentFid}`}</button></div>}
       <CastText config={config} cast={cast} visible={visible} onProfile={handlers.onProfile} onOpen={detailed?undefined:handlers.onOpen} limit={detailed?undefined:600}/>
       <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>
       {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen} onProfile={handlers.onProfile}/>)}

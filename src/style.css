@@ -158,3 +158,4 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 .signer .client-prefix-short{display:none}@media(max-width:700px){.cast-interactive .signer .client-prefix-long{display:none}.cast-interactive .signer .client-prefix-short{display:inline}}
 .signer .client-username{text-decoration:underline;text-underline-offset:2px}
 .cast-detail .reply-context{display:none}
+.reply-context .reply-profile{padding:0;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px}.reply-context .reply-profile:hover{color:var(--ink)}
