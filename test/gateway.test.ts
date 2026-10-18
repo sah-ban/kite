@@ -58,3 +58,26 @@ test('HTTPS writes accept the configured origin and reject forged hosts and orig
     assert.equal(calls,1);
   }finally{globalThis.fetch=original;}
 });
+
+test('local writes use their exact loopback origin even when a hosted public URL is configured',async()=>{
+  const original=globalThis.fetch;let calls=0;
+  globalThis.fetch=async()=>{calls++;return Response.json({ok:true});};
+  const middleware=gateway({VALIDATOR_URL:'https://validator.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  try{
+    for(const [host,origin,peer,status] of [
+      ['localhost:5173','http://localhost:5173','127.0.0.1',200],
+      ['127.0.0.1:5173','http://127.0.0.1:5173','::ffff:127.0.0.1',200],
+      ['[::1]:5173','http://[::1]:5173','::1',200],
+      ['localhost:5173','https://attacker.example','127.0.0.1',403],
+      ['localhost:5173','http://127.0.0.1:5173','127.0.0.1',403],
+      ['localhost:5173','http://localhost:5174','127.0.0.1',403],
+      ['localhost:5173','http://localhost:5173','192.0.2.1',403],
+      ['192.0.2.1:5173','http://192.0.2.1:5173','127.0.0.1',403],
+    ] as const){
+      const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1]),{host,origin});
+      (req as any).socket={remoteAddress:peer};
+      await middleware(req,res,()=>{});assert.equal(res.statusCode,status,`${host}, ${origin}, ${peer}`);
+    }
+    assert.equal(calls,3);
+  }finally{globalThis.fetch=original;}
+});

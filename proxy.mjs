@@ -1,6 +1,15 @@
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
 const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'userDataByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
+function writeOrigin(req, config) {
+  const direct = new URL(`${req.socket?.encrypted?'https':'http'}://${req.headers.host}`);
+  const localHost = ['localhost','127.0.0.1','[::1]'].includes(direct.hostname);
+  const localPeer = ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress);
+  const configured = config.FREECAST_PUBLIC_URL ? new URL(config.FREECAST_PUBLIC_URL) : direct;
+  // A hosted origin may remain in .env when the app is also opened locally.
+  // Trust loopback only when both the request host and TCP peer are loopback.
+  return localHost && localPeer && configured.host!==direct.host ? direct : configured;
+}
 export function gateway(config) {
   const readUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
   const validatorUrl = config.VALIDATOR_URL || '';
@@ -15,8 +24,9 @@ export function gateway(config) {
     if (!read && !write) return next();
     if ((read && (req.method !== 'GET' || !readPaths.has(url.pathname.split('/').pop()))) || (write && req.method !== 'POST')) { res.statusCode = 405; res.end('Method or endpoint not allowed'); return; }
     if (write) {
-      const expected=config.FREECAST_PUBLIC_URL?new URL(config.FREECAST_PUBLIC_URL):new URL(`${req.socket?.encrypted?'https':'http'}://${req.headers.host}`);
-      if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch'); return; }
+      let expected;
+      try { expected=writeOrigin(req,config); } catch { res.statusCode=403;res.end('Invalid request origin');return; }
+      if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch. Open the app at its configured origin, or set FREECAST_PUBLIC_URL to the exact browser origin and restart.'); return; }
     }
     if (write && !validatorUrl) { res.statusCode = 503; res.end('Set VALIDATOR_URL to a validator HTTP endpoint before posting.'); return; }
     try {

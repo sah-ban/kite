@@ -92,6 +92,8 @@ The account must already exist and have active storage; gasless signer registrat
 
 The phrase and custody key stay in browser memory. Public custody lookup calls go to the configured Optimism RPC; the node receives signed Farcaster authorization, never the phrase or custody private key. Only the Ed25519 app key is persisted, encrypted with AES-256-GCM and PBKDF2-SHA256 (310,000 iterations). The registration type is authenticated with the other account metadata. The encryption passphrase is not persisted.
 
+If a write reports **Origin mismatch**, check that `FREECAST_PUBLIC_URL` matches the exact browser origin (scheme, host, and port), then restart the server. For local-only development you can leave it unset. Verified same-origin loopback writes also work when a hosted public URL remains configured.
+
 The encrypted key is saved **before** submission. If confirmation is interrupted, select **Unlock saved app key** after the read node catches up; unlocking checks that the gasless key is still active, unexpired, and has the required scopes. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes authorization. Gasless revocation uses a `KEY_REMOVE` message, not the Optimism Key Registry; see the [official signer documentation](https://snapchain.farcaster.xyz/guides/writing-messages).
 
 No analytics are added. The optional QR approval flow uses Farcaster's signed-key-request API. Images and videos load from their original hosts; YouTube and Vimeo players load only after Play. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
