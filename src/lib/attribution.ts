@@ -30,3 +30,6 @@ export async function attribute(config: Config, casts: Cast[]): Promise<Map<stri
   if(failures.length) throw new Error(`Client attribution failed for ${failures.length} author(s). Retry the filter when the node is available.`);
   return map;
 }
+export async function signerRequester(config: Config, fid: number, signer: string): Promise<number | undefined> {
+  return (await keys(config, fid)).get(signer.toLowerCase());
+}
