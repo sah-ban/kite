@@ -151,3 +151,17 @@ test('developer identity file reads only the requested identity fields',async()=
     assert.ok(!('DATABASE_URL' in settings));
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test('cast deletion signs a valid removal for the session owner and rejects other accounts',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);
+  h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const hash='0x'+'ab'.repeat(20);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'deleteCast',targetFid:999,targetHash:hash}})).status,403);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'deleteCast',targetFid:123,targetHash:'0x123'}})).status,400);
+  assert.equal(h.submitted.length,0);
+  const deleted=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'deleteCast',targetFid:123,targetHash:hash}});
+  assert.equal(deleted.status,200);assert.equal(h.submitted.length,1);
+  const message=h.submitted[0],data=MessageData.decode(message.dataBytes!);
+  assert.equal(data.fid,123);assert.equal(data.type,2);assert.equal(bytesToHex(data.castRemoveBody!.targetHash),hash);
+  assert.ok((await validations.validateMessage({...message,data})).isOk());
+});

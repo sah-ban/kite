@@ -8,7 +8,7 @@ import {
   NobleEd25519Signer, ViemLocalEip712Signer, Message, MessageData,
   ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, idRegistryABI, keyRegistryABI,
   FarcasterNetwork, CastType, ReactionType,
-  makeCastAdd, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
+  makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
 } from '@farcaster/core';
 
 const COOKIE = 'freecast_session';
@@ -94,6 +94,11 @@ async function buildAction(session, action) {
       parentCastId = {fid:action.parent.fid,hash:hexToBytes(action.parent.hash)};
     }
     return unwrap(await makeCastAdd({text:action.text,mentions:[],mentionsPositions:[],embeds:[],embedsDeprecated:[],type:bytes<=320?CastType.CAST:CastType.LONG_CAST,parentCastId},options,signer));
+  }
+  if (action.kind === 'deleteCast') {
+    if(action.targetFid!==session.fid)throw new Failure(403,'You can only delete your own casts.');
+    if(!/^0x[0-9a-fA-F]{40}$/.test(action.targetHash))throw new Failure(400,'Invalid cast hash.');
+    return unwrap(await makeCastRemove({targetHash:hexToBytes(action.targetHash)},options,signer));
   }
   if (action.kind === 'reaction') {
     if (!['like','recast'].includes(action.reaction) || !Number.isSafeInteger(action.targetFid) || action.targetFid <= 0 || !/^0x[0-9a-fA-F]{40}$/.test(action.targetHash)) throw new Failure(400, 'Invalid reaction target.');

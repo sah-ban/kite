@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CastType, FarcasterNetwork, Message, MessageData, NobleEd25519Signer, makeCastAdd, validations } from '@farcaster/core';
 import { bytesToHex, encodeAbiParameters } from 'viem';
-import { encodeForSnapchain } from '../src/lib/signing';
+import { encodeForSnapchain, deleteCast } from '../src/lib/signing';
 import { requester, metadataAbi } from '../src/lib/attribution';
 import { filterBySigner, resolveCast, onlyCastAdds, type Cast, type Config } from '../src/lib/hub';
 
@@ -57,4 +57,27 @@ test('cast feeds omit CAST_REMOVE tombstones and malformed records',()=>{
   const visible=cast('0x50184b62b4c52fd76628713562e1eda3dccaf63d');
   const removal={hash:'0xremoved',signer:'0xabc',data:{fid:37,timestamp:1,type:'MESSAGE_TYPE_CAST_REMOVE',castRemoveBody:{targetHash:'base64'}}};
   assert.deepEqual(onlyCastAdds([visible,removal,{data:null},{}]),[visible]);
+});
+
+test('local cast deletion signs the target and waits for the read node to report it missing',async()=>{
+  const originalFetch=globalThis.fetch;
+  Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
+  const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
+  const target=cast('0x'+'ab'.repeat(20));
+  const session={fid:37,address:'0x0000000000000000000000000000000000000001' as const,key:'0x11' as const,signer};
+  let submissions=0,reads=0;
+  globalThis.fetch=async(input,init)=>{
+    if(String(input).includes('/api/write/')){
+      submissions++;const message=Message.decode(init!.body as Uint8Array),data=MessageData.decode(message.dataBytes!);
+      assert.equal(data.fid,37);assert.equal(data.type,2);assert.equal(bytesToHex(data.castRemoveBody!.targetHash),target.hash);
+      assert.ok((await validations.validateMessage({...message,data})).isOk());
+      return Response.json({accepted:true});
+    }
+    reads++;return Response.json({errCode:'not_found'},{status:404});
+  };
+  try{
+    await assert.rejects(deleteCast(config,{...session,fid:999},target),/only delete your own/);
+    assert.equal(submissions,0);assert.equal(reads,0);
+    await deleteCast(config,session,target);assert.equal(submissions,1);assert.equal(reads,1);
+  }finally{globalThis.fetch=originalFetch;}
 });

@@ -1,4 +1,4 @@
-import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_GATEWAY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, ViemLocalEip712Signer, idRegistryABI, keyGatewayABI, keyRegistryABI, makeCastAdd, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
+import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_GATEWAY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, ViemLocalEip712Signer, idRegistryABI, keyGatewayABI, keyRegistryABI, makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
 import { createPublicClient, createWalletClient, http, bytesToHex, hexToBytes, formatEther, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
@@ -118,6 +118,24 @@ export async function postCast(config: Config, session: Session, text: string, p
     try { await hub(config,'castById',{fid:session.fid,hash}); return hash; } catch { /* node may still be syncing */ }
   }
   throw new Error(`Accepted by validator; inclusion is not confirmed yet. Check FID ${session.fid}, hash ${hash} before retrying.`);
+}
+export async function deleteCast(config:Config,session:Session,cast:Cast):Promise<void> {
+  if(session.fid!==cast.data.fid)throw new Error('You can only delete your own casts.');
+  if(!/^0x[0-9a-fA-F]{40}$/.test(cast.hash))throw new Error('Invalid cast hash.');
+  if(session.remote)await serverAction({kind:'deleteCast',targetFid:cast.data.fid,targetHash:cast.hash});
+  else {
+    const message=result(await makeCastRemove({targetHash:hexToBytes(cast.hash as Hex)},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
+    await submit(config,message);
+  }
+  for(let i=0;i<12;i++){
+    await new Promise(resolve=>setTimeout(resolve,2500));
+    try{await hub(config,'castById',{fid:session.fid,hash:cast.hash});}
+    catch(error){
+      const message=(error as Error).message;
+      if(/^Node returned (404|410):/.test(message)||/^Node returned 400:.*"errCode"\s*:\s*"not_found"/s.test(message))return;
+    }
+  }
+  throw new Error('Deletion submitted, but removal is not confirmed yet. Refresh your profile before trying again.');
 }
 export async function react(config: Config, session: Session, cast: Cast, kind: 'like'|'recast', remove = false) {
   if (session.remote) return serverAction({kind:'reaction',reaction:kind,targetFid:cast.data.fid,targetHash:cast.hash,remove});

@@ -144,3 +144,5 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 .reply-modal-composer{padding:0;border:0;background:transparent}.reply-modal-composer>div{width:100%}.reply-modal-composer textarea{font-size:15px;min-height:120px}.cast-actions .reply-action.button{padding:8px 12px;font-size:11px}
 
 .cast-interactive{cursor:pointer;transition:background-color .15s}.cast-interactive:hover,.cast-interactive:focus-visible{background:var(--surface-hover)}.cast-interactive:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+
+.cast-actions .delete-cast{margin-left:auto;order:2;color:var(--muted)}.cast-actions .delete-cast:hover{color:var(--danger)}.delete-confirm-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.delete-confirm{color:var(--danger);border-color:var(--danger)}
