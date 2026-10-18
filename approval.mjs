@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { sessionStore, SessionStorageError } from './session-store.mjs';
 import { parseEnv } from 'node:util';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
@@ -13,11 +14,14 @@ import {
 
 const COOKIE = 'freecast_session';
 const PENDING_TTL = 10 * 60_000;
-const SESSION_TTL = 8 * 60 * 60_000;
+const SESSION_TTL = 30 * 24 * 60 * 60_000;
 class Failure extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 class RegistrationPending extends Error {}
+class SignerInactive extends Failure {
+  constructor(){super(403,'The approved signer is inactive or has been revoked.');}
+}
 const unwrap = result => { if (result.isErr()) throw new Failure(400, result.error.message); return result.value; };
 
 function originFor(req, config) {
@@ -74,7 +78,7 @@ async function verifyRegistration(config, fid, key, request) {
   const client = createPublicClient({chain:optimism,transport:http(config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io')});
   const state = await client.readContract({address:KEY_REGISTRY_ADDRESS,abi:keyRegistryABI,functionName:'keys',args:[BigInt(fid),key]});
   if (Number(state[0]) === 0) throw new RegistrationPending();
-  if (Number(state[0]) !== 1 || Number(state[1]) !== 1) throw new Failure(403, 'The approved signer is inactive or has been revoked.');
+  if (Number(state[0]) !== 1 || Number(state[1]) !== 1) throw new SignerInactive();
   const address = await client.readContract({address:ID_REGISTRY_ADDRESS,abi:idRegistryABI,functionName:'custodyOf',args:[BigInt(fid)]});
   const response = await request(new URL(`/v1/storageLimitsByFid?fid=${fid}`,config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381'),{signal:AbortSignal.timeout(20_000)});
   if (!response.ok) throw new Failure(502, 'Could not check account storage.');
@@ -125,14 +129,32 @@ export function approval(config, dependencies = {}) {
   const now = dependencies.now || Date.now;
   const verify = dependencies.verify || ((fid,key) => verifyRegistration(config,fid,key,request));
   const sessions = new Map();
+  const store=dependencies.store||sessionStore(config.FREECAST_SESSION_DIR||undefined);
+  let ready;
   const starts = new Map();
   let identity;
   const api = 'https://api.farcaster.xyz/v2';
 
-  function erase(id) { const session=sessions.get(id); session?.privateKey.fill(0); sessions.delete(id); }
-  function prune() {
-    for (const [id,session] of sessions) if (session.expires <= now()) erase(id);
-    for (const [ip,record] of starts) if (record.expires <= now()) starts.delete(ip);
+  async function erase(id) { const session=sessions.get(id);if(session){session.privateKey.fill(0);session.state='removed';}await store.remove(id);sessions.delete(id); }
+  async function prune() {
+    for(const [id,session] of sessions)if(session.expires<=now())await erase(id);
+    for(const [ip,record] of starts)if(record.expires<=now())starts.delete(ip);
+  }
+  async function restore(){
+    for(const session of sessions.values())session.privateKey.fill(0);sessions.clear();
+    for(const [id,session] of await store.load()){
+      if(session.state==='active')session.needsVerification=true;
+      sessions.set(id,session);
+    }
+    await prune();
+  }
+  async function verifyRestored(id,session){
+    if(!session.needsVerification)return;
+    session.verification ||= (async()=>{
+      try{const address=await verify(session.fid,session.key);if(sessions.get(id)===session&&session.state==='active'){session.address=address;session.needsVerification=false;}}
+      catch(error){if(error instanceof RegistrationPending||error instanceof SignerInactive){await erase(id);throw new Failure(403,'The saved signer is inactive or has been revoked.');}throw error;}
+    })();
+    try{await session.verification;}finally{delete session.verification;}
   }
   const publicSession = session => ({fid:session.fid,address:session.address,key:session.key,remote:true});
 
@@ -140,7 +162,6 @@ export function approval(config, dependencies = {}) {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
     if (!path.startsWith('/api/auth/')) return next();
     try {
-      prune();
       const origin = originFor(req,config);
       if (!canConnect(origin)) throw new Failure(403, 'Open Freecast through localhost or HTTPS to connect an account.');
       if (origin.protocol !== 'https:' && !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress)) throw new Failure(403, 'Localhost account connections must originate on this server.');
@@ -148,8 +169,15 @@ export function approval(config, dependencies = {}) {
       if (req.method !== expectedMethod) throw new Failure(405, 'Method not allowed.');
       if (req.method === 'POST' && req.headers.origin !== origin.origin) throw new Failure(403, 'Origin mismatch.');
       if (!['/api/auth/start','/api/auth/session','/api/auth/action','/api/auth/logout'].includes(path)) throw new Failure(404, 'Unknown account endpoint.');
+      try{await (ready ||= restore());}catch(error){ready=undefined;throw error;}await prune();
       let id = cookieValue(req);
       let session = id && sessions.get(id);
+      if(session&&!(await store.has(id))){session.privateKey.fill(0);sessions.delete(id);session=undefined;}
+      if(session&&(session.origin!==origin.origin||(session.state==='removed'&&path!=='/api/auth/logout')))session=undefined;
+      if(session?.state==='active'&&path!=='/api/auth/logout'){
+        await verifyRestored(id,session);
+        if(sessions.get(id)!==session||session.state!=='active'||session.expires<=now())session=undefined;
+      }
 
       if (path === '/api/auth/start') {
         if (session?.state === 'active') return send(res,200,{state:'active',session:publicSession(session)});
@@ -170,21 +198,22 @@ export function approval(config, dependencies = {}) {
           const data = (await response.json()).result?.signedKeyRequest;
           if (!data?.token || !data?.deeplinkUrl || !['https:','farcaster:','warpcast:'].includes(new URL(data.deeplinkUrl).protocol)) throw new Failure(502, 'Invalid Farcaster approval response.');
           id = randomBytes(32).toString('hex');
-          sessions.set(id,{state:'pending',privateKey:new Uint8Array(privateKey),key,token:data.token,deepLinkUrl:data.deeplinkUrl,expires:now()+PENDING_TTL,lastPoll:0});
+          sessions.set(id,{state:'pending',origin:origin.origin,privateKey:new Uint8Array(privateKey),key,token:data.token,deepLinkUrl:data.deeplinkUrl,expires:now()+PENDING_TTL,lastPoll:0});
+          try{await store.save(id,sessions.get(id));}catch(error){await erase(id);throw error;}
           setCookie(res,id,origin,PENDING_TTL/1000);
           return send(res,200,{state:'pending',deepLinkUrl:data.deeplinkUrl,key});
         } finally { privateKey.fill(0); }
       }
 
       if (path === '/api/auth/logout') {
-        if (id) erase(id);
+        if (id&&session) await erase(id);
         setCookie(res,'',origin,0);
         return send(res,200,{state:'none'});
       }
 
       if (path === '/api/auth/session') {
         if (!session) return send(res,200,{state:'none'});
-        if (session.state === 'active') return send(res,200,{state:'active',session:publicSession(session)});
+        if (session.state === 'active') {setCookie(res,id,origin,Math.max(1,Math.floor((session.expires-now())/1000)));return send(res,200,{state:'active',session:publicSession(session)});}
         if (session.polling || now()-session.lastPoll < 1500) return send(res,200,{state:'pending'});
         session.polling = true; session.lastPoll = now();
         try {
@@ -192,18 +221,21 @@ export function approval(config, dependencies = {}) {
           if (!response.ok) throw new Failure(502, 'Could not check Farcaster approval. Try again.');
           const data = (await response.json()).result?.signedKeyRequest;
           if (!data?.state) throw new Failure(502, 'Invalid approval status response.');
-          if (['expired','cancelled','failed'].includes(data.state)) { erase(id); throw new Failure(400, 'Approval expired or was cancelled. Create a new request.'); }
+          if (['expired','cancelled','failed'].includes(data.state)) { await erase(id); throw new Failure(400, 'Approval expired or was cancelled. Create a new request.'); }
           if (!['completed','approved'].includes(data.state)) return send(res,200,{state:'pending'});
           const fid = Number(data.userFid);
           if (!Number.isSafeInteger(fid) || fid <= 0) throw new Failure(502, 'Farcaster did not return a valid approved FID.');
           try { session.address = await verify(fid,session.key); }
           catch (error) { if (error instanceof RegistrationPending) return send(res,200,{state:'pending',message:'Waiting for onchain signer registration.'}); throw error; }
-          if (sessions.get(id) !== session || session.expires <= now()) {
-            erase(id);
+          if (sessions.get(id) !== session || session.state!=='pending' || session.expires <= now()) {
+            await erase(id);
             return send(res,200,{state:'none'});
           }
-          session.fid = fid; session.state = 'active'; session.expires = now()+SESSION_TTL;
-          delete session.token; delete session.deepLinkUrl;
+          const activated={...session,fid,state:'active',expires:now()+SESSION_TTL};
+          await store.save(id,activated);
+          if(sessions.get(id)!==session||session.state!=='pending'||session.expires<=now()){await erase(id);return send(res,200,{state:'none'});}
+          Object.assign(session,activated);
+          delete session.token;delete session.deepLinkUrl;
           setCookie(res,id,origin,SESSION_TTL/1000);
           return send(res,200,{state:'active',session:publicSession(session)});
         } finally { session.polling = false; }
@@ -212,15 +244,15 @@ export function approval(config, dependencies = {}) {
       if (!session || session.state !== 'active') throw new Failure(401, 'Connect and approve an account first.');
       if (!config.VALIDATOR_URL) throw new Failure(503, 'Configure the server submission endpoint before publishing.');
       const action = await readBody(req);
-      if (sessions.get(id) !== session || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
+      if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const message = await buildAction(session,action);
-      if (sessions.get(id) !== session || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
+      if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();
       const response = await request(new URL('/v1/submitMessage',config.VALIDATOR_URL),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
       if (!response.ok) throw new Failure(502, `Submission endpoint rejected the message (${response.status}).`);
       return send(res,200,{hash:bytesToHex(message.hash),accepted:true});
     } catch (error) {
-      return send(res,error instanceof Failure?error.status:502,{error:error instanceof Failure?error.message:'Could not complete account approval. Check server configuration and try again.'});
+      return send(res,error instanceof SessionStorageError?503:error instanceof Failure?error.status:502,{error:error instanceof Failure||error instanceof SessionStorageError?error.message:'Could not complete account approval. Check server configuration and try again.'});
     }
   };
 }

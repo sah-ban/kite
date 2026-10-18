@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { Message, MessageData, validations, SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_DOMAIN, SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_TYPES } from '@farcaster/core';
 import { bytesToHex, recoverTypedDataAddress } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, readdir, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // @ts-expect-error Shared server middleware is JavaScript.
 import { approval, loadApprovalIdentity } from '../approval.mjs';
+// @ts-expect-error Server-only JavaScript storage module.
+import {sessionStore,SessionStorageError} from '../session-store.mjs';
 
 // Public deterministic development fixture. Never used for a live approval.
 const mnemonic='test test test test test test test test test test test junk';
@@ -21,14 +23,16 @@ async function call(middleware:ReturnType<typeof approval>,path:string,options:{
   await middleware(req,res,()=>{throw new Error('Unexpected next middleware');});
   return {status:res.statusCode,headers:res.headers,body:JSON.parse(String(res.body))};
 }
+const memoryStore=()=>({load:async()=>new Map(),save:async()=>{},remove:async()=>{},has:async()=>true});
 function harness(extra:Record<string,string>={}) {
-  let time=Date.now(),state='pending_approval',approvedFid=123;
+  let time=Date.now(),state='pending_approval',approvedFid=123,verifyError:Error|undefined;
   const calls:{url:string;body?:unknown}[]=[];
   const verified:{fid:number;key:string}[]=[];
   const submitted:Message[]=[];
-  const middleware=approval({...config,...extra},{
+  const dependencies={
+    ...(extra.FREECAST_SESSION_DIR?{}:{store:memoryStore()}),
     now:()=>time,
-    verify:async(fid:number,key:string)=>{verified.push({fid,key});return custody;},
+    verify:async(fid:number,key:string)=>{if(verifyError)throw verifyError;verified.push({fid,key});return custody;},
     fetch:async(input:string|URL,init?:RequestInit)=>{
       const url=String(input);calls.push({url,body:init?.body});
       if(url.endsWith('/signed-key-requests'))return Response.json({result:{signedKeyRequest:{token:'0xdeadbeef',deeplinkUrl:'farcaster://signed-key-request?token=0xdeadbeef'}}});
@@ -38,8 +42,9 @@ function harness(extra:Record<string,string>={}) {
       }
       throw new Error('Unexpected network request: '+url);
     },
-  });
-  return {middleware,calls,verified,submitted,approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
+  };
+  let middleware=approval({...config,...extra},dependencies);
+  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
 }
 const cookieFrom=(result:Awaited<ReturnType<typeof call>>)=>result.headers['Set-Cookie'].split(';')[0];
 
@@ -90,6 +95,7 @@ test('logging out during registration verification cannot restore an active sess
   let verificationStarted!: ()=>void;
   const verifying = new Promise<void>(resolve=>{verificationStarted=resolve;});
   const middleware=approval(config,{
+    store:memoryStore(),
     verify:()=>{verificationStarted();return new Promise<string>(resolve=>{finishVerification=resolve;});},
     fetch:async(input:string|URL)=>Response.json({result:{signedKeyRequest:String(input).endsWith('/signed-key-requests')
       ?{token:'fixture-token',deeplinkUrl:'farcaster://signed-key-request?token=fixture-token'}
@@ -127,7 +133,7 @@ test('expired approvals and sessions stop authorizing actions',async()=>{
   assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'none');
   const second=await call(h.middleware,'/api/auth/start');const approvedCookie=cookieFrom(second);h.approve();
   assert.equal((await call(h.middleware,'/api/auth/session',{cookie:approvedCookie})).body.state,'active');
-  h.advance(9*60*60_000);
+  h.advance(31*24*60*60_000);
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie:approvedCookie,body:{kind:'follow',targetFid:37}})).status,401);
 });
 
@@ -197,4 +203,83 @@ test('mentions are signed as FIDs and UTF-8 positions for casts, replies, and qu
     assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'🤓 hi',...fields}})).status,400);
   }
   assert.equal(h.submitted.length,4);
+});
+
+test('pending and approved signer connections survive restarts with the same key and cookie',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  try{
+    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    h.restart();const pending=await call(h.middleware,'/api/auth/start',{cookie});
+    assert.equal(pending.body.key,start.body.key);assert.equal(pending.body.deepLinkUrl,start.body.deepLinkUrl);
+    assert.equal(h.calls.filter(call=>call.url.endsWith('/signed-key-requests')).length,1);
+    h.approve();const approved=await call(h.middleware,'/api/auth/session',{cookie});assert.equal(approved.body.state,'active');
+    assert.ok(approved.headers['Set-Cookie'].includes('Max-Age=2592000'));
+    h.restart();const restored=await call(h.middleware,'/api/auth/session',{cookie});
+    assert.equal(restored.body.state,'active');assert.equal(restored.body.session.key,start.body.key);assert.equal(restored.body.session.fid,123);
+    assert.equal(h.verified.length,2,'revalidate a restored signer before exposing it as connected');
+    await call(h.middleware,'/api/auth/session',{cookie});assert.equal(h.verified.length,2);
+    assert.equal(h.submitted.length,0,'restoring a connection must not send messages');
+    const action=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Persisted signer fixture'}});
+    assert.equal(action.status,200);assert.equal(bytesToHex(h.submitted[0].signer),start.body.key);
+    const message=h.submitted[0];assert.ok((await validations.validateMessage({...message,data:MessageData.decode(message.dataBytes!)})).isOk());
+    await call(h.middleware,'/api/auth/logout',{cookie});h.restart();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'none');
+    assert.equal((await readdir(dir)).filter(name=>name.endsWith('.json')).length,0);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('saved sessions remain bound to their origin and transient verification failures do not erase them',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  try{
+    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    h.approve();await call(h.middleware,'/api/auth/session',{cookie});h.restart();
+    h.failVerification(new Error('RPC unavailable'));
+    assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).status,502);
+    assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'must not send'}})).status,502);
+    assert.equal(h.submitted.length,0);assert.equal((await readdir(dir)).filter(name=>name.endsWith('.json')).length,1);
+    h.failVerification();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.session.key,start.body.key);
+    const other={cookie,host:'127.0.0.1:5174',origin:'http://127.0.0.1:5174'};
+    assert.equal((await call(h.middleware,'/api/auth/session',other)).body.state,'none');
+    await call(h.middleware,'/api/auth/logout',other);
+    assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active','another origin cannot erase this connection');
+    h.advance(31*24*60*60_000);h.restart();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'none');
+    assert.equal((await readdir(dir)).filter(name=>name.endsWith('.json')).length,0);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('corrupted saved signer storage returns an error without generating a replacement',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  try{
+    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+    const path=join(dir,(await readdir(dir)).find(name=>name.endsWith('.json'))!);
+    await writeFile(path,'invalid encrypted record',{mode:0o600});h.restart();
+    assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).status,503);
+    assert.equal((await call(h.middleware,'/api/auth/start',{cookie})).status,503);
+    assert.equal(h.calls.filter(call=>call.url.endsWith('/signed-key-requests')).length,1);assert.equal(h.submitted.length,0);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('approval is not active until its saved key is durable, and logout during saving cannot restore it',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  try{
+    const disk=sessionStore(dir);let release!:()=>void,started!:()=>void;
+    const saving=new Promise<void>(resolve=>{started=resolve;}),gate=new Promise<void>(resolve=>{release=resolve;});
+    const dependencies={store:{...disk,save:async(id:string,session:{state:string})=>{if(session.state==='active'){started();await gate;}await disk.save(id,session);}},verify:async()=>custody,fetch:async(input:string|URL)=>Response.json({result:{signedKeyRequest:String(input).endsWith('/signed-key-requests')?{token:'fixture-token',deeplinkUrl:'farcaster://signed-key-request?token=fixture-token'}:{state:'completed',userFid:123}}})};
+    const middleware=approval(config,dependencies),start=await call(middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    const poll=call(middleware,'/api/auth/session',{cookie});await saving;
+    assert.equal((await call(middleware,'/api/auth/session',{cookie})).body.state,'pending','do not report success while saving');
+    await call(middleware,'/api/auth/logout',{cookie});release();
+    assert.equal((await poll).body.state,'none');
+    assert.equal((await sessionStore(dir).load()).size,0,'late saves cannot leave a signer after logout');
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('a failed active-session save can be retried without generating another signer',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  try{
+    const disk=sessionStore(dir);let fail=true,time=Date.now(),starts=0;
+    const middleware=approval(config,{now:()=>time,store:{...disk,save:async(id:string,session:{state:string})=>{if(session.state==='active'&&fail){fail=false;throw new SessionStorageError();}await disk.save(id,session);}},verify:async()=>custody,fetch:async(input:string|URL)=>{const start=String(input).endsWith('/signed-key-requests');if(start)starts++;return Response.json({result:{signedKeyRequest:start?{token:'fixture-token',deeplinkUrl:'farcaster://signed-key-request?token=fixture-token'}:{state:'completed',userFid:123}}});}});
+    const start=await call(middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    assert.equal((await call(middleware,'/api/auth/session',{cookie})).status,503);
+    assert.equal([...((await sessionStore(dir).load()).values())][0].state,'pending');
+    time+=2000;const retried=await call(middleware,'/api/auth/session',{cookie});
+    assert.equal(retried.body.state,'active');assert.equal(retried.body.session.key,start.body.key);assert.equal(starts,1);
+  }finally{await rm(dir,{recursive:true,force:true});}
 });

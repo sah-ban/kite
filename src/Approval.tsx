@@ -25,6 +25,7 @@ export function Approval({configured,onSession,onClose}:{configured:boolean;onSe
       try {
         const result=await accountRequest('session');
         if (!active) return;
+        setError('');
         if (result.state==='active'&&result.session) {onSession({...result.session,remote:true});onClose();return;}
         if (result.state==='none'||Date.now()-started>10*60_000) {setLink('');setError('Approval expired. Create a new request.');return;}
         setMessage(result.message || 'Waiting for approval in Farcaster…');
@@ -35,7 +36,7 @@ export function Approval({configured,onSession,onClose}:{configured:boolean;onSe
     return()=>{active=false;clearTimeout(timer);};
   },[link,onSession,onClose]);
   return <div className="approval">
-    <p>Create a fresh signer and approve it in Farcaster. Your account's seed phrase is not requested. The delegated private key stays in this server's memory.</p>
+    <p>Create a fresh signer and approve it in Farcaster. Your account's seed phrase is not requested. The delegated private key is stored encrypted on this server.</p>
     {!secure&&<div className="note">Open this client through localhost or HTTPS to approve an account. This public HTTP view supports reading.</div>}
     {!configured&&<div className="note">The operator needs to configure a server-only developer app identity before approval requests can be created.</div>}
     {link?<>
@@ -54,6 +55,6 @@ export function Approval({configured,onSession,onClose}:{configured:boolean;onSe
       }catch(e){setError((e as Error).message);}finally{setBusy(false);}
     }}>{busy?<><RefreshCw className="spin" size={16}/>Creating signer…</>:<>Create signer and show QR <ArrowUpRight size={16}/></>}</button>}
     {error&&<div className="error" role="alert">{error}</div>}
-    <p className="small muted">Sessions last up to eight hours and end if the server restarts. Signing out clears this server's key copy; it does not revoke the app key in Farcaster.</p>
+    <p className="small muted">Connections last up to 30 days and survive server restarts. Signing out removes the saved signer; it does not revoke the app key in Farcaster.</p>
   </div>;
 }
