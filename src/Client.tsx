@@ -29,7 +29,8 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   useEffect(()=>{const pop=()=>setView(clientRoute(location.pathname,location.search));window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
   useEffect(()=>{if(view.kind==='profile'){setFid(view.fid);}},[view]);
   const [order,setOrder]=useState<'newest'|'oldest'>('newest');
-  const [castType,setCastType]=useState<'posts'|'replies'>('posts');
+  const [profileCastType,setCastType]=useState<'posts'|'replies'>('posts');
+  const castType=feed==='profile'?profileCastType:'posts';
   const autoPages=useRef(0);
   const profileOrder=feed==='profile'?order:'newest';
   const requestId=useRef(0), reading=useRef(false), composer=useRef<HTMLTextAreaElement>(null);
@@ -94,7 +95,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {view.kind==='profile'&&<ProfileHeader key={fid} config={config} fid={fid} onProfile={openProfile} onFollow={toggleFollow} followed={followed.has(fid)} busy={Boolean(actionBusy)} ownProfile={session?.fid===fid} revision={refresh}/>}
   {(view.kind!=='profile'||session?.fid===fid||reply)&&<div className="composer"><Avatar p={session?profiles[session.fid]:undefined}/><div><textarea ref={composer} value={text} onChange={e=>setText(e.target.value)} placeholder={session?'What would you like to put into the world?':'Your next cast starts here.'} aria-label="Cast text" rows={3}/>{reply&&<div className="reply-draft">Replying to FID {reply.data.fid} <button onClick={()=>setReply(null)}>Cancel</button></div>}<div className="composer-bottom"><span>{session?<><span className="live-dot"/> Signing as FID {session.fid}</>:<><Lock size={12}/> Connect your account to publish</>}</span><button className="button primary small-button" disabled={publishing} onClick={async()=>{if(!session){setAccountOpen(true);return;}setPublishing(true);setError('');try{const hash=await postCast(config,session,text,reply||undefined);setText('');setReply(null);setNotice(`Included in your read node: ${hash}`);setRefresh(v=>v+1);}catch(e){setError((e as Error).message);}finally{setPublishing(false);}}}>{publishing?'Confirming inclusion…':'Publish cast'}<ArrowUpRight size={14}/></button></div></div></div>}
   {error&&<div className="feed-message error" role="alert"><AlertCircle size={17}/><span>{error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}>×</button></div>}{notice&&<div className="feed-message notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={()=>setNotice('')}>×</button></div>}
-  <div className="cast-type-tabs" role="tablist" aria-label="Posts and replies" onKeyDown={e=>{
+  {feed==='profile'&&<div className="cast-type-tabs" role="tablist" aria-label="Posts and replies" onKeyDown={e=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
     e.preventDefault();
     const next=e.key==='Home'?'posts':e.key==='End'?'replies':castType==='posts'?'replies':'posts';
@@ -103,9 +104,9 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   }}>
     <button role="tab" id="posts-tab" aria-controls="cast-feed" aria-selected={castType==='posts'} tabIndex={castType==='posts'?0:-1} onClick={()=>selectCastType('posts')}>Posts</button>
     <button role="tab" id="replies-tab" aria-controls="cast-feed" aria-selected={castType==='replies'} tabIndex={castType==='replies'?0:-1} onClick={()=>selectCastType('replies')}>Replies</button>
-  </div>
+  </div>}
   <div className="feed-count"><span>{busy&&!filtered.length?'READING FROM YOUR NODE':`${filtered.length} ${castType.toUpperCase()}${mode!=='all'?' · FILTERED':''}`}</span>{attributing&&<span role="status">Resolving client keys…</span>}<select className="feed-order" aria-label="Chronological order" value={order} onChange={e=>setOrder(e.target.value as 'newest'|'oldest')}><option value="newest">Newest first</option><option value="oldest">{feed==='following'?'Oldest loaded first':'Oldest first'}</option></select></div>
-  <div id="cast-feed" role="tabpanel" aria-labelledby={`${castType}-tab`} aria-busy={busy}>
+  <div id="cast-feed" role={feed==='profile'?'tabpanel':'region'} aria-labelledby={feed==='profile'?`${castType}-tab`:undefined} aria-label={feed==='following'?'Following posts':undefined} aria-busy={busy}>
   {busy&&!filtered.length?<div className="loading"><span className="loader"/><p>Reading the network…</p></div>:filtered.length?filtered.map(renderCast):<div className="empty"><Radio size={30}/><h3>{error?'The feed is unavailable':`No ${castType} in this view`}</h3><p>{error?'Check your node connection and refresh.':hasMore?`No ${castType} match the loaded pages. Load more or adjust your client filter.`:feed==='following'?(session?'Follow some accounts to fill your home feed, or adjust your client filter.':'Try another public FID or connect your account to see casts from accounts you follow.'):`Try another FID or adjust your client filter.`}</p></div>}
   {hasMore&&<button className="load-more" disabled={busy} onClick={()=>loadMore()}>{busy?'Reading…':feed==='following'?'Load next 12 followed profiles':order==='newest'?'Load older casts':'Load newer casts'} <ArrowRight size={15}/></button>}{feed==='following'&&<p className="feed-limit">Showing up to 15 recent casts per followed account, loaded in batches of 12 accounts.</p>}
   </div>
