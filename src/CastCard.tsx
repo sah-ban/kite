@@ -5,6 +5,7 @@ import { castPath, countLabel, readActivity, type Activity, type ActivityTab } f
 import { ClientLabel } from './ClientLabel';
 import { Avatar, useProfile } from './social-ui';
 import { QuotedCast } from './QuotedCast';
+import { CastEmbeds } from './CastEmbeds';
 
 export type CastHandlers = {
   onProfile:(fid:number)=>void;
@@ -34,7 +35,7 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
       <div className="cast-header"><button className="author" onClick={()=>handlers.onProfile(cast.data.fid)}>{person?.name||`FID ${cast.data.fid}`}</button><span className="username">{person?.username?`@${person.username}`:`#${cast.data.fid}`}</span><a className="cast-date" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}><time dateTime={castDate(cast.data.timestamp).toISOString()} title={castDate(cast.data.timestamp).toLocaleString()}>{castDate(cast.data.timestamp).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></a><a aria-label="Open cast on Farcaster" href={`https://farcaster.xyz/${person?.username||cast.data.fid}/${cast.hash}`} target="_blank" rel="noreferrer"><ArrowUpRight size={15}/></a></div>
       {cast.data.castAddBody.parentCastId&&<div className="reply-context">Reply to FID {cast.data.castAddBody.parentCastId.fid}</div>}
       {detailed?<p className="cast-text">{cast.data.castAddBody.text}</p>:<a className="cast-text cast-permalink" href={castPath(cast)} onClick={e=>{e.preventDefault();handlers.onOpen(cast);}}>{truncated?characters.slice(0,600).join('').trimEnd()+'…':cast.data.castAddBody.text}{truncated&&<span className="read-full">Read full cast →</span>}</a>}
-      {cast.data.castAddBody.embeds?.filter(e=>e.url&&/^https?:\/\//.test(e.url)).map((e,i)=><a className="embed-link" href={e.url} key={i} target="_blank" rel="noreferrer">{e.url}</a>)}
+      <CastEmbeds urls={cast.data.castAddBody.embeds?.flatMap(e=>e.url?[e.url]:[])||[]} visible={visible}/>
       {cast.data.castAddBody.embeds?.filter(e=>e.castId).map((e,i)=><QuotedCast key={`${e.castId!.fid}:${e.castId!.hash}:${i}`} config={config} fid={e.castId!.fid} hash={e.castId!.hash} visible={visible} onOpen={handlers.onOpen}/>)}
       {detailed&&<div className="cast-timestamp">{castDate(cast.data.timestamp).toLocaleString()}</div>}
       <div className="cast-actions">

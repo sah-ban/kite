@@ -4,11 +4,14 @@ import react from '@vitejs/plugin-react';
 import { gateway } from './proxy.mjs';
 // @ts-expect-error Server-only middleware is shared with the Node production server.
 import { approval } from './approval.mjs';
+// @ts-expect-error Server-only metadata fetcher is shared with production.
+import { embedPreviews } from './embeds.mjs';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), { name: 'freecast-gateway', configureServer(server) {
     const config = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
     server.middlewares.use(approval(config));
+    server.middlewares.use(embedPreviews());
     server.middlewares.use(gateway(config));
   } }],
   server: { host: '127.0.0.1', port: 5173, strictPort: true },

@@ -92,7 +92,7 @@ The phrase and custody key stay in browser memory. Public contract calls and the
 
 The encrypted key is saved **before** broadcasting registration so an interrupted confirmation does not lose it. If the transaction failed, unlocking reports the unregistered key; register a replacement after checking the transaction. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes the onchain key. Revoke through the Key Registry from your custody wallet. Onchain app keys are not scoped like current gasless signers: they authorize broad Farcaster message signing until revoked.
 
-No analytics or remote scripts are used. The optional QR approval flow uses Farcaster's signed-key-request API. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
+No analytics are added. The optional QR approval flow uses Farcaster's signed-key-request API. Images and videos load from their original hosts; YouTube and Vimeo players load only after Play. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
 
 ## Reading and writing
 
@@ -148,3 +148,9 @@ This is an implementation to test, not a claim of contest qualification. Complet
 Open an author's name or avatar to view their profile, biography, Posts/Replies tabs, and paginated follower/following lists. My profile opens the connected account. Click a cast to open its conversation; Replies, Likes, and Recasts tabs show direct replies and the accounts behind reactions. Opening a reply opens its own thread, and parent links let you move back up a conversation. These pages have shareable URLs and support browser back/forward navigation.
 
 Counts come from the read node's current retained messages. A `+` means additional pages remain; it is a lower bound, not a complete total. Load more to read the remaining pages. An unavailable count is shown as `—`, never zero. Offscreen cast counts are deferred, and count requests are cached briefly and limited to three concurrent requests. No third-party engagement index is used.
+
+## Media and link embeds
+
+Regular casts and quoted casts render images with an enlarged viewer, click-to-play native videos and HLS streams, and YouTube/Vimeo players. Nothing starts playing automatically. HLS support is loaded only when needed, and playback depends on the host permitting browser access and the browser supporting the video's codec. Unavailable media keeps an original-source link.
+
+Link cards use Open Graph/Twitter metadata fetched by the server through `/api/embed`. The fetcher restricts destinations to public HTTP(S), pins validated DNS answers, checks redirects, and bounds response size, time, concurrency, and request rate. It forwards no browser credentials and does not execute webpage scripts or embed arbitrary player frames. Previews are cached briefly. Sites that require authentication or block previews fall back to a plain link card.
