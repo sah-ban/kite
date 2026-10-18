@@ -1,5 +1,5 @@
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
-export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string };
+export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string };
 export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
@@ -51,13 +51,19 @@ export async function hub<T>(config: Config, endpoint: string, params: Record<st
   if (['castsByFid','castsByParent','castsByMention'].includes(endpoint) && Array.isArray(result.messages)) result.messages=onlyCastAdds(result.messages);
   return result;
 }
+const profileListeners=new Set<()=>void>();
+let profileVersion=0;
+export const subscribeProfiles=(listener:()=>void)=>{profileListeners.add(listener);return()=>{profileListeners.delete(listener);};};
+export const getProfileVersion=()=>profileVersion;
+export function invalidateProfile(fid:number){profiles.delete(fid);profileVersion++;for(const listener of profileListeners)listener();}
 const profiles = new Map<number, Promise<Profile>>();
 export function profile(config: Config, fid: number): Promise<Profile> {
-  if (!profiles.has(fid)) profiles.set(fid, hub<{ messages: HubMessage[] }>(config,'userDataByFid',{fid}).then(({messages}) => {
+  const cached=profiles.get(fid);if(cached)return cached;
+  const pending=hub<{ messages: HubMessage[] }>(config,'userDataByFid',{fid}).then(({messages}) => {
     const value = (type: string, n: number) => messages.find(m => m.data.userDataBody?.type === type || m.data.userDataBody?.type === n)?.data.userDataBody?.value || '';
-    return {fid, name: value('USER_DATA_TYPE_DISPLAY',2) || `FID ${fid}`, username: value('USER_DATA_TYPE_USERNAME',6), avatar: value('USER_DATA_TYPE_PFP',1), bio: value('USER_DATA_TYPE_BIO',3), banner: value('USER_DATA_TYPE_BANNER',10)};
-  }).catch(e => { profiles.delete(fid); throw e; }));
-  return profiles.get(fid)!;
+    return {fid, displayName:value('USER_DATA_TYPE_DISPLAY',2),website:value('USER_DATA_TYPE_URL',5),name:value('USER_DATA_TYPE_DISPLAY',2)||`FID ${fid}`, username:value('USER_DATA_TYPE_USERNAME',6),avatar:value('USER_DATA_TYPE_PFP',1),bio:value('USER_DATA_TYPE_BIO',3),banner:value('USER_DATA_TYPE_BANNER',10)};
+  }).catch(error=>{if(profiles.get(fid)===pending)profiles.delete(fid);throw error;});
+  profiles.set(fid,pending);return pending;
 }
 export function filterBySigner(casts: Cast[], keys: string[], mode: 'all' | 'include' | 'exclude'): Cast[] {
   if (mode === 'all' || !keys.length) return casts;

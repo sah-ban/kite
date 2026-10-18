@@ -189,3 +189,12 @@ Use **Add image** in the composer, reply or quote dialog. JPEG, PNG, GIF and Web
 ### GIF picker
 
 Use **GIF** beside **Add image** to browse featured GIFs, search, or load more results. Selected GIFs attach directly from Tenor and share the two image slots (one alongside a quoted cast); they do not upload to ImgBB. The same picker is available in casts, replies and quotes. Freecast uses the `tenor.bhopp.ing` provider from the [GIF miniapp](https://github.com/sah-ban/gif) through its server-side `/api/gifs` route, with a short bounded cache, validated media URLs, and retryable errors. No additional API key is required; availability depends on that third-party provider.
+
+
+### Edit profile
+
+Open **My profile → Edit profile** to update your display name, bio, profile picture, banner, or website. Pictures and banners accept image URLs or uploads through the configured ImgBB integration. Username registration and transfers are separate and are not changed by this form.
+
+Updates use signed `USER_DATA_ADD` messages for the connected FID, and the client waits for each field to appear on the read node before reporting success. Multi-field edits are separate messages; an interrupted save can partially succeed and the editor reports how many fields were confirmed. Profile caches refresh after edits. Display names allow 32 UTF-8 bytes; the other editable values allow 256.
+
+Existing gasless keys without `MESSAGE_TYPE_USER_DATA_ADD` (scope 11) retain their current posting access but cannot edit profiles. New gasless registrations include scope 11 and show profile editing in the permission review. Approved onchain signers support profile edits.

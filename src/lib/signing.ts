@@ -182,3 +182,13 @@ async function serverAction(action: Record<string,unknown>): Promise<string> {
   if (!response.ok) throw new Error(body.error || 'Account action failed.');
   return body.hash;
 }
+
+export async function updateProfileField(config:Config,session:Session,type:number,value:string):Promise<string> {
+  // @ts-expect-error Shared browser/server field validation.
+  const {validateProfileField}=await import('../../profile-fields.mjs');
+  validateProfileField(type,value);
+  if(session.remote)return serverAction({kind:'profile',type,value});
+  const {loadGaslessSdk}=await import('./gasless-sdk');const sdk=await loadGaslessSdk();
+  const message=result(await sdk.makeUserDataAdd({type,value},{fid:session.fid,network:sdk.FarcasterNetwork.MAINNET},session.signer));
+  return submit(config,message as unknown as Message);
+}

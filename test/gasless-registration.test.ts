@@ -40,7 +40,7 @@ async function environment(options:Options,run:(env:{writes:GaslessSdk.Message[]
       const message=sdk.Message.decode(new Uint8Array(await new Response(init?.body).arrayBuffer()));
       message.data=sdk.MessageData.decode(message.dataBytes!);writes.push(message);
       if(options.submitFails)return new Response('node rejected registration',{status:400});
-      if(message.data.type===sdk.MessageType.KEY_ADD&&!options.delayMerge){const body=message.data.keyAddBody!;activeSigner={fid,key:bytesToHex(body.key),keyType:1,source:'SIGNER_SOURCE_OFFCHAIN',scopes:['MESSAGE_TYPE_CAST_ADD','MESSAGE_TYPE_CAST_REMOVE','MESSAGE_TYPE_REACTION_ADD','MESSAGE_TYPE_REACTION_REMOVE','MESSAGE_TYPE_LINK_ADD','MESSAGE_TYPE_LINK_REMOVE'],expiresAt:Math.floor(Date.now()/1000)+body.ttl};}
+      if(message.data.type===sdk.MessageType.KEY_ADD&&!options.delayMerge){const body=message.data.keyAddBody!;activeSigner={fid,key:bytesToHex(body.key),keyType:1,source:'SIGNER_SOURCE_OFFCHAIN',scopes:['MESSAGE_TYPE_CAST_ADD','MESSAGE_TYPE_CAST_REMOVE','MESSAGE_TYPE_REACTION_ADD','MESSAGE_TYPE_REACTION_REMOVE','MESSAGE_TYPE_LINK_ADD','MESSAGE_TYPE_LINK_REMOVE','MESSAGE_TYPE_USER_DATA_ADD'],expiresAt:Math.floor(Date.now()/1000)+body.ttl};}
       return Response.json({hash:bytesToHex(message.hash)});
     }
     throw new Error('Unexpected request: '+url);

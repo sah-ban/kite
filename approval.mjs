@@ -12,6 +12,9 @@ import {
   makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
 } from '@farcaster/core';
 
+import { loadModernSdk } from './modern-sdk.mjs';
+import { validateProfileField } from './profile-fields.mjs';
+
 const COOKIE = 'freecast_session';
 const PENDING_TTL = 10 * 60_000;
 const SESSION_TTL = 30 * 24 * 60 * 60_000;
@@ -89,6 +92,11 @@ async function verifyRegistration(config, fid, key, request) {
 async function buildAction(session, action) {
   const signer = new NobleEd25519Signer(session.privateKey);
   const options = {fid:session.fid,network:FarcasterNetwork.MAINNET};
+  if(action.kind==='profile'){
+    try{validateProfileField(action.type,action.value);}catch(error){throw new Failure(400,error.message);}
+    const sdk=await loadModernSdk();
+    return unwrap(await sdk.makeUserDataAdd({type:action.type,value:action.value},options,new sdk.NobleEd25519Signer(session.privateKey)));
+  }
   if (action.kind === 'cast') {
     const bytes = typeof action.text === 'string' ? Buffer.byteLength(action.text) : 0;
     const mentions=action.mentions??[],mentionsPositions=action.mentionsPositions??[];

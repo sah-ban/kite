@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { profile, type Config, type Profile } from './lib/hub';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { profile, subscribeProfiles, getProfileVersion, type Config, type Profile } from './lib/hub';
 
 export function useProfile(config:Config,fid:number) {
+  const revision=useSyncExternalStore(subscribeProfiles,getProfileVersion);
   const [person,setPerson]=useState<Profile>();
-  useEffect(()=>{let active=true;setPerson(undefined);if(fid>0)profile(config,fid).then(p=>{if(active)setPerson(p);}).catch(()=>{});return()=>{active=false;};},[config,fid]);
+  useEffect(()=>{let active=true;setPerson(undefined);if(fid>0)profile(config,fid).then(p=>{if(active)setPerson(p);}).catch(()=>{});return()=>{active=false;};},[config,fid,revision]);
   return person;
 }
 export function Avatar({person}:{person?:Profile}) {

@@ -305,3 +305,15 @@ test('approved signer accepts direct Tenor GIF embeds and rejects other Tenor me
   for(const url of ['https://media.tenor.com/fixture/video.mp4','https://media.tenor.com.evil.example/a.gif'])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[url]}})).status,400);
   assert.equal(h.submitted.length,1);
 });
+
+test('approved signer edits only permitted profile fields as its own FID, including modern banners',async()=>{
+  const {loadGaslessSdk}=await import('../src/lib/gasless-sdk');const sdk=await loadGaslessSdk();
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  for(const [type,value] of [[2,'Updated'],[10,'https://example.com/banner.png'],[1,''],[3,'Bio'],[5,'https://example.com']] as const){
+    const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'profile',fid:999,type,value}});assert.equal(result.status,200);
+    const envelope=h.submitted.at(-1)!;const message=sdk.Message.decode(Message.encode(envelope).finish()),data=sdk.MessageData.decode(message.dataBytes!);
+    assert.equal(data.fid,123);assert.equal(data.type,sdk.MessageType.USER_DATA_ADD);assert.equal(data.userDataBody?.type,type);assert.equal(data.userDataBody?.value,value);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
+  }
+  for(const body of [{type:6,value:'unowned-name'},{type:2,value:'😀'.repeat(9)},{type:1,value:'javascript:alert(1)'},{type:11,value:'0x00'}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'profile',...body}})).status,400);
+  assert.equal(h.submitted.length,5);
+});

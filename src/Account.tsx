@@ -62,7 +62,7 @@ export function Account({ config, onSession, onClose }: {
           <dt>App public key</dt><dd className="mono">{pending.key}</dd>
           <dt>Registration fee</dt><dd>No gas required</dd>
           <dt>Key expiry</dt><dd>{pending.ttlSeconds / 86400} days of inactivity</dd>
-          <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow and unfollow</dd>
+          <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow, unfollow and edit your profile</dd>
         </dl>
         <p className="small muted">The encrypted app key is saved before submission so you can unlock it if confirmation is interrupted. Active use refreshes its expiry.</p>
         <button className="button primary full" disabled={busy} onClick={() => run(async () => {

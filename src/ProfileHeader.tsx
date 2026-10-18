@@ -11,8 +11,8 @@ function ProfileCover({banner}:{banner?:string}) {
   return <div className="profile-cover">{src&&failedSrc!==src?<img key={src} src={src} alt="Profile banner" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailedSrc(src)}/>:<span>YOUR CORNER OF THE NETWORK</span>}</div>;
 }
 
-export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,followed,busy,ownProfile,revision}: {
-  config:Config;fid:number;viewerFid?:number;onConnections:(kind:'followers'|'following')=>void;onFollow:()=>void;followed:boolean;busy:boolean;ownProfile:boolean;revision:number;
+export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,followed,busy,ownProfile,revision,onEdit}: {
+  config:Config;fid:number;viewerFid?:number;onConnections:(kind:'followers'|'following')=>void;onFollow:()=>void;followed:boolean;busy:boolean;ownProfile:boolean;revision:number;onEdit:()=>void;
 }) {
   const person=useProfile(config,fid);
   const [relationship,setRelationship]=useState<{fid:number;viewerFid:number;follows:boolean}>();
@@ -27,10 +27,10 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
   return <>
     <section className="profile-hero" aria-label="Profile">
       <ProfileCover banner={person?.banner}/>
-      <div className="profile-top"><Avatar person={person}/>{!ownProfile&&<button className="button small-button" disabled={busy} onClick={onFollow}>{followed?'Unfollow':'Follow'}</button>}</div>
+      <div className="profile-top"><Avatar person={person}/>{ownProfile&&<button className="button small-button" onClick={onEdit}>Edit profile</button>}{!ownProfile&&<button className="button small-button" disabled={busy} onClick={onFollow}>{followed?'Unfollow':'Follow'}</button>}</div>
       <h2>{person?.name||`FID ${fid}`}</h2><div className="profile-handle">{person?.username?`@${person.username}`:`FID ${fid}`} <span>· FID {fid}</span>{followsYou&&<span className="follows-you">Follows you</span>}</div>
       {person?.bio&&<p className="profile-bio">{person.bio}</p>}
-      <div className="profile-meta">{(['following','followers'] as const).map(kind=><button key={kind} title={errors[kind]?'Count unavailable. Open list to retry.':undefined} onClick={()=>onConnections(kind)}><strong>{countLabel(pages[kind])}</strong> {kind[0].toUpperCase()+kind.slice(1)}</button>)}<a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
+      <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}{(['following','followers'] as const).map(kind=><button key={kind} title={errors[kind]?'Count unavailable. Open list to retry.':undefined} onClick={()=>onConnections(kind)}><strong>{countLabel(pages[kind])}</strong> {kind[0].toUpperCase()+kind.slice(1)}</button>)}<a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
     </section>
 
   </>;
