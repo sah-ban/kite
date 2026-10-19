@@ -197,6 +197,18 @@ export async function updateProfileField(config:Config,session:Session,type:numb
   return submit(config,message as unknown as Message);
 }
 
+export async function setPreferredFname(config:Config,session:Session,value:string):Promise<string> {
+  requireLocal();
+  // @ts-expect-error Registry name and ownership validation is shared with the server.
+  const {fnameName,ownsFnameProof}=await import('../../fname-utils.mjs');const name=fnameName(value);
+  const proof=await hub(config,'userNameProofByName',{name});
+  if(!ownsFnameProof(proof,name,session.fid))throw new Error('The read node does not confirm this fname belongs to your FID.');
+  if(session.remote)return serverAction({kind:'setPreferredFname',name});
+  const {loadGaslessSdk}=await import('./gasless-sdk');const sdk=await loadGaslessSdk();
+  const message=result(await sdk.makeUserDataAdd({type:6,value:name},{fid:session.fid,network:sdk.FarcasterNetwork.MAINNET},session.signer));
+  return submit(config,message as unknown as Message);
+}
+
 export async function prepareCastReplacement(config:Config,session:Session,cast:Cast,body:unknown):Promise<{hash:string;bytes:Uint8Array}> {
   if(cast.data.fid!==session.fid)throw new Error('You can only edit your own casts.');
   const source={fid:cast.data.fid,hash:cast.hash,timestamp:cast.data.timestamp};

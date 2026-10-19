@@ -199,13 +199,23 @@ HTTP and HTTPS links typed or pasted into the cast, reply, quote, or edit compos
 
 ### Edit profile
 
-Open **My profile → Edit profile** to update your display name, bio, profile picture, banner, or website. Pictures and banners accept image URLs or uploads through the configured ImgBB integration. Username registration and transfers are separate and are not changed by this form.
+Open **My profile → Edit profile** to update your display name, bio, profile picture, banner, or website. Pictures and banners accept image URLs or uploads through the configured ImgBB integration. Fname changes have a separate localhost-only flow described below.
 
 Updates use signed `USER_DATA_ADD` messages for the connected FID, and the client waits for each field to appear on the read node before reporting success. Multi-field edits are separate messages; an interrupted save can partially succeed and the editor reports how many fields were confirmed. Profile caches refresh after edits. Display names allow 32 UTF-8 bytes; the other editable values allow 256.
 
 Existing gasless keys without `MESSAGE_TYPE_USER_DATA_ADD` (scope 11) retain their current posting access but cannot edit profiles. New gasless registrations include scope 11 and show profile editing in the permission review. Approved onchain signers support profile edits.
 
 Banner editing requires an active Farcaster Pro subscription. The editor checks `storageLimitsByFid` before enabling banner upload, URL changes, or removal, and rechecks before submitting any save that changes the banner. If Pro status cannot be verified, banner editing stays disabled with a retry option; other profile fields remain available. Existing banners remain visible after a subscription expires.
+
+### Change fname on localhost
+
+Open Freecast at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then choose **Edit profile → Change username**. Enter the new fname, custody recovery phrase and derivation index. The phrase stays in browser memory and is cleared from the field before review; it is never stored or sent to Freecast, the registry or the RPC. Only signed public username proofs go directly to `fnames.farcaster.xyz`. The phrase must derive the connected FID's current custody address, and the connected app signer must allow profile updates. ENS names use a separate registration process.
+
+Availability, known reserved names, and the registry's [28-day cooldown](https://github.com/farcasterxyz/fname-registry/blob/main/src/transfers.ts) are checked before review and again before submission. The new name's complete transfer history is checked too: a released name can still be cooling down. Review the current and new fnames and custody address, then explicitly confirm the release. Releasing the old name and claiming the new one are separate registry writes; the new name is not reserved by an availability check, and the old name may not be reclaimable for 28 days. Both custody proofs are prepared before releasing anything, with the claim timestamp later than the release.
+
+After claiming, Freecast waits for the fname proof on the read node, submits the preferred username (`USER_DATA_ADD`, type 6), and waits for inclusion. A failed release never proceeds to claiming. A failed or ambiguous submission can be retried on the open page: registry ownership is checked first, so confirmed releases or claims are not repeated. If a name is already claimed by this FID, the flow can finish only the preferred-name update. Closing the form discards its in-memory custody key and does not reverse completed transfers; after reopening, enter the same claimed fname to finish a pending profile update. Tests use public fixture keys and mocked transfers only.
+
+The preferred-fname action is restricted to loopback hosts and loopback peers on the server, and independently verifies that the node's proof belongs to the approved FID. Existing hosted approval configuration can remain in `.env` while connecting locally; local and hosted sessions remain bound to their own origins.
 
 Active Farcaster Pro subscriptions display a **PRO** badge beside names in profiles, casts, quotes, notifications, and user lists. Hover or focus the badge to access its expiry description, such as “Expires in 2 months 5 days.” Remaining time uses calendar months and UTC days. Badge lookups share a bounded five-minute cache per node and FID, with at most four concurrent requests. Expired, non-Pro, or unavailable subscriptions do not display a badge; banner editing continues to perform its own fresh subscription checks.
 

@@ -17,6 +17,8 @@ import {
 import { buildCastMessage, buildReplacementMessage, replacementBody } from './replacement.mjs';
 import { loadModernSdk } from './modern-sdk.mjs';
 import { validateProfileField } from './profile-fields.mjs';
+import { fnameName, ownsFnameProof } from './fname-utils.mjs';
+import { writeOrigin } from './proxy.mjs';
 
 const COOKIE = 'freecast_session';
 const PENDING_TTL = 10 * 60_000;
@@ -31,12 +33,9 @@ class SignerInactive extends Failure {
 const unwrap = result => { if (result.isErr()) throw new Failure(400, result.error.message); return result.value; };
 
 function originFor(req, config) {
-  if (config.FREECAST_PUBLIC_URL) {
-    const url = new URL(config.FREECAST_PUBLIC_URL);
-    if (req.headers.host !== url.host) throw new Failure(403, 'Unexpected request host.');
-    return url;
-  }
-  return new URL(`${req.socket?.encrypted ? 'https' : 'http'}://${req.headers.host}`);
+  const url=writeOrigin(req,config);
+  if(req.headers.host!==url.host)throw new Failure(403,'Unexpected request host.');
+  return url;
 }
 function canConnect(origin) {
   return origin.protocol === 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
@@ -92,9 +91,14 @@ async function verifyRegistration(config, fid, key, request) {
   return address;
 }
 
-async function buildAction(session, action,checkCastPro) {
+async function buildAction(session, action,checkCastPro,checkFname) {
   const signer = new NobleEd25519Signer(session.privateKey);
   const options = {fid:session.fid,network:FarcasterNetwork.MAINNET};
+  if(action.kind==='setPreferredFname'){
+    let name;try{name=fnameName(action.name);}catch(error){throw new Failure(400,error.message);}
+    await checkFname(name);
+    const sdk=await loadModernSdk();return unwrap(await sdk.makeUserDataAdd({type:6,value:name},options,new sdk.NobleEd25519Signer(session.privateKey)));
+  }
   if(action.kind==='prepareCastReplacement'){
     const sdk=await loadModernSdk();
     try{await checkCastPro(replacementBody(action.body));return await buildReplacementMessage(action.body,action.source,session.fid,new sdk.NobleEd25519Signer(session.privateKey));}
@@ -258,6 +262,12 @@ export function approval(config, dependencies = {}) {
           if(!response.ok)throw new Error('Unavailable');pro=activeProSubscription(await response.json(),now()/1000);
         }catch{throw new Failure(503,'Could not verify Farcaster Pro status. Your draft is kept; retry when the read node is available.');}
         if(!pro)throw new Failure(400,'Active Farcaster Pro is required for more than two embeds or text over 1,024 UTF-8 bytes.');
+      },async name=>{
+        const host=new URL(`http://${req.headers.host}`).hostname,peer=req.socket?.remoteAddress;
+        if(!['localhost','127.0.0.1','[::1]'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer))throw new Failure(403,'Fname changes are available only on localhost.');
+        const target=new URL('/v1/userNameProofByName',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381');target.searchParams.set('name',name);
+        const response=await request(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});
+        if(!response.ok||!ownsFnameProof(await response.json(),name,session.fid))throw new Failure(400,'The read node does not confirm this fname belongs to your FID.');
       });
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();

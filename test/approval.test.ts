@@ -26,7 +26,7 @@ async function call(middleware:ReturnType<typeof approval>,path:string,options:{
 const memoryStore=()=>({load:async()=>new Map(),save:async()=>{},remove:async()=>{},has:async()=>true});
 function harness(extra:Record<string,string>={}) {
   let time=Date.now(),state='pending_approval',approvedFid=123,verifyError:Error|undefined;
-  let proStatus:unknown={tier_subscriptions:[]};
+  let proStatus:unknown={tier_subscriptions:[]},fnameProof:unknown;
   const calls:{url:string;body?:unknown}[]=[];
   const verified:{fid:number;key:string}[]=[];
   const submitted:Message[]=[];
@@ -36,6 +36,7 @@ function harness(extra:Record<string,string>={}) {
     verify:async(fid:number,key:string)=>{if(verifyError)throw verifyError;verified.push({fid,key});return custody;},
     fetch:async(input:string|URL,init?:RequestInit)=>{
       const url=String(input);calls.push({url,body:init?.body});
+      if(new URL(url).pathname==='/v1/userNameProofByName')return fnameProof?Response.json(fnameProof):Response.json({error:'Missing'},{status:404});
       if(new URL(url).pathname==='/v1/storageLimitsByFid')return Response.json(proStatus);
       if(url.endsWith('/signed-key-requests'))return Response.json({result:{signedKeyRequest:{token:'0xdeadbeef',deeplinkUrl:'farcaster://signed-key-request?token=0xdeadbeef'}}});
       if(url.includes('/signed-key-request?'))return Response.json({result:{signedKeyRequest:{state,userFid:approvedFid}}});
@@ -46,7 +47,7 @@ function harness(extra:Record<string,string>={}) {
     },
   };
   let middleware=approval({...config,...extra},dependencies);
-  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,setPro:(value:unknown)=>{proStatus=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
+  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,setPro:(value:unknown)=>{proStatus=value;},setFnameProof:(value:unknown)=>{fnameProof=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
 }
 const cookieFrom=(result:Awaited<ReturnType<typeof call>>)=>result.headers['Set-Cookie'].split(';')[0];
 
@@ -376,4 +377,19 @@ test('server rechecks Pro for new and replacement casts and rejects absent, expi
   }
   assert.equal(h.submitted.length,0);
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Normal cast'}})).status,200,'Ordinary casts remain usable when Pro lookup is unavailable.');
+});
+
+test('localhost preferred fname updates require an owning node proof and sign only for the approved FID',async()=>{
+  const h=harness({FREECAST_PUBLIC_URL:'https://hosted.example',NEXT_PUBLIC_HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active');
+  for(const proof of [undefined,{fid:999,type:1,name:'newfname'},{fid:123,type:2,name:'newfname'},{fid:123,type:1,name:'different'}]){h.setFnameProof(proof);assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,400);}
+  assert.equal(h.submitted.length,0);h.setFnameProof({fid:123,type:'USERNAME_TYPE_FNAME',name:'newfname'});
+  const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname',fid:999}});assert.equal(result.status,200);
+  const message=h.submitted[0],data=MessageData.decode(message.dataBytes!);assert.equal(data.fid,123);assert.equal(data.userDataBody?.type,6);assert.equal(data.userDataBody?.value,'newfname');assert.ok((await validations.validateMessage({...message,data})).isOk());
+  assert.ok(h.calls.some(value=>value.url==='https://read.example/v1/userNameProofByName?name=newfname'));
+});
+test('hosted accounts cannot call the localhost-only fname action; fake loopback hosts and foreign origins stay rejected',async()=>{
+  const h=harness({FREECAST_PUBLIC_URL:'https://client.example'}),options={host:'client.example',origin:'https://client.example',ip:'192.0.2.20'},start=await call(h.middleware,'/api/auth/start',options),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{...options,cookie});h.setFnameProof({fid:123,type:1,name:'newfname'});
+  assert.equal((await call(h.middleware,'/api/auth/action',{...options,cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,403);
+  assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173',ip:'192.0.2.20'})).status,403);
+  assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'https://attacker.example',ip:'127.0.0.1'})).status,403);assert.equal(h.submitted.length,0);
 });
