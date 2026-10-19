@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { Modal } from './components';
 import { resolveCast, type Cast, type Config } from './lib/hub';
 import { resolveCastUrl } from './lib/cast-url';
 import { resolveProfileSearch } from './lib/profile-search';
 
-export function SearchDialog({ config, onClose, onFound, onProfile }: { config: Config; onClose: () => void; onFound: (cast: Cast) => void; onProfile: (fid: number) => void }) {
+export function SearchPage({ config, onFound, onProfile }: { config: Config; onFound: (cast: Cast) => void; onProfile: (fid: number) => void }) {
   const [mode, setMode] = useState<'url' | 'hash' | 'profile'>('url');
   const [url, setUrl] = useState(''), [fid, setFid] = useState('37'), [hash, setHash] = useState('');
   const [query, setQuery] = useState('');
@@ -13,14 +12,16 @@ export function SearchDialog({ config, onClose, onFound, onProfile }: { config: 
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
   function reset() { request.current?.abort(); setBusy(false); setError(''); }
-  return <Modal title="Search" onClose={onClose}>
+  return <div className="search-page">
+    <div className="detail-heading"><Search size={22}/><h1>Search</h1></div>
+    <div className="search-content">
     <p>{mode === 'profile' ? 'Find a profile by exact username, FID, or Farcaster profile URL.' : "Paste a Farcaster cast URL, or enter the author's FID and hash. Short hashes are resolved to the full cast hash using your read node."}</p>
     <div className="cast-type-tabs" aria-label="Search using">
       <button type="button" className={mode === 'url' ? 'selected' : ''} aria-pressed={mode === 'url'} onClick={() => { reset(); setMode('url'); }}>Cast URL</button>
       <button type="button" className={mode === 'hash' ? 'selected' : ''} aria-pressed={mode === 'hash'} onClick={() => { reset(); setMode('hash'); }}>FID and hash</button>
       <button type="button" className={mode === 'profile' ? 'selected' : ''} aria-pressed={mode === 'profile'} onClick={() => { reset(); setMode('profile'); }}>Profiles</button>
     </div>
-    <form onSubmit={async event => {
+    <form className="search-form" onSubmit={async event => {
       event.preventDefault(); reset();
       const controller = new AbortController(); request.current = controller; setBusy(true);
       try {
@@ -41,5 +42,6 @@ export function SearchDialog({ config, onClose, onFound, onProfile }: { config: 
       <button className="button primary full" disabled={busy}>{busy ? (mode === 'profile' ? 'Finding profile…' : 'Finding cast…') : (mode === 'profile' ? 'Find profile' : 'Find cast')}<Search size={16}/></button>
     </form>
     {error && <div className="error" role="alert">{error}</div>}
-  </Modal>;
+    </div>
+  </div>;
 }
