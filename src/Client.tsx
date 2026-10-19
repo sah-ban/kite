@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { Settings, Bell, Radio, UserRound, Server, ArrowUpRight, RefreshCw, SlidersHorizontal, Search, ArrowRight, Users, Lock, KeyRound, AlertCircle } from 'lucide-react';
-import { hub, profile, following, filterBySigner, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
+import { hub, profile, following, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
 import { attribute } from './lib/attribution';
 import type { Session } from './lib/signing';
 const Account=lazy(()=>import('./Account').then(m=>({default:m.Account})));
@@ -11,6 +11,7 @@ const follow=async(...args:Parameters<typeof import('./lib/signing')['follow']>)
 import { Modal } from './components';
 import { SearchPage } from './SearchPage';
 import { FeedControls } from './FeedControls';
+import { filterByClient } from './lib/feed-filters';
 import { CastCard, type CastHandlers } from './CastCard';
 import { CastDetail } from './CastDetail';
 import { QuotedCast } from './QuotedCast';
@@ -33,7 +34,7 @@ import { castPath, type ActivityTab } from './lib/social';
 function Avatar({p}:{p?:Profile}) {const [broken,setBroken]=useState(false);return <div className="avatar">{p?.avatar&&!broken?<img src={p.avatar} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)}/>:<span>{(p?.name||'F').slice(0,1).toUpperCase()}</span>}</div>;}
 export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   const [info,setInfo]=useState<NodeInfo|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false);
-  const [fid,setFid]=useState(37),[homeFid,setHomeFid]=useState(37),[fidInput,setFidInput]=useState('37'),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
+  const [fid,setFid]=useState(37),[homeFid,setHomeFid]=useState(37),[fidInput,setFidInput]=useState('37'),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[selfRegistered,setSelfRegistered]=useState(false),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
   const [draftMentions,setDraftMentions]=useState<DraftMention[]>([]),[replyMentions,setReplyMentions]=useState<DraftMention[]>([]);
   const [images,setImages]=useState<string[]>([]),[replyImages,setReplyImages]=useState<string[]>([]),[uploading,setUploading]=useState(false),[replyUploading,setReplyUploading]=useState(false);
   const [editingCast,setEditingCast]=useState<Cast|null>(null),[editCastOpen,setEditCastOpen]=useState(false);
@@ -91,12 +92,9 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
     }
   })().catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current){reading.current=false;setBusy(false);}});return()=>{requestId.current++;};},[fid,feed,feedFid,config,refresh,profileOrder,view.kind,likesView]);
   useEffect(()=>{const fids=[...new Set([fid,feedFid,...casts.map(c=>c.data.fid)])];let active=true;(async()=>{for(let i=0;i<fids.length;i+=5)await Promise.all(fids.slice(i,i+5).map(async f=>{try{const p=await profile(config,f);if(active)setProfiles(v=>({...v,[f]:p}));}catch{/* FID remains usable without profile data */}}));})();return()=>{active=false;};},[casts,fid,feedFid,config]);
-  useEffect(()=>{if(mode==='all'||!clientFids.trim()){setAttributing(false);return;}let active=true;setAttributing(true);attribute(config,casts).then(map=>{if(active)setAttribution(map);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setAttributing(false);});return()=>{active=false;};},[casts,mode,clientFids,config]);
-  const keys=signerKeys.split(/[\s,]+/).filter(Boolean), appFids=clientFids.split(/[\s,]+/).filter(Boolean).map(Number);
-  const matchingKeys=[...new Set([...keys,...[...attribution].filter(([,requestFid])=>appFids.includes(requestFid)).map(([key])=>key)])];
+  useEffect(()=>{if(mode==='all'||(!clientFids.trim()&&!selfRegistered)){setAttributing(false);return;}let active=true;setAttributing(true);attribute(config,casts).then(map=>{if(active)setAttribution(map);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setAttributing(false);});return()=>{active=false;};},[casts,mode,clientFids,selfRegistered,config]);
   const typedCasts=likesView?casts:casts.filter(c=>Boolean(c.data.castAddBody.parentCastId)===(castType==='replies'));
-  let filtered=filterBySigner(likesView?typedCasts:[...typedCasts].sort((a,b)=>(order==='newest'?-1:1)*(a.data.timestamp-b.data.timestamp)||a.hash.localeCompare(b.hash)),matchingKeys,mode);
-  if(mode==='include'&&(keys.length||appFids.length)&&!matchingKeys.length)filtered=[];
+  const filtered=filterByClient(likesView?typedCasts:[...typedCasts].sort((a,b)=>(order==='newest'?-1:1)*(a.data.timestamp-b.data.timestamp)||a.hash.localeCompare(b.hash)),{mode,clientFids,signerKeys,selfRegistered},attribution);
   useEffect(()=>{
     if(view.kind==='cast'||view.kind==='connections'||view.kind==='notifications'||view.kind==='settings'||view.kind==='search'||reading.current||busy||error||attributing||!hasMore||filtered.length||autoPages.current>=3)return;
     autoPages.current++;
@@ -170,6 +168,6 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {editingCast&&session?.fid===editingCast.data.fid&&<EditCast key={`${session.key}:${editingCast.hash}`} config={config} session={session} cast={editingCast} open={editCastOpen} onClose={pending=>{setEditCastOpen(false);if(!pending)setEditingCast(null);}} onDeleted={()=>setCasts(value=>value.filter(cast=>cast.hash!==editingCast.hash))} onPublished={hash=>{setEditingCast(null);setEditCastOpen(false);published(session.fid,hash);setRefresh(value=>value+1);navigate(`/cast/${session.fid}/${hash}`);}}/>}
   {editProfileOpen&&session&&<EditProfile key={session.key} config={config} session={session} onClose={()=>setEditProfileOpen(false)} onConnect={()=>{setEditProfileOpen(false);setAccountOpen(true);}} onSaved={()=>{setNotice('Profile updated');profile(config,session.fid).then(person=>setProfiles(value=>({...value,[person.fid]:person}))).catch(()=>{});setRefresh(value=>value+1);}}/>}
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
-  {controls&&<FeedControls initial={{mode,clientFids,signerKeys}} onClose={()=>setControls(false)} onApply={filters=>{setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setControls(false);}}/>}
+  {controls&&<FeedControls initial={{mode,clientFids,signerKeys,selfRegistered}} onClose={()=>setControls(false)} onApply={filters=>{setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setSelfRegistered(filters.selfRegistered);setControls(false);}}/>}
   </main>;
 }

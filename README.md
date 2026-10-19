@@ -109,9 +109,9 @@ No analytics are added. The optional QR approval flow uses Farcaster's signed-ke
 
 ## Filtering by client
 
-Feed controls can include or exclude requesting client FIDs and exact Ed25519 public keys. Onchain key registration metadata includes a requester FID. The client reads active signer events for each loaded author and maps signer keys to those requesters. Unknown keys are dropped by include filters and retained by exclude filters.
+Feed controls offer named choices for Warpcast (FID 9152) and Firefly (FID 16823), plus self-registered clients such as Freecast where the signer requester FID equals the cast author FID. Additional requester FIDs and exact Ed25519 public keys can also be entered. Selections combine as alternatives and can be included or excluded. The client resolves registration metadata for each loaded author using onchain signer events and the unified signer endpoint, including supported gasless keys. Unknown keys are dropped by include filters and retained by exclude filters.
 
-Limitations: gasless-key attribution is not yet resolved; active signer queries cannot attribute old revoked keys; some clients register using the user's own FID, and a requester FID alone is not an independently verified application identity. Exact-key filtering still works. A production indexer could retain historical registry events and resolve gasless signer metadata.
+Limitations: gasless attribution requires a node that supports the unified signer endpoint; active signer queries cannot attribute old revoked keys; a requester FID alone is not an independently verified application identity. The self-registered option matches a registration pattern rather than proving use of Freecast specifically. Exact-key filtering still works. A production indexer could retain historical registry events.
 
 ## Development and validation
 
