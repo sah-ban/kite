@@ -329,3 +329,17 @@ test('replacement preparation signs complete cast data for the approved FID with
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source:{...source,fid:999},body}})).status,400);
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source,body:{...body,mentionsPositions:[999]}}})).status,400);assert.equal(h.submitted.length,0);
 });
+
+test('approved casts sign link embeds alongside images or quotes and reject invalid or excess links',async()=>{
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const image='https://i.ibb.co/example/photo.png',link='https://example.com/article',quote={fid:37,hash:'0x'+'cd'.repeat(20)};
+  for(const body of [{text:'',links:[link]},{text:'Text keeps https://example.com/article',images:[image],links:[link]},{text:'Quote',quote,links:[link]}]){
+    const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body}});assert.equal(result.status,200);
+    const envelope=h.submitted.at(-1)!,data=MessageData.decode(envelope.dataBytes!);
+    assert.ok(data.castAddBody?.embeds.some(embed=>embed.url===link));assert.equal(data.castAddBody?.text,body.text);assert.ok((await validations.validateMessage({...envelope,data})).isOk());
+    if('images' in body)assert.equal(data.castAddBody?.embeds[0].url,image);
+    if('quote' in body)assert.equal(data.castAddBody?.embeds[1].castId?.fid,37);
+  }
+  for(const body of [{links:['javascript:alert(1)']},{links:['https://user:pass@example.com']},{links:[link,link,link]},{images:[image,image],links:[link]},{quote,links:[link,link]},{links:'https://example.com'},{links:['https://example.com/'+ 'x'.repeat(300)]}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Test',...body}})).status,400);
+  assert.equal(h.submitted.length,3);
+});

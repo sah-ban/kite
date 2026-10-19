@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Repeat2, RefreshCw, X } from 'lucide-react';
 import { Modal } from './components';
 import { MentionComposer } from './MentionComposer';
 import { ImageAttachments } from './ImageAttachments';
+import { LinkAttachments, useComposerLinks } from './LinkAttachments';
 import { CastEmbeds } from './CastEmbeds';
 import { QuotedCast } from './QuotedCast';
 import { CastTime } from './CastTime';
@@ -22,10 +23,12 @@ export function EditCast({config,session,cast,open,onClose,onPublished,onDeleted
     return()=>{active=false;};
   },[config,cast,session.fid]);
   useEffect(()=>{let active=true;readActivity(config,cast,`edit:${retry}`).then(value=>{if(active)setActivity(value);});return()=>{active=false;};},[config,cast,retry]);
+  const maximum=pro?4:2;
+  const links=useComposerLinks(draft?.text||'',draft?.embeds.flatMap(embed=>embed.url?[embed.url]:[])||[],maximum-(draft?.embeds.length||0));
+  const effectiveDraft=draft?{...draft,embeds:[...draft.embeds,...links.urls.map(url=>({url}))]}:undefined;
   if(!open)return null;
   const frozen=busy||Boolean(attempt.current),locked=frozen||uploading;
-  let validation='';if(draft)try{encodedEditDraft(draft);}catch(e){validation=(e as Error).message;}
-  const maximum=pro?4:2;
+  let validation='';if(effectiveDraft)try{encodedEditDraft(effectiveDraft);}catch(e){validation=(e as Error).message;}
   const originalDeleted=Boolean(attempt.current?.originalDeleted);
   return <Modal title="Edit cast" className="edit-cast-modal" onClose={()=>{if(!busy&&!uploading)onClose(Boolean(attempt.current));}}>
     <section className="previous-cast" aria-label="Previous cast">
@@ -38,7 +41,7 @@ export function EditCast({config,session,cast,open,onClose,onPublished,onDeleted
     {draft?<form onSubmit={async event=>{
       event.preventDefault();if(busy||uploading||!activity||validation)return;setBusy(true);setError('');
       try{
-        if(!attempt.current){setProgress('Preparing replacement…');attempt.current=await prepareReplacement(config,session,cast,draft);}
+        if(!attempt.current){setProgress('Preparing replacement…');attempt.current=await prepareReplacement(config,session,cast,effectiveDraft!);}
         const hash=await publishReplacement(config,session,cast,attempt.current,message=>{if(mounted.current)setProgress(message);},onDeleted);
         if(mounted.current)onPublished(hash);
       }catch(e){if(mounted.current)setError((e as Error).message);}
@@ -49,11 +52,11 @@ export function EditCast({config,session,cast,open,onClose,onPublished,onDeleted
         {draft.parentCastId&&<p className="small muted">Reply to FID {draft.parentCastId.fid} · Reply context preserved</p>}
         {draft.parentUrl&&<p className="small muted edit-parent-url">Context: {draft.parentUrl}</p>}
         <div className="edit-cast-embeds">{draft.embeds.map((embed,index)=><div className="edit-cast-embed" key={index}>
-          <div className="edit-embed-heading"><strong>{embed.castId?'Quoted cast':`Embed ${index+1}`}</strong><button type="button" className="icon-button" aria-label={`Remove embed ${index+1}`} onClick={()=>setDraft({...draft,embeds:draft.embeds.filter((_,i)=>i!==index)})}><X size={15}/></button></div>
+          <div className="edit-embed-heading"><strong>{embed.castId?'Quoted cast':`Embed ${index+1}`}</strong><button type="button" className="icon-button" aria-label={`Remove embed ${index+1}`} onClick={()=>{if(embed.url)links.remove(embed.url);setDraft({...draft,embeds:draft.embeds.filter((_,i)=>i!==index)});}}><X size={15}/></button></div>
           {embed.castId?<QuotedCast config={config} fid={embed.castId.fid} hash={embed.castId.hash} visible onOpen={value=>window.open(castPath(value),'_blank','noopener,noreferrer')} onProfile={fid=>window.open(`/profile/${fid}`,'_blank','noopener,noreferrer')}/>:<><label>Embed URL<input type="text" value={embed.url||''} onChange={event=>setDraft({...draft,embeds:draft.embeds.map((value,i)=>i===index?{url:event.target.value}:value)})}/></label><CastEmbeds urls={embed.url?[embed.url]:[]} visible/></>}
         </div>)}</div>
-        <ImageAttachments images={[]} reserved={draft.embeds.length} max={maximum} onChange={images=>setDraft({...draft,embeds:[...draft.embeds,...images.map(url=>({url}))]})} onBusy={setUploading} disabled={frozen}/>
-        <button type="button" className="text-button" disabled={locked||draft.embeds.length>=maximum} onClick={()=>setDraft({...draft,embeds:[...draft.embeds,{url:''}]})}>Add link embed</button>
+        <ImageAttachments images={[]} reserved={draft.embeds.length+links.urls.length} max={maximum} onChange={images=>setDraft({...draft,embeds:[...draft.embeds,...images.map(url=>({url}))]})} onBusy={setUploading} disabled={frozen}/>
+        <LinkAttachments links={links} available={maximum-draft.embeds.length} disabled={locked}/>
       </fieldset>
       {validation&&<p className="danger" role="alert">{validation}</p>}
       {error&&<p className="danger" role="alert">{error}</p>}

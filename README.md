@@ -190,6 +190,8 @@ Use **Add image** in the composer, reply or quote dialog. JPEG, PNG, GIF and Web
 
 Use **GIF** beside **Add image** to browse featured GIFs, search, or load more results. Selected GIFs attach directly from Tenor and share the two image slots (one alongside a quoted cast); they do not upload to ImgBB. The same picker is available in casts, replies and quotes. Freecast uses the `tenor.bhopp.ing` provider from the [GIF miniapp](https://github.com/sah-ban/gif) through its server-side `/api/gifs` route, with a short bounded cache, validated media URLs, and retryable errors. No additional API key is required; availability depends on that third-party provider.
 
+HTTP and HTTPS links typed or pasted into the cast, reply, quote, or edit composer automatically become embeds while remaining in the text. Use **Attach link** to embed a URL without putting it in the text. Remove a preview to keep that URL as text only for the rest of the draft; explicitly attaching the same URL restores its preview. Duplicate URLs are skipped, and removing an automatic URL from the text removes its preview. Previews load after a short typing pause and may fall back to a plain link when metadata is unavailable. Links share slots with images, GIFs, and quoted casts: two total for new casts, replies, and quotes, or the existing account limit in the edit composer. When slots are full, additional text links remain ordinary text. Both local signing and approved-account signing validate the same HTTP/HTTPS URL and 256-byte limit.
+
 
 ### Edit profile
 

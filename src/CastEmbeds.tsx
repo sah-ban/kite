@@ -7,7 +7,7 @@ function ImageEmbed({url,title}:{url:string;title?:string}) {
   const [failed,setFailed]=useState(false),[open,setOpen]=useState(false);
   useEffect(()=>{setFailed(false);setOpen(false);},[url]);
   return failed?<a className="media-fallback" href={url} target="_blank" rel="noreferrer"><ImageOff size={18}/>Image unavailable · Open original <ArrowUpRight size={13}/></a>:<>
-    <button className="image-embed" aria-label="Enlarge cast image" onClick={()=>setOpen(true)}><img src={url} alt={title||'Image attached to cast'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/><span>Enlarge ↗</span></button>
+    <button type="button" className="image-embed" aria-label="Enlarge cast image" onClick={()=>setOpen(true)}><img src={url} alt={title||'Image attached to cast'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/><span>Enlarge ↗</span></button>
     {open&&<Modal title="Cast image" className="image-viewer" onClose={()=>setOpen(false)}><img className="enlarged-image" src={url} alt={title||'Image attached to cast'} referrerPolicy="no-referrer"/><a className="text-button" href={url} target="_blank" rel="noreferrer">Open original image <ArrowUpRight size={13}/></a></Modal>}
   </>;
 }
@@ -32,7 +32,7 @@ function VideoEmbed({url,poster,contentType}:{url:string;poster?:string;contentT
     return()=>{active=false;hls?.destroy();video.pause();video.removeAttribute('src');video.load();};
   },[started,url,contentType]);
   return <div className="video-embed">
-    {failed?<a className="media-fallback" href={url} target="_blank" rel="noreferrer">Video unavailable here · Open original <ArrowUpRight size={13}/></a>:started?<video ref={player} controls playsInline preload="none" poster={poster} aria-label="Cast video" onError={()=>setFailed(true)} onPlay={event=>{document.querySelectorAll('video').forEach(video=>{if(video!==event.currentTarget)video.pause();});}}/>:<button className="video-cover" onClick={()=>setStarted(true)} aria-label="Play cast video">{poster&&<img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display='none';}}/>}<span><Play size={26}/>Play video</span></button>}
+    {failed?<a className="media-fallback" href={url} target="_blank" rel="noreferrer">Video unavailable here · Open original <ArrowUpRight size={13}/></a>:started?<video ref={player} controls playsInline preload="none" poster={poster} aria-label="Cast video" onError={()=>setFailed(true)} onPlay={event=>{document.querySelectorAll('video').forEach(video=>{if(video!==event.currentTarget)video.pause();});}}/>:<button type="button" className="video-cover" onClick={()=>setStarted(true)} aria-label="Play cast video">{poster&&<img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display='none';}}/>}<span><Play size={26}/>Play video</span></button>}
     {!failed&&<a className="media-original" href={url} target="_blank" rel="noreferrer">Open original video <ArrowUpRight size={11}/></a>}
   </div>;
 }
@@ -40,7 +40,7 @@ function HostedVideo({kind,id,url}:{kind:'youtube'|'vimeo';id:string;url:string}
   const [started,setStarted]=useState(false);
   const name=kind==='youtube'?'YouTube':'Vimeo';
   const source=kind==='youtube'?`https://www.youtube-nocookie.com/embed/${id}?autoplay=1`:`https://player.vimeo.com/video/${id}?autoplay=1`;
-  return <div className="hosted-video">{started?<iframe src={source} title={`${name} video`} allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation"/>:<button className="video-cover" aria-label={`Play ${name} video`} onClick={()=>setStarted(true)}>{kind==='youtube'&&<img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display='none';}}/>}<span><Play size={26}/>Play on {name}</span></button>}<a className="media-original" href={url} target="_blank" rel="noreferrer">Open on {name} <ArrowUpRight size={11}/></a></div>;
+  return <div className="hosted-video">{started?<iframe src={source} title={`${name} video`} allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation"/>:<button type="button" className="video-cover" aria-label={`Play ${name} video`} onClick={()=>setStarted(true)}>{kind==='youtube'&&<img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display='none';}}/>}<span><Play size={26}/>Play on {name}</span></button>}<a className="media-original" href={url} target="_blank" rel="noreferrer">Open on {name} <ArrowUpRight size={11}/></a></div>;
 }
 function LinkCard({url,info}:{url:string;info?:EmbedInfo}) {
   const [imageFailed,setImageFailed]=useState(false);

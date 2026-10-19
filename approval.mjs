@@ -1,3 +1,4 @@
+import { linkEmbeds } from './link-embeds.mjs';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { sessionStore, SessionStorageError } from './session-store.mjs';
@@ -116,7 +117,8 @@ async function buildAction(session, action) {
       if(url.protocol!=='https:'||!(url.hostname==='i.ibb.co'||(/^media(?:\d+)?\.tenor\.com$/.test(url.hostname)&&url.pathname.endsWith('.gif')))||url.username||url.password||url.port||Buffer.byteLength(url.href)>256)throw new Failure(400,'Invalid image URL.');
       return {url:url.href};
     });
-    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length&&!attachments.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add an image, mention or quoted cast.');
+    try{attachments.push(...linkEmbeds(action.links??[],(action.quote?1:2)-images.length));}catch(error){throw new Failure(400,error.message);}
+    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length&&!attachments.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add an embed, mention or quoted cast.');
     const embeds=[...attachments];
     if(action.quote){
       if(!Number.isSafeInteger(action.quote.fid)||action.quote.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(action.quote.hash))throw new Failure(400,'Invalid quoted cast.');
