@@ -1,7 +1,7 @@
-// @ts-expect-error Shared link embed validation for browser and server.
-import { linkEmbeds } from '../../link-embeds.mjs';
-import { imageEmbeds } from './images';
-import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, idRegistryABI, keyRegistryABI, makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
+// @ts-expect-error Shared cast validation for browser and server.
+import { newCastBody, requiresCastPro } from '../../cast.mjs';
+import { getProStatus } from './pro';
+import { FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, MessageData, NobleEd25519Signer, ReactionType, idRegistryABI, keyRegistryABI, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove } from '@farcaster/core';
 import { createPublicClient, http, bytesToHex, hexToBytes, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
@@ -129,17 +129,17 @@ export async function submit(config: Config, message: Message): Promise<string> 
   return bytesToHex(message.hash);
 }
 export async function postCast(config: Config, session: Session, text: string, parent?: Cast, quote?: Cast, mentions:DraftMention[]=[], images:string[]=[], links:string[]=[]): Promise<string> {
-  const body=encodeMentionText(text,mentions);
-  const attachments=[...imageEmbeds(images,Boolean(quote)),...linkEmbeds(links,(quote?1:2)-images.length)];
-  const length = new TextEncoder().encode(body.text).length;
-  if ((!body.text.trim()&&!quote&&!body.mentions.length&&!attachments.length) || length > 1024) throw new Error('Write up to 1,024 UTF-8 bytes or add an embed, mention or quoted cast.');
-  if(quote&&(!Number.isSafeInteger(quote.data.fid)||quote.data.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(quote.hash)))throw new Error('Invalid quoted cast.');
-  let hash: string;
-  if (session.remote) {
-    hash = await serverAction({kind:'cast',images,links,text:body.text,mentions:body.mentions,mentionsPositions:body.mentionsPositions,...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{}),...(quote?{quote:{fid:quote.data.fid,hash:quote.hash}}:{})});
-  } else {
-    const message = result(await makeCastAdd({...body,embeds:[...attachments,...(quote?[{castId:{fid:quote.data.fid,hash:hexToBytes(quote.hash as Hex)}}]:[])],embedsDeprecated:[],type:length<=320?CastType.CAST:CastType.LONG_CAST,...(parent ? {parentCastId:{fid:parent.data.fid,hash:hexToBytes(parent.hash as Hex)}} : {})},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
-    hash = await submit(config,message);
+  const action={kind:'cast',images,links,...encodeMentionText(text,mentions),...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{}),...(quote?{quote:{fid:quote.data.fid,hash:quote.hash}}:{})};
+  const body=newCastBody(action);
+  if(requiresCastPro(body)&&!await getProStatus(config,session.fid))throw new Error('Active Farcaster Pro is required for more than two embeds or text over 1,024 UTF-8 bytes.');
+  let hash:string;
+  if(session.remote)hash=await serverAction(action);
+  else{
+    requireLocal();
+    // @ts-expect-error Shared modern builder supports the 10k cast type and four embeds.
+    const {buildCastMessage}=await import('../../replacement.mjs');
+    const message=await buildCastMessage(body,session.fid,session.signer);
+    hash=await submit(config,message);
   }
   // Acceptance is not inclusion. Poll our read node and never claim success early.
   for (let i=0;i<12;i++) {

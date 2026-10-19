@@ -1,4 +1,5 @@
-import { linkEmbeds } from './link-embeds.mjs';
+import { newCastBody, requiresCastPro } from './cast.mjs';
+import { activeProSubscription } from './pro-subscription.mjs';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { sessionStore, SessionStorageError } from './session-store.mjs';
@@ -9,11 +10,11 @@ import { bytesToHex, hexToBytes, createPublicClient, http } from 'viem';
 import {
   NobleEd25519Signer, ViemLocalEip712Signer, Message, MessageData,
   ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, idRegistryABI, keyRegistryABI,
-  FarcasterNetwork, CastType, ReactionType,
-  makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
+  FarcasterNetwork, ReactionType,
+  makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
 } from '@farcaster/core';
 
-import { buildReplacementMessage } from './replacement.mjs';
+import { buildCastMessage, buildReplacementMessage, replacementBody } from './replacement.mjs';
 import { loadModernSdk } from './modern-sdk.mjs';
 import { validateProfileField } from './profile-fields.mjs';
 
@@ -58,7 +59,7 @@ async function readBody(req) {
   let size = 0; const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 16_000) throw new Failure(413, 'Request too large.');
+    if (size > 100_000) throw new Failure(413, 'Request too large.');
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString() || '{}'); }
@@ -91,13 +92,13 @@ async function verifyRegistration(config, fid, key, request) {
   return address;
 }
 
-async function buildAction(session, action) {
+async function buildAction(session, action,checkCastPro) {
   const signer = new NobleEd25519Signer(session.privateKey);
   const options = {fid:session.fid,network:FarcasterNetwork.MAINNET};
   if(action.kind==='prepareCastReplacement'){
     const sdk=await loadModernSdk();
-    try{return await buildReplacementMessage(action.body,action.source,session.fid,new sdk.NobleEd25519Signer(session.privateKey));}
-    catch(error){throw new Failure(400,error.message);}
+    try{await checkCastPro(replacementBody(action.body));return await buildReplacementMessage(action.body,action.source,session.fid,new sdk.NobleEd25519Signer(session.privateKey));}
+    catch(error){if(error instanceof Failure)throw error;throw new Failure(400,error.message);}
   }
   if(action.kind==='profile'){
     try{validateProfileField(action.type,action.value);}catch(error){throw new Failure(400,error.message);}
@@ -105,31 +106,11 @@ async function buildAction(session, action) {
     return unwrap(await sdk.makeUserDataAdd({type:action.type,value:action.value},options,new sdk.NobleEd25519Signer(session.privateKey)));
   }
   if (action.kind === 'cast') {
-    const bytes = typeof action.text === 'string' ? Buffer.byteLength(action.text) : 0;
-    const mentions=action.mentions??[],mentionsPositions=action.mentionsPositions??[];
-    if(!Array.isArray(mentions)||!Array.isArray(mentionsPositions)||mentions.length>10||mentions.length!==mentionsPositions.length||mentions.some(fid=>!Number.isSafeInteger(fid)||fid<=0)||mentionsPositions.some((position,index)=>!Number.isSafeInteger(position)||position<0||position>bytes||(index>0&&position<mentionsPositions[index-1])))throw new Failure(400,'Invalid mentions.');
-    const boundaries=new Set([0]);let offset=0;for(const character of typeof action.text==='string'?action.text:''){offset+=Buffer.byteLength(character);boundaries.add(offset);}
-    if(mentionsPositions.some(position=>!boundaries.has(position)))throw new Failure(400,'Invalid mention position.');
-    const images=action.images??[];
-    if(!Array.isArray(images)||images.length>(action.quote?1:2))throw new Failure(400,'Too many image attachments.');
-    const attachments=images.map(value=>{
-      let url;try{url=new URL(value);}catch{throw new Failure(400,'Invalid image URL.');}
-      if(url.protocol!=='https:'||!(url.hostname==='i.ibb.co'||(/^media(?:\d+)?\.tenor\.com$/.test(url.hostname)&&url.pathname.endsWith('.gif')))||url.username||url.password||url.port||Buffer.byteLength(url.href)>256)throw new Failure(400,'Invalid image URL.');
-      return {url:url.href};
-    });
-    try{attachments.push(...linkEmbeds(action.links??[],(action.quote?1:2)-images.length));}catch(error){throw new Failure(400,error.message);}
-    if(typeof action.text!=='string'||bytes>1024||(!action.text.trim()&&!action.quote&&!mentions.length&&!attachments.length))throw new Failure(400,'Write up to 1,024 UTF-8 bytes or add an embed, mention or quoted cast.');
-    const embeds=[...attachments];
-    if(action.quote){
-      if(!Number.isSafeInteger(action.quote.fid)||action.quote.fid<=0||!/^0x[0-9a-fA-F]{40}$/.test(action.quote.hash))throw new Failure(400,'Invalid quoted cast.');
-      embeds.push({castId:{fid:action.quote.fid,hash:hexToBytes(action.quote.hash)}});
-    }
-    let parentCastId;
-    if (action.parent) {
-      if (!Number.isSafeInteger(action.parent.fid) || action.parent.fid <= 0 || !/^0x[0-9a-fA-F]{40}$/.test(action.parent.hash)) throw new Failure(400, 'Invalid reply target.');
-      parentCastId = {fid:action.parent.fid,hash:hexToBytes(action.parent.hash)};
-    }
-    return unwrap(await makeCastAdd({text:action.text,mentions,mentionsPositions,embeds,embedsDeprecated:[],type:bytes<=320?CastType.CAST:CastType.LONG_CAST,parentCastId},options,signer));
+    let body;try{body=newCastBody(action);}catch(error){throw new Failure(400,error.message);}
+    await checkCastPro(body);
+    const sdk=await loadModernSdk();
+    try{return await buildCastMessage(body,session.fid,new sdk.NobleEd25519Signer(session.privateKey));}
+    catch(error){throw new Failure(400,error.message);}
   }
   if (action.kind === 'deleteCast') {
     if(action.targetFid!==session.fid)throw new Failure(403,'You can only delete your own casts.');
@@ -268,7 +249,16 @@ export function approval(config, dependencies = {}) {
       if (!config.VALIDATOR_URL) throw new Failure(503, 'Configure the server submission endpoint before publishing.');
       const action = await readBody(req);
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
-      const message = await buildAction(session,action);
+      const message = await buildAction(session,action,async body=>{
+        if(!requiresCastPro(body))return;
+        let pro;
+        try{
+          const target=new URL('/v1/storageLimitsByFid',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381');target.searchParams.set('fid',String(session.fid));
+          const response=await request(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});
+          if(!response.ok)throw new Error('Unavailable');pro=activeProSubscription(await response.json(),now()/1000);
+        }catch{throw new Failure(503,'Could not verify Farcaster Pro status. Your draft is kept; retry when the read node is available.');}
+        if(!pro)throw new Failure(400,'Active Farcaster Pro is required for more than two embeds or text over 1,024 UTF-8 bytes.');
+      });
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();
       if(action.kind==='prepareCastReplacement')return send(res,200,{hash:bytesToHex(message.hash),message:Buffer.from(bytes).toString('base64')});

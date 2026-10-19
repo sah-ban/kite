@@ -22,6 +22,7 @@ test('manual links take priority, existing images and quotes reserve slots, and 
   assert.deepEqual(resolveLinks('https://a.example',[],[],[],0),{urls:[],overflow:1});
   assert.deepEqual(resolveLinks('https://a.example',[],[],[],-2),{urls:[],overflow:1});
   assert.deepEqual(resolveLinks('https://a.example',['https://a.example/'],[],[],1),{urls:['https://a.example/'],overflow:0});
+  assert.deepEqual(resolveLinks('', ['https://a.example/','https://b.example/','https://c.example/'],[],[],2),{urls:['https://a.example/','https://b.example/','https://c.example/'],overflow:0},'A lower account limit must not silently remove manually attached links.');
 });
 test('link submission validation enforces shared slots, protocols and the UTF-8 URL limit',()=>{
   assert.deepEqual(linkEmbeds(['https://example.com','http://example.org/path'],2),[{url:'https://example.com/'},{url:'http://example.org/path'}]);

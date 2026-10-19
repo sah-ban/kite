@@ -22,7 +22,8 @@ export function textLinks(text) {
 }
 export function resolveLinks(text,manual,existing,suppressed,available) {
   const used=new Set(existing.map(value=>{try{return linkURL(value);}catch{return value;}}));
-  const candidates=[...new Set([...manual,...textLinks(text).filter(url=>!suppressed.includes(url))])].filter(url=>!used.has(url));
-  const urls=candidates.slice(0,Math.max(0,available));
-  return {urls,overflow:candidates.length-urls.length};
+  const attached=[...new Set(manual)].filter(url=>!used.has(url));
+  const candidates=textLinks(text).filter(url=>!used.has(url)&&!attached.includes(url)&&!suppressed.includes(url));
+  const automatic=candidates.slice(0,Math.max(0,available-attached.length));
+  return {urls:[...attached,...automatic],overflow:candidates.length-automatic.length};
 }

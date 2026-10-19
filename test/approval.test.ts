@@ -26,6 +26,7 @@ async function call(middleware:ReturnType<typeof approval>,path:string,options:{
 const memoryStore=()=>({load:async()=>new Map(),save:async()=>{},remove:async()=>{},has:async()=>true});
 function harness(extra:Record<string,string>={}) {
   let time=Date.now(),state='pending_approval',approvedFid=123,verifyError:Error|undefined;
+  let proStatus:unknown={tier_subscriptions:[]};
   const calls:{url:string;body?:unknown}[]=[];
   const verified:{fid:number;key:string}[]=[];
   const submitted:Message[]=[];
@@ -35,6 +36,7 @@ function harness(extra:Record<string,string>={}) {
     verify:async(fid:number,key:string)=>{if(verifyError)throw verifyError;verified.push({fid,key});return custody;},
     fetch:async(input:string|URL,init?:RequestInit)=>{
       const url=String(input);calls.push({url,body:init?.body});
+      if(new URL(url).pathname==='/v1/storageLimitsByFid')return Response.json(proStatus);
       if(url.endsWith('/signed-key-requests'))return Response.json({result:{signedKeyRequest:{token:'0xdeadbeef',deeplinkUrl:'farcaster://signed-key-request?token=0xdeadbeef'}}});
       if(url.includes('/signed-key-request?'))return Response.json({result:{signedKeyRequest:{state,userFid:approvedFid}}});
       if(url==='https://submit.example/v1/submitMessage'){
@@ -44,7 +46,7 @@ function harness(extra:Record<string,string>={}) {
     },
   };
   let middleware=approval({...config,...extra},dependencies);
-  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
+  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,setPro:(value:unknown)=>{proStatus=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
 }
 const cookieFrom=(result:Awaited<ReturnType<typeof call>>)=>result.headers['Set-Cookie'].split(';')[0];
 
@@ -340,6 +342,38 @@ test('approved casts sign link embeds alongside images or quotes and reject inva
     if('images' in body)assert.equal(data.castAddBody?.embeds[0].url,image);
     if('quote' in body)assert.equal(data.castAddBody?.embeds[1].castId?.fid,37);
   }
-  for(const body of [{links:['javascript:alert(1)']},{links:['https://user:pass@example.com']},{links:[link,link,link]},{images:[image,image],links:[link]},{quote,links:[link,link]},{links:'https://example.com'},{links:['https://example.com/'+ 'x'.repeat(300)]}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Test',...body}})).status,400);
+  for(const body of [{links:['javascript:alert(1)']},{links:['https://user:pass@example.com']},{links:[link,'https://example.com/second','https://example.com/third']},{images:[image,image],links:[link]},{quote,links:[link,'https://example.com/second']},{links:'https://example.com'},{links:['https://example.com/'+ 'x'.repeat(300)]}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Test',...body}})).status,400);
   assert.equal(h.submitted.length,3);
+});
+
+test('approved Pro accounts publish four embeds and 10k-byte casts, replies and quotes using modern signatures',async()=>{
+  const {loadGaslessSdk}=await import('../src/lib/gasless-sdk');const sdk=await loadGaslessSdk();
+  const h=harness({NEXT_PUBLIC_HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  h.setPro({tier_subscriptions:[{tier_type:'Pro',expires_at:Math.floor(Date.now()/1000)+86400}]});
+  const quote={fid:37,hash:'0x'+'cd'.repeat(20)},images=['https://i.ibb.co/fixture/photo.png','https://media.tenor.com/fixture/hello.gif'],links=['https://example.com/one','https://example.com/two'];
+  for(const body of [{text:'😀'.repeat(2500),images,links},{text:'Reply '+ 'x'.repeat(1024),images,links,parent:quote},{text:'Quote',images,links:links.slice(0,1),quote},{text:'Four images',images:[images[0],images[0],images[0],images[0]]},{text:'Quote images',images:[images[0],images[0],images[0]],quote},{text:'Escaped\n'+ '\\'.repeat(9992)}]){
+    const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body,pro:false}});assert.equal(result.status,200);
+    const message=sdk.Message.decode(Message.encode(h.submitted.at(-1)!).finish()),data=sdk.MessageData.decode(message.dataBytes!);
+    assert.equal(data.fid,123);assert.equal(data.castAddBody?.text,body.text);assert.equal(data.castAddBody?.type,Buffer.byteLength(body.text)>1024?sdk.CastType.TEN_K_CAST:sdk.CastType.CAST);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
+    if('parent' in body)assert.equal(data.castAddBody?.parentCastId?.fid,37);
+    if('quote' in body)assert.equal(data.castAddBody?.embeds.at(-1)?.castId?.fid,37);
+    if(!body.text.startsWith('Escaped'))assert.equal(data.castAddBody?.embeds.length,4);
+  }
+  const checks=h.calls.filter(value=>value.url.startsWith('https://read.example/'));assert.equal(checks.length,6);assert.ok(checks.every(value=>value.url==='https://read.example/v1/storageLimitsByFid?fid=123'));
+  const before=h.submitted.length;
+  for(const body of [{text:'😀'.repeat(2500)+'x'},{text:'Too many',links:[...links,...links,'https://example.com/five']},{text:'Too many quoted',quote,images,links}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body}})).status,400);
+  assert.equal(h.submitted.length,before);
+});
+
+test('server rechecks Pro for new and replacement casts and rejects absent, expired or unknown status before submission',async()=>{
+  const h=harness(),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  for(const status of [{tier_subscriptions:[]},{tierSubscriptions:[{tierType:1,expiresAt:1}]},{}]){
+    h.setPro(status);
+    for(const payload of [{text:'x'.repeat(1025)},{text:'',links:['https://a.example','https://b.example','https://c.example']}]){
+      const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...payload,pro:true}});assert.equal(result.status,'tier_subscriptions' in status||'tierSubscriptions' in status?400:503);
+    }
+    const prepared=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source:{fid:123,hash:'0x'+'ab'.repeat(20),timestamp:Math.floor(Date.now()/1000)-1609459200},body:{text:'x'.repeat(1025),embeds:[]}}});assert.equal(prepared.status,'tier_subscriptions' in status||'tierSubscriptions' in status?400:503);
+  }
+  assert.equal(h.submitted.length,0);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Normal cast'}})).status,200,'Ordinary casts remain usable when Pro lookup is unavailable.');
 });
