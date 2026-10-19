@@ -1,5 +1,6 @@
 import { JoinedDate } from './JoinedDate';
 import { ProfileCounts } from './ProfileCounts';
+import { ConnectedClients } from './ConnectedClients';
 import { ProBadge } from './ProBadge';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
@@ -14,8 +15,8 @@ function ProfileCover({banner}:{banner?:string}) {
   return <div className="profile-cover">{src&&failedSrc!==src?<img key={src} src={src} alt="Profile banner" decoding="async" referrerPolicy="no-referrer" onError={()=>setFailedSrc(src)}/>:<span>YOUR CORNER OF THE NETWORK</span>}</div>;
 }
 
-export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,followed,busy,ownProfile,revision,onEdit}: {
-  config:Config;fid:number;viewerFid?:number;onConnections:(kind:'followers'|'following')=>void;onFollow:()=>void;followed:boolean;busy:boolean;ownProfile:boolean;revision:number;onEdit:()=>void;
+export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,followed,busy,ownProfile,revision,onEdit,onProfile}: {
+  config:Config;fid:number;viewerFid?:number;onConnections:(kind:'followers'|'following')=>void;onFollow:()=>void;followed:boolean;busy:boolean;ownProfile:boolean;revision:number;onEdit:()=>void;onProfile:(fid:number)=>void;
 }) {
   const person=useProfile(config,fid);
   const [relationship,setRelationship]=useState<{fid:number;viewerFid:number;follows:boolean}>();
@@ -33,6 +34,7 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
       {person?.bio&&<p className="profile-bio">{person.bio}</p>}
       <JoinedDate fid={fid} revision={revision}/>
       <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}<ProfileCounts config={config} fid={fid} revision={revision} onConnections={onConnections}/><a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
+      <ConnectedClients config={config} fid={fid} revision={revision} onProfile={onProfile}/>
     </section>
 
   </>;

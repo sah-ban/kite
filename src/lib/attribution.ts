@@ -1,7 +1,7 @@
 import { bytesToHex, decodeAbiParameters, type Hex } from 'viem';
 import { hub, type Config, type Cast } from './hub';
 export const metadataAbi = [{type:'tuple',components:[{name:'requestFid',type:'uint256'},{name:'requestSigner',type:'address'},{name:'signature',type:'bytes'},{name:'deadline',type:'uint256'}]}] as const;
-const validFid=(value:unknown):number|undefined=>{
+export const validFid=(value:unknown):number|undefined=>{
   if(typeof value!=='number'&&!(typeof value==='string'&&/^\d+$/.test(value)))return;
   const fid=Number(value);return Number.isSafeInteger(fid)&&fid>0?fid:undefined;
 };
