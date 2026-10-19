@@ -1,9 +1,10 @@
 import { JoinedDate } from './JoinedDate';
+import { ProfileCounts } from './ProfileCounts';
 import { ProBadge } from './ProBadge';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { type Config } from './lib/hub';
-import { countLabel, followsAccount, readConnections, type Page } from './lib/social';
+import { followsAccount } from './lib/social';
 import { Avatar, useProfile } from './social-ui';
 import { embedURL } from './lib/embeds';
 
@@ -24,8 +25,6 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
     return()=>controller.abort();
   },[config,fid,viewerFid,revision]);
   const followsYou=Boolean(viewerFid&&viewerFid!==fid&&relationship?.fid===fid&&relationship.viewerFid===viewerFid&&relationship.follows);
-  const [pages,setPages]=useState<Partial<Record<'followers'|'following',Page<number>>>>({}),[errors,setErrors]=useState<Partial<Record<'followers'|'following',string>>>({});
-  useEffect(()=>{let active=true;setPages({});setErrors({});for(const kind of ['followers','following'] as const)readConnections(config,fid,kind).then(page=>{if(active)setPages(value=>({...value,[kind]:page}));}).catch(error=>{if(active)setErrors(value=>({...value,[kind]:(error as Error).message}));});return()=>{active=false;};},[config,fid,revision]);
   return <>
     <section className="profile-hero" aria-label="Profile">
       <ProfileCover banner={person?.banner}/>
@@ -33,7 +32,7 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
       <h2>{person?.name||`FID ${fid}`} <ProBadge config={config} fid={fid}/></h2><div className="profile-handle">{person?.username?`@${person.username}`:`FID ${fid}`} <span>· FID {fid}</span>{followsYou&&<span className="follows-you">Follows you</span>}</div>
       {person?.bio&&<p className="profile-bio">{person.bio}</p>}
       <JoinedDate fid={fid} revision={revision}/>
-      <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}{(['following','followers'] as const).map(kind=><button key={kind} title={errors[kind]?'Count unavailable. Open list to retry.':undefined} onClick={()=>onConnections(kind)}><strong>{countLabel(pages[kind])}</strong> {kind[0].toUpperCase()+kind.slice(1)}</button>)}<a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
+      <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}<ProfileCounts config={config} fid={fid} revision={revision} onConnections={onConnections}/><a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
     </section>
 
   </>;

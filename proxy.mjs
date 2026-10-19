@@ -1,4 +1,5 @@
 import { joinedDates } from './joined.mjs';
+import { profileCounts } from './profile-counts.mjs';
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
 const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'castsByMention', 'userDataByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
@@ -13,11 +14,13 @@ export function writeOrigin(req, config) {
 }
 export function gateway(config) {
   const joinedMiddleware=joinedDates();
+  const countsMiddleware=profileCounts();
   const readUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
   const validatorUrl = config.VALIDATOR_URL || '';
   return async (req, res, next) => {
     const url = new URL(req.url || '/', 'http://localhost');
     if(url.pathname==='/api/profile/joined')return joinedMiddleware(req,res,next);
+    if(url.pathname==='/api/profile/counts')return countsMiddleware(req,res,next);
     if (url.pathname === '/api/config') {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ readUrl: '/api/read', validatorUrl: validatorUrl ? '/api/write' : '', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io', approvalConfigured: Boolean(config.FARCASTER_APP_ENV_FILE || (config.FARCASTER_APP_FID && config.FARCASTER_APP_MNEMONIC)) })); return;
