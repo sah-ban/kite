@@ -1,7 +1,7 @@
 import { hub, HubError, type Cast, type Config } from './hub';
 
 export type Page<T> = { items: T[]; next: string };
-export type Reaction = { hash: string; data: { fid: number; timestamp: number; type: string | number; reactionBody: { type: string | number; targetCastId?: {fid: number; hash: string} } } };
+export type Reaction = { hash: string; signer?:string; data: { fid: number; timestamp: number; type: string | number; reactionBody: { type: string | number; targetCastId?: {fid: number; hash: string} } } };
 export type ActivityTab = 'replies' | 'likes' | 'recasts';
 export type Activity = { replies?: Page<Cast>; likes?: Page<Reaction>; recasts?: Page<Reaction>; errors: Partial<Record<ActivityTab,string>> };
 export const castPath = (cast: Pick<Cast,'hash'|'data'>) => `/cast/${cast.data.fid}/${cast.hash}`;

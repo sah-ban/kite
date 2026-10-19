@@ -3,7 +3,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { hub, type Cast, type Config } from './lib/hub';
 import { countLabel, mergePage, readActivity, readReactions, readReplies, type Activity, type ActivityTab, type Page, type Reaction } from './lib/social';
 import { CastCard, type CastHandlers } from './CastCard';
-import { PersonRow } from './social-ui';
+import { ReactionRow } from './ReactionRow';
 
 export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionFid,busy,onBack}: {
   config:Config;fid:number;hash:string;tab:ActivityTab;onTab:(tab:ActivityTab)=>void;handlers:CastHandlers;revision:number;sessionFid?:number;busy:boolean;onBack:()=>void;
@@ -55,7 +55,7 @@ export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionF
       </div>
       <div id="activity-panel" role="tabpanel" aria-labelledby={`activity-${tab}`}>
         {!activity?<div className="loading"><span className="loader"/><p>Reading cast activity…</p></div>:activity.errors[tab]?<div className="feed-message error" role="alert">Could not read {tab}. <button className="text-button" onClick={()=>setRetry(v=>v+1)}>Retry</button></div>:page?.items.length?
-          tab==='replies'?(page.items as Cast[]).slice(0,limit).map(c=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={revision} sessionFid={sessionFid} busy={busy}/>):(page.items as Reaction[]).slice(0,limit).map(m=><PersonRow key={m.data.fid} config={config} fid={m.data.fid} onProfile={handlers.onProfile}/>)
+          tab==='replies'?(page.items as Cast[]).slice(0,limit).map(c=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={revision} sessionFid={sessionFid} busy={busy}/>):(page.items as Reaction[]).slice(0,limit).map(m=><ReactionRow key={m.hash} config={config} reaction={m} onProfile={handlers.onProfile}/>)
           :<div className="empty"><h3>No {tab} yet</h3><p>{tab==='replies'?'Start the conversation with a reply.':'Accounts will appear here when they react.'}</p></div>}
         {page&&(page.items.length>limit||page.next)&&<button className="load-more" disabled={loading} onClick={more}>{loading?'Reading…':`Load more ${tab}`}</button>}
         {page?.next&&<p className="feed-limit">{countLabel(page)} {tab} loaded. More results are available.</p>}
