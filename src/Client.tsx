@@ -18,6 +18,7 @@ import { ImageAttachments } from './ImageAttachments';
 import { MentionComposer } from './MentionComposer';
 import type { DraftMention } from './lib/mentions';
 import { ConnectionsPage } from './ConnectionsPage';
+import { EditCast } from './EditCast';
 import { EditProfile } from './EditProfile';
 import { ProfileHeader } from './ProfileHeader';
 import { SettingsPage } from './SettingsPage';
@@ -32,6 +33,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   const [fid,setFid]=useState(37),[homeFid,setHomeFid]=useState(37),[fidInput,setFidInput]=useState('37'),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
   const [draftMentions,setDraftMentions]=useState<DraftMention[]>([]),[replyMentions,setReplyMentions]=useState<DraftMention[]>([]);
   const [images,setImages]=useState<string[]>([]),[replyImages,setReplyImages]=useState<string[]>([]),[uploading,setUploading]=useState(false),[replyUploading,setReplyUploading]=useState(false);
+  const [editingCast,setEditingCast]=useState<Cast|null>(null),[editCastOpen,setEditCastOpen]=useState(false);
   const [editProfileOpen,setEditProfileOpen]=useState(false);
   const [deletePending,setDeletePending]=useState<Cast|null>(null),[deleting,setDeleting]=useState(false);
   const [view,setView]=useState(()=>clientRoute(location.pathname,location.search));
@@ -103,6 +105,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   async function action(id:string,fn:(s:Session)=>Promise<unknown>){if(!session){setAccountOpen(true);return;}setActionBusy(id);setError('');try{await fn(session);setNotice('Accepted by validator. Refresh after your read node catches up.');}catch(e){setError((e as Error).message);}finally{setActionBusy('');}}
   const handlers:CastHandlers={
     onProfile:openProfile,onOpen:openCast,
+    onEdit:cast=>{if(session?.fid===cast.data.fid){setError('');if(!editingCast)setEditingCast(cast);setEditCastOpen(true);}},
     onDelete:cast=>{if(session?.fid===cast.data.fid){setError('');setDeletePending(cast);}},
     onQuote:c=>{setQuote(c);setReply(null);setReplyText('');setReplyMentions([]);setReplyImages([]);setError('');setLookupOpen(false);setTimeout(()=>replyComposer.current?.focus(),0);},
     onReply:c=>{setQuote(null);setReply(c);setReplyText('');setReplyMentions([]);setReplyImages([]);setError('');setLookupOpen(false);setTimeout(()=>replyComposer.current?.focus(),0);},
@@ -137,6 +140,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   {(view.kind==='cast'||view.kind==='settings')&&error&&<div className="feed-message error" role="alert">{error}</div>}
   {(view.kind==='cast'||view.kind==='settings')&&notice&&<div className="feed-message notice" role="status">{notice}</div>}
+  {editingCast&&!editCastOpen&&session?.fid===editingCast.data.fid&&<div className="feed-message notice" role="status"><span>Your cast edit is still pending.</span><button type="button" className="text-button" onClick={()=>setEditCastOpen(true)}>Resume cast edit</button></div>}
   </section><aside className="client-right"><div className="node-card"><div className="card-label"><Server size={16}/><span>READ NODE</span><span className={info?'status-pill':'status-pill offline'}>{info?'Connected':nodeError?'Unavailable':'Checking'}</span></div><h3>Your window<br/>into the network.</h3><a className="node-url" href={`${config.readUrl}/v1/info`} target="_blank" rel="noreferrer">{new URL(config.readUrl).hostname}<ArrowUpRight size={13}/></a><div className="node-stats"><div><span>VERSION</span><strong>{info?.version||'—'}</strong></div><div><span>SHARD DELAY</span><strong>{info?`${Math.max(...info.shardInfos.map(s=>s.blockDelay))}s`:'—'}</strong></div></div>{nodeError&&<p className="small danger">{nodeError}</p>}<div className="node-card-footer"><span className="live-dot"/> Operator-configured read node</div></div><div className="write-card"><div className="card-label"><ArrowUpRight size={16}/>WRITE PATH</div><h4>Signed here.<br/>Included by a validator.</h4><p>{config.validatorUrl?new URL(config.validatorUrl).hostname:'Set VALIDATOR_URL in your local .env to enable writes.'}</p></div><div className="protocol-note"><span className="eyebrow">GOOD TO KNOW</span><p>A username can change.<br/>An FID is your stable identity.</p><button className="text-button" onClick={openGuide}>Meet the protocol <ArrowRight size={14}/></button></div><div className="sidebar-fineprint">NO READ-PROVIDER API KEY<br/>NO ALGORITHMIC RANKING<br/>OPEN SOURCE / MIT</div></aside>
   {deletePending&&<Modal title="Delete this cast?" onClose={()=>{if(!deleting)setDeletePending(null);}}><p>This permanently removes your cast from Farcaster. This action cannot be undone.</p><div className="delete-confirm-actions"><button className="button" disabled={deleting} onClick={()=>setDeletePending(null)}>Cancel</button><button className="button delete-confirm" disabled={deleting} onClick={async()=>{
     if(!session||session.fid!==deletePending.data.fid){setError('Connect the account that owns this cast.');return;}
@@ -155,6 +159,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
     }}>{publishing?'Publishing…':session?(quote?'Publish quote':'Publish reply'):'Connect to publish'}</button></div></div></div>{error&&<div className="feed-message error" role="alert">{error}</div>}
   </Modal>}
 
+  {editingCast&&session?.fid===editingCast.data.fid&&<EditCast key={`${session.key}:${editingCast.hash}`} config={config} session={session} cast={editingCast} open={editCastOpen} onClose={pending=>{setEditCastOpen(false);if(!pending)setEditingCast(null);}} onDeleted={()=>setCasts(value=>value.filter(cast=>cast.hash!==editingCast.hash))} onPublished={hash=>{setEditingCast(null);setEditCastOpen(false);published(session.fid,hash);setRefresh(value=>value+1);navigate(`/cast/${session.fid}/${hash}`);}}/>}
   {editProfileOpen&&session&&<EditProfile key={session.key} config={config} session={session} onClose={()=>setEditProfileOpen(false)} onConnect={()=>{setEditProfileOpen(false);setAccountOpen(true);}} onSaved={()=>{setNotice('Profile updated');profile(config,session.fid).then(person=>setProfiles(value=>({...value,[person.fid]:person}))).catch(()=>{});setRefresh(value=>value+1);}}/>}
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys}} onClose={()=>setControls(false)} onApply={filters=>{setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setControls(false);}}/>}

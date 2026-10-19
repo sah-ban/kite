@@ -12,6 +12,7 @@ import {
   makeCastAdd, makeCastRemove, makeReactionAdd, makeReactionRemove, makeLinkAdd, makeLinkRemove,
 } from '@farcaster/core';
 
+import { buildReplacementMessage } from './replacement.mjs';
 import { loadModernSdk } from './modern-sdk.mjs';
 import { validateProfileField } from './profile-fields.mjs';
 
@@ -92,6 +93,11 @@ async function verifyRegistration(config, fid, key, request) {
 async function buildAction(session, action) {
   const signer = new NobleEd25519Signer(session.privateKey);
   const options = {fid:session.fid,network:FarcasterNetwork.MAINNET};
+  if(action.kind==='prepareCastReplacement'){
+    const sdk=await loadModernSdk();
+    try{return await buildReplacementMessage(action.body,action.source,session.fid,new sdk.NobleEd25519Signer(session.privateKey));}
+    catch(error){throw new Failure(400,error.message);}
+  }
   if(action.kind==='profile'){
     try{validateProfileField(action.type,action.value);}catch(error){throw new Failure(400,error.message);}
     const sdk=await loadModernSdk();
@@ -263,6 +269,7 @@ export function approval(config, dependencies = {}) {
       const message = await buildAction(session,action);
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();
+      if(action.kind==='prepareCastReplacement')return send(res,200,{hash:bytesToHex(message.hash),message:Buffer.from(bytes).toString('base64')});
       const response = await request(new URL('/v1/submitMessage',config.VALIDATOR_URL),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
       if (!response.ok) throw new Failure(502, `Submission endpoint rejected the message (${response.status}).`);
       return send(res,200,{hash:bytesToHex(message.hash),accepted:true});

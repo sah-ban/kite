@@ -317,3 +317,15 @@ test('approved signer edits only permitted profile fields as its own FID, includ
   for(const body of [{type:6,value:'unowned-name'},{type:2,value:'😀'.repeat(9)},{type:1,value:'javascript:alert(1)'},{type:11,value:'0x00'}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'profile',...body}})).status,400);
   assert.equal(h.submitted.length,5);
 });
+
+test('replacement preparation signs complete cast data for the approved FID without submitting or deleting',async()=>{
+  const {loadGaslessSdk}=await import('../src/lib/gasless-sdk');const sdk=await loadGaslessSdk();
+  const h=harness();const start=await call(h.middleware,'/api/auth/start');const cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const source={fid:123,hash:'0x'+'ab'.repeat(20),timestamp:Math.floor(Date.now()/1000)-1609459200};
+  const body={text:'Hi  !',mentions:[37],mentionsPositions:[3],embeds:[{url:'https://example.com/image.png'},{castId:{fid:37,hash:'0x'+'cd'.repeat(20)}}],parentUrl:'chain://channel'};
+  const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source,body}});assert.equal(result.status,200);assert.equal(h.submitted.length,0);
+  const message=sdk.Message.decode(Buffer.from(result.body.message,'base64')),data=sdk.MessageData.decode(message.dataBytes!);
+  assert.equal(data.fid,123);assert.equal(data.castAddBody?.parentUrl,'chain://channel');assert.equal(data.castAddBody?.embeds[0].url,'https://example.com/image.png');assert.equal(data.castAddBody?.embeds[1].castId?.fid,37);assert.deepEqual(data.castAddBody?.mentions,[37]);assert.ok(data.timestamp>source.timestamp);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());assert.equal(result.body.hash,bytesToHex(message.hash));
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source:{...source,fid:999},body}})).status,400);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source,body:{...body,mentionsPositions:[999]}}})).status,400);assert.equal(h.submitted.length,0);
+});

@@ -3,7 +3,7 @@ import { CastType, FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, 
 import { createPublicClient, http, bytesToHex, hexToBytes, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
-import { hub, localOrigin, type Config, type Cast } from './hub';
+import { hub, HubError, localOrigin, type Config, type Cast } from './hub';
 import { encodeMentionText, type DraftMention } from './mentions';
 import { saveAppKey, unlockAppKey } from './vault';
 import { buildGaslessKey, checkGaslessSigner, gaslessState, GASLESS_TTL } from './gasless';
@@ -146,7 +146,7 @@ export async function postCast(config: Config, session: Session, text: string, p
   }
   throw new Error(`Accepted by validator; inclusion is not confirmed yet. Check FID ${session.fid}, hash ${hash} before retrying.`);
 }
-export async function deleteCast(config:Config,session:Session,cast:Cast):Promise<void> {
+export async function deleteCast(config:Config,session:Session,cast:Cast,onSubmitted?:()=>void):Promise<void> {
   if(session.fid!==cast.data.fid)throw new Error('You can only delete your own casts.');
   if(!/^0x[0-9a-fA-F]{40}$/.test(cast.hash))throw new Error('Invalid cast hash.');
   if(session.remote)await serverAction({kind:'deleteCast',targetFid:cast.data.fid,targetHash:cast.hash});
@@ -154,11 +154,13 @@ export async function deleteCast(config:Config,session:Session,cast:Cast):Promis
     const message=result(await makeCastRemove({targetHash:hexToBytes(cast.hash as Hex)},{fid:session.fid,network:FarcasterNetwork.MAINNET},session.signer));
     await submit(config,message);
   }
+  onSubmitted?.();
   for(let i=0;i<12;i++){
     await new Promise(resolve=>setTimeout(resolve,2500));
     try{await hub(config,'castById',{fid:session.fid,hash:cast.hash});}
     catch(error){
       const message=(error as Error).message;
+      if(error instanceof HubError&&(error.notFound||error.status===410))return;
       if(/^Node returned (404|410):/.test(message)||/^Node returned 400:.*"errCode"\s*:\s*"not_found"/s.test(message))return;
     }
   }
@@ -191,4 +193,23 @@ export async function updateProfileField(config:Config,session:Session,type:numb
   const {loadGaslessSdk}=await import('./gasless-sdk');const sdk=await loadGaslessSdk();
   const message=result(await sdk.makeUserDataAdd({type,value},{fid:session.fid,network:sdk.FarcasterNetwork.MAINNET},session.signer));
   return submit(config,message as unknown as Message);
+}
+
+export async function prepareCastReplacement(config:Config,session:Session,cast:Cast,body:unknown):Promise<{hash:string;bytes:Uint8Array}> {
+  if(cast.data.fid!==session.fid)throw new Error('You can only edit your own casts.');
+  const source={fid:cast.data.fid,hash:cast.hash,timestamp:cast.data.timestamp};
+  if(session.remote){
+    const response=await fetch('/api/auth/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'prepareCastReplacement',source,body}),signal:AbortSignal.timeout(30_000)});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not prepare the replacement.');
+    if(typeof result.message!=='string'||!/^0x[0-9a-f]{40}$/i.test(result.hash))throw new Error('Invalid prepared replacement.');
+    const bytes=Uint8Array.from(atob(result.message),character=>character.charCodeAt(0));
+    const decoded=Message.decode(bytes),data=decoded.dataBytes?MessageData.decode(decoded.dataBytes):decoded.data;
+    if(data?.fid!==session.fid||data.type!==1||bytesToHex(decoded.hash)!==result.hash||result.hash.toLowerCase()===cast.hash.toLowerCase())throw new Error('Invalid prepared replacement.');
+    return {hash:result.hash,bytes};
+  }
+  requireLocal();
+  // @ts-expect-error Shared modern cast builder preserves all embed and parent types.
+  const {buildReplacementMessage}=await import('../../replacement.mjs');
+  const message=await buildReplacementMessage(body,source,session.fid,session.signer);
+  return {hash:bytesToHex(message.hash),bytes:encodeForSnapchain(message)};
 }

@@ -1,4 +1,4 @@
-export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
+export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; parentUrl?:string; embedsDeprecated?:string[]; type?:number|string; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
 export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string };
 export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
