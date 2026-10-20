@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, LogOut, Settings, UserRound, KeyRound } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, UserRound, KeyRound, Menu } from 'lucide-react';
 import type { Profile } from './lib/hub';
 import type { Session } from './lib/signing';
 import { Avatar } from './social-ui';
 
-export function AccountMenu({session,person,onSettings,onConnect,onLock}:{session:Session|null;person?:Profile;onSettings:()=>void;onConnect:()=>void;onLock:()=>Promise<void>}) {
+export function AccountMenu({session,person,menuIcon=false,onSettings,onConnect,onLock}:{session:Session|null;person?:Profile;menuIcon?:boolean;onSettings:()=>void;onConnect:()=>void;onLock:()=>Promise<void>}) {
   const [open,setOpen]=useState(false),[locking,setLocking]=useState(false),root=useRef<HTMLDivElement>(null),toggle=useRef<HTMLButtonElement>(null),id=useId();
   useEffect(()=>{
     if(!open)return;
@@ -23,8 +23,8 @@ export function AccountMenu({session,person,onSettings,onConnect,onLock}:{sessio
     }
   }}>
     <button ref={toggle} className="account-menu-toggle" aria-label="Account menu" aria-haspopup="menu" aria-expanded={open} aria-controls={open?id:undefined} onClick={()=>setOpen(value=>!value)}>
-      {session?<Avatar person={person}/>:<UserRound size={21}/>}
-      <span>{session?(person?.username?`@${person.username}`:person?.name||'Your account'):'Account'}</span><ChevronDown size={14}/>
+      {menuIcon?<Menu size={22}/>:<>{session?<Avatar person={person}/>:<UserRound size={21}/>}
+      <span>{session?(person?.username?`@${person.username}`:person?.name||'Your account'):'Account'}</span><ChevronDown size={14}/></>}
     </button>
     {open&&<div id={id} className="account-menu-items" role="menu" aria-label="Your account">
       {session&&<div className="account-menu-identity"><strong>{person?.name||'Your account'}</strong><small>{person?.username?`@${person.username}`:`FID ${session.fid}`}</small></div>}
