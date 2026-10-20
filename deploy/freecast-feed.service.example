@@ -1,12 +1,12 @@
 [Unit]
-Description=Freecast Following feed worker
+Description=Kite Following feed worker
 After=network-online.target docker.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/freecast
-ExecStart=/path/to/node /path/to/freecast/feed/worker.mjs
+WorkingDirectory=/path/to/kiteapp
+ExecStart=/path/to/node /path/to/kiteapp/feed/worker.mjs
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

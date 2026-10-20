@@ -171,7 +171,7 @@ export function approval(config, dependencies = {}) {
     if (!path.startsWith('/api/auth/')) return next();
     try {
       const origin = originFor(req,config);
-      if (!canConnect(origin)) throw new Failure(403, 'Open Freecast through localhost or HTTPS to connect an account.');
+      if (!canConnect(origin)) throw new Failure(403, 'Open Kite through localhost or HTTPS to connect an account.');
       if (origin.protocol !== 'https:' && !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress)) throw new Failure(403, 'Localhost account connections must originate on this server.');
       const expectedMethod = path === '/api/auth/session' ? 'GET' : 'POST';
       if (req.method !== expectedMethod) throw new Failure(405, 'Method not allowed.');

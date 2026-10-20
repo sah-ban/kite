@@ -26,7 +26,7 @@ export function FeedControls({initial,onApply,onClose}:{initial:Filters;onApply:
     </fieldset>
     <fieldset className="client-filter-options"><legend>Custom clients</legend>
       <label className="client-filter-option"><input type="checkbox" checked={draft.selfRegistered} onChange={event => {setError('');setDraft({...draft,selfRegistered:event.target.checked,mode:draft.mode==='all'?'include':draft.mode});}}/>
-        <span><strong>Self-registered clients</strong><small>Clients like Freecast, where the client FID matches the cast author’s FID.</small></span>
+        <span><strong>Self-registered clients</strong><small>Clients like Kite, where the client FID matches the cast author’s FID.</small></span>
       </label>
     </fieldset>
     <label>Other client FIDs<input value={otherFids} onChange={event=>{setError('');setOtherFids(event.target.value);setDraft({...draft,clientFids:[...fids.filter(fid => knownFids.has(Number(fid))),event.target.value].filter(Boolean).join(', ')});}} placeholder="Add client FIDs, separated by commas"/></label>

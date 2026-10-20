@@ -36,7 +36,7 @@ export function localFeedEnrollment(config,enroll,{fetcher=fetch,now=Date.now}={
       const ip=req.socket.remoteAddress,rate=rates.get(ip)||{count:0,expires:now()+60000};
       if(rate.count>=10||challenges.size>=1000)fail(429,'Too many enrollment requests. Please retry later.');rate.count++;rates.set(ip,rate);
       const nonce=randomBytes(24).toString('hex'),expires=now()+120000;
-      const message=`Freecast feed enrollment\nOrigin: ${origin.origin}\nFID: ${fid}\nApp key: ${key}\nNonce: ${nonce}\nExpires: ${expires}`;
+      const message=`Kite feed enrollment\nOrigin: ${origin.origin}\nFID: ${fid}\nApp key: ${key}\nNonce: ${nonce}\nExpires: ${expires}`;
       challenges.set(nonce,{fid,key,expires,message,origin:origin.origin});return {nonce,message};
     }
     if(req.method!=='POST')fail(405,'Method not allowed');

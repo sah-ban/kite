@@ -39,7 +39,7 @@ export async function loadDocument(input,dependencies={},redirects=0,deadline=Da
     let timer,settled=false;
     const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value);};
     const req=send(url,{
-      method:'GET',headers:{Accept:'text/html,application/xhtml+xml,image/*,video/*,application/vnd.apple.mpegurl;q=0.8','Accept-Encoding':'identity','User-Agent':'Freecast-LinkPreview/1.0'},
+      method:'GET',headers:{Accept:'text/html,application/xhtml+xml,image/*,video/*,application/vnd.apple.mpegurl;q=0.8','Accept-Encoding':'identity','User-Agent':'Kite-LinkPreview/1.0'},
       // Pin the validated DNS answer so the connection cannot resolve a private address later.
       lookup:(_host,options,callback)=>options?.all?callback(null,[address]):callback(null,address.address,address.family),
       agent:false,

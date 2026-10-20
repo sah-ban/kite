@@ -1,19 +1,20 @@
-# Freecast
+# Kite (@kiteapp)
 
-A local Farcaster client and a responsive tutorial for running your own Snapchain read node. MIT licensed.
+**Your people. Your feed.**
+
+Kite is an open source Farcaster client (project name and handle: `kiteapp`) with chronological Following feeds, client filters, rich profiles, notifications, and account tools. It also includes a responsive tutorial for running your own Snapchain read node. MIT licensed.
 
 The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. It signs protocol messages in the browser and submits them to a separately configured validator.
 
-## Try it on this machine
+## Try the client
 
-This development machine has about 8 GB RAM and 20 GB free disk: enough for the client, far below the read node's capacity requirements. No node has been provisioned here.
+From your repository checkout:
 
 ```bash
-cd /root/projects/freecast
-./freecast client
+./kiteapp client
 ```
 
-Open http://127.0.0.1:5173 for the client or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` pointing at a node on localhost. This development machine needs an existing remote node: configure `NEXT_PUBLIC_HUBURL` in your local `.env` before starting. Existing `.env` files are never overwritten. Endpoint URLs belong in local configuration, not in source control. `VALIDATOR_URL` is empty by default: configure a real validator HTTP endpoint to enable posting. No seed phrase is needed for reads.
+Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `NEXT_PUBLIC_HUBURL` and a submission endpoint through `VALIDATOR_URL`; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
 
 ## Three-command quickstart on suitable existing compute
 
@@ -22,16 +23,16 @@ To access the guide and read-only client through this server's IP address, run `
 First clone this repository. The node host needs Ubuntu 22.04/24.04, Python 3, curl, a public IP, four cores, at least 16 GB RAM, and at least 1.5 TB free SSD. The script allows 15 GiB reported physical RAM to accommodate a nominal 16 GB VM. The client machine needs Node.js 22.13+ and npm 10+.
 
 ```bash
-./freecast provision --existing
-./freecast node
-./freecast client
+./kiteapp provision --existing
+./kiteapp node
+./kiteapp client
 ```
 
 1. Provision checks hardware before installing Docker. It supports an existing Ubuntu server and stops if an installed Docker daemon is inaccessible. If it adds your user to the Docker group, reconnect before continuing. It does not provision a new paid VM.
 2. Node resolves the latest stable upstream release on first run, pins that release and image, and starts the canonical mainnet read-node configuration. Later runs retain the same release. Set `SNAPCHAIN_REF=0.x.y` explicitly to change it after reviewing upstream release notes. The full initial sync downloads a very large snapshot and can take hours.
 3. Client installs locked dependencies if missing, creates a local-node `.env` if needed, and starts a localhost-only Vite server. Set the validator URL before account actions. These three shell invocations do not eliminate prerequisite installation, configuration, browser account registration, or initial sync.
 
-Check progress with `./freecast status`. Each shard should have advancing heights and a delay approaching zero. The script exits 2 while catching up and 1 when unavailable. A low-delay sample is not proof of sustained health; check it again later.
+Check progress with `./kiteapp status`. Each shard should have advancing heights and a delay approaching zero. The script exits 2 while catching up and 1 when unavailable. A low-delay sample is not proof of sustained health; check it again later.
 
 The official read-node configuration needs inbound UDP 3382 and outbound access to network peers and snapshot storage. Our script binds HTTP 3381 and gRPC 3383 to loopback. It leaves APIs private; it does not change an existing firewall. Configure the host and provider firewalls accordingly.
 
@@ -51,7 +52,7 @@ VALIDATOR_URL=https://YOUR-VALIDATOR-HTTP-ENDPOINT
 OPTIMISM_RPC_URL=https://mainnet.optimism.io
 ```
 
-Then run `./freecast client`. Set `NODE_STATUS_URL` explicitly if `./freecast status` should inspect a different host. Keep the browser and client server on the machine you control; account import is disabled for non-loopback browser origins.
+Then run `./kiteapp client`. Set `NODE_STATUS_URL` explicitly if `./kiteapp status` should inspect a different host. Keep the browser and client server on the machine you control; account import is disabled for non-loopback browser origins.
 
 ## Optional AWS provisioning
 
@@ -60,8 +61,8 @@ Then run `./freecast client`. Set `NODE_STATUS_URL` explicitly if `./freecast st
 Install Terraform 1.6+ and configure AWS credentials locally. Copy `infra/aws/terraform.example.tfvars` to `infra/aws/terraform.tfvars` and enter your SSH **public** key and client IPv4 CIDR. Never put private SSH keys in this file.
 
 ```bash
-./freecast provision --aws
-terraform -chdir=infra/aws apply freecast.tfplan
+./kiteapp provision --aws
+terraform -chdir=infra/aws apply kiteapp.tfplan
 ```
 
 The first command generates a plan without creating paid resources. Review instance, disk, public IPv4, and egress costs in your AWS account before applying. Applying creates billable infrastructure. SSH to the output address, clone this repository there, then run provision and node on that host. Cloud provisioning is an alternative workflow with more setup, not the existing-host three-command path.
@@ -72,7 +73,7 @@ To stop charges when finished, review a Terraform destroy plan before applying i
 
 For a fresh delegated signer without entering the user's custody phrase, choose **Approve a fresh signer in Farcaster**. Configure the server-only `FARCASTER_APP_FID` and `FARCASTER_APP_MNEMONIC`, or set `FARCASTER_APP_ENV_FILE` to an explicitly selected app configuration containing `DEVELOPER_FID` and `DEVELOPER_MNEMONIC`. Only those identity fields are read from that file; its database and hub settings are not imported. Never use a `NEXT_PUBLIC_` or `VITE_` prefix for developer credentials.
 
-Freecast generates a fresh Ed25519 key, signs a request with the developer identity, and displays the Farcaster approval link and a locally rendered QR code. The account owner approves in Farcaster. The server checks onchain registration and active storage, then binds the connection to that browser with an HttpOnly, SameSite cookie. The delegated private key is encrypted on disk and is never returned to the browser. No cast, reaction, or follow is sent during approval. Later actions require explicit client interaction.
+Kite generates a fresh Ed25519 key, signs a request with the developer identity, and displays the Farcaster approval link and a locally rendered QR code. The account owner approves in Farcaster. The server checks onchain registration and active storage, then binds the connection to that browser with an HttpOnly, SameSite cookie. The delegated private key is encrypted on disk and is never returned to the browser. No cast, reaction, or follow is sent during approval. Later actions require explicit client interaction.
 
 Approval sessions require localhost or HTTPS. For an HTTPS reverse proxy, set `FREECAST_PUBLIC_URL` to its exact public origin; HTTPS session cookies are Secure. The public HTTP network preview remains read-only. Connections last up to 30 days and survive server restarts. Signing out removes the saved signer and browser session but does not revoke its onchain registration; manage old keys in Farcaster. Pending approval requests expire after ten minutes. This optional flow depends on the Farcaster client approval API; the custody-phrase path below remains available for the contest's independent onboarding flow.
 
@@ -109,9 +110,9 @@ No analytics are added. The optional QR approval flow uses Farcaster's signed-ke
 
 ## Filtering by client
 
-Feed controls offer named choices for Warpcast (FID 9152) and Firefly (FID 16823), plus self-registered clients such as Freecast where the signer requester FID equals the cast author FID. Additional requester FIDs and exact Ed25519 public keys can also be entered. Selections combine as alternatives and can be included or excluded. The client resolves registration metadata for each loaded author using onchain signer events and the unified signer endpoint, including supported gasless keys. Unknown keys are dropped by include filters and retained by exclude filters.
+Feed controls offer named choices for Warpcast (FID 9152) and Firefly (FID 16823), plus self-registered clients such as Kite where the signer requester FID equals the cast author FID. Additional requester FIDs and exact Ed25519 public keys can also be entered. Selections combine as alternatives and can be included or excluded. The client resolves registration metadata for each loaded author using onchain signer events and the unified signer endpoint, including supported gasless keys. Unknown keys are dropped by include filters and retained by exclude filters.
 
-Limitations: gasless attribution requires a node that supports the unified signer endpoint; active signer queries cannot attribute old revoked keys; a requester FID alone is not an independently verified application identity. The self-registered option matches a registration pattern rather than proving use of Freecast specifically. Exact-key filtering still works. A production indexer could retain historical registry events.
+Limitations: gasless attribution requires a node that supports the unified signer endpoint; active signer queries cannot attribute old revoked keys; a requester FID alone is not an independently verified application identity. The self-registered option matches a registration pattern rather than proving use of Kite specifically. Exact-key filtering still works. A production indexer could retain historical registry events.
 
 ## Development and validation
 
@@ -178,21 +179,21 @@ Type `@` in the cast, reply, or quote composer and select an account. Suggestion
 
 Approval sessions, including pending requests, are encrypted with AES-256-GCM in `.freecast/sessions/` by default. The server creates a random encryption key and restricts the directory and files to its operating-system user. Set `FREECAST_SESSION_DIR` to use another private directory outside `dist` and `public`. Keep both the encrypted session files and their master key when moving this server. These files are ignored by Git and blocked by the development server.
 
-After a restart, Freecast restores the same browser-bound signer and checks its onchain registration and storage before allowing it to be used. Connections expire after 30 days; pending requests expire after ten minutes. Signing out deletes the saved signer for that browser. No message is submitted when a connection is restored. Missing or unreadable encryption data fails closed instead of silently replacing a saved key.
+After a restart, Kite restores the same browser-bound signer and checks its onchain registration and storage before allowing it to be used. Connections expire after 30 days; pending requests expire after ten minutes. Signing out deletes the saved signer for that browser. No message is submitted when a connection is restored. Missing or unreadable encryption data fails closed instead of silently replacing a saved key.
 
-Client attribution reads `requestFid` for gasless keys from `signersByFid` and retains onchain signer metadata for existing clients and older nodes. Custody-phrase registration currently uses the account itself as requester, so its label resolves to that account's username rather than a separate Freecast app identity. Attribution caches expire so new keys can become visible.
+Client attribution reads `requestFid` for gasless keys from `signersByFid` and retains onchain signer metadata for existing clients and older nodes. Custody-phrase registration currently uses the account itself as requester, so its label resolves to that account's username rather than a separate Kite app identity. Attribution caches expire so new keys can become visible.
 
 Notifications are available at `/notifications` for the connected account. Mentions and current follow events are paginated directly from the node. Replies, likes and recasts are checked on the latest ten authored casts first; **Load more activity** checks older casts and continues activity pages. The view deduplicates mentions that are also replies, excludes your own actions, and shows retry controls for partial failures. It is a read-on-demand view with manual refresh, not push notifications or a complete historical archive.
 
 ### Image uploads
 
-Set `IMGBB_API_KEY` in the ignored server `.env` and restart Freecast. The API key stays on the server; do not prefix it with `VITE_` or `NEXT_PUBLIC_`. Both the development and production server expose the same image upload route.
+Set `IMGBB_API_KEY` in the ignored server `.env` and restart Kite. The API key stays on the server; do not prefix it with `VITE_` or `NEXT_PUBLIC_`. Both the development and production server expose the same image upload route.
 
 Use **Add image** in the composer, reply or quote dialog. JPEG, PNG, GIF and WebP files up to 10 MB are supported, with previews and removal before publishing. Casts and replies support two images, or four for active Pro accounts; quotes reserve one of those slots for the quoted cast. Image-only casts and replies are supported. Publishing waits until the upload finishes, and failed uploads preserve the draft. Images upload immediately to ImgBB without an expiration setting; removing an attachment from the draft or deleting a cast does not delete the hosted image. The upload endpoint enforces the app origin and limits each connecting IP to 20 attempts per hour (in-memory per server process).
 
 ### GIF picker
 
-Use **GIF** beside **Add image** to browse featured GIFs, search, or load more results. Selected GIFs attach directly from Tenor and share the account's embed slots (two normally, four for Pro, with one reserved for a quoted cast); they do not upload to ImgBB. The same picker is available in casts, replies and quotes. Freecast uses the `tenor.bhopp.ing` provider from the [GIF miniapp](https://github.com/sah-ban/gif) through its server-side `/api/gifs` route, with a short bounded cache, validated media URLs, and retryable errors. No additional API key is required; availability depends on that third-party provider.
+Use **GIF** beside **Add image** to browse featured GIFs, search, or load more results. Selected GIFs attach directly from Tenor and share the account's embed slots (two normally, four for Pro, with one reserved for a quoted cast); they do not upload to ImgBB. The same picker is available in casts, replies and quotes. Kite uses the `tenor.bhopp.ing` provider from the [GIF miniapp](https://github.com/sah-ban/gif) through its server-side `/api/gifs` route, with a short bounded cache, validated media URLs, and retryable errors. No additional API key is required; availability depends on that third-party provider.
 
 HTTP and HTTPS links typed or pasted into the cast, reply, quote, or edit composer automatically become embeds while remaining in the text. Use **Attach link** to embed a URL without putting it in the text. Remove a preview to keep that URL as text only for the rest of the draft; explicitly attaching the same URL restores its preview. Duplicate URLs are skipped, and removing an automatic URL from the text removes its preview. Previews load after a short typing pause and may fall back to a plain link when metadata is unavailable. Links share slots with images, GIFs, and quoted casts: two total normally, or four with an active Pro subscription, including the quoted cast itself. When slots are full, additional text links remain ordinary text. Both local signing and approved-account signing validate the same HTTP/HTTPS URL and 256-byte limit.
 
@@ -209,11 +210,11 @@ Banner editing requires an active Farcaster Pro subscription. The editor checks 
 
 ### Change fname on localhost
 
-Open Freecast at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then choose **Edit profile → Change username**. Enter the new fname, custody recovery phrase and derivation index. The phrase stays in browser memory and is cleared from the field before review; it is never stored or sent to Freecast, the registry or the RPC. Only signed public username proofs go directly to `fnames.farcaster.xyz`. The phrase must derive the connected FID's current custody address, and the connected app signer must allow profile updates. ENS names use a separate registration process.
+Open Kite at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then choose **Edit profile → Change username**. Enter the new fname, custody recovery phrase and derivation index. The phrase stays in browser memory and is cleared from the field before review; it is never stored or sent to Kite, the registry or the RPC. Only signed public username proofs go directly to `fnames.farcaster.xyz`. The phrase must derive the connected FID's current custody address, and the connected app signer must allow profile updates. ENS names use a separate registration process.
 
 Availability, known reserved names, and the registry's [28-day cooldown](https://github.com/farcasterxyz/fname-registry/blob/main/src/transfers.ts) are checked before review and again before submission. The new name's complete transfer history is checked too: a released name can still be cooling down. Review the current and new fnames and custody address, then explicitly confirm the release. Releasing the old name and claiming the new one are separate registry writes; the new name is not reserved by an availability check, and the old name may not be reclaimable for 28 days. Both custody proofs are prepared before releasing anything, with the claim timestamp later than the release.
 
-After claiming, Freecast waits for the fname proof on the read node, submits the preferred username (`USER_DATA_ADD`, type 6), and waits for inclusion. A failed release never proceeds to claiming. A failed or ambiguous submission can be retried on the open page: registry ownership is checked first, so confirmed releases or claims are not repeated. If a name is already claimed by this FID, the flow can finish only the preferred-name update. Closing the form discards its in-memory custody key and does not reverse completed transfers; after reopening, enter the same claimed fname to finish a pending profile update. Tests use public fixture keys and mocked transfers only.
+After claiming, Kite waits for the fname proof on the read node, submits the preferred username (`USER_DATA_ADD`, type 6), and waits for inclusion. A failed release never proceeds to claiming. A failed or ambiguous submission can be retried on the open page: registry ownership is checked first, so confirmed releases or claims are not repeated. If a name is already claimed by this FID, the flow can finish only the preferred-name update. Closing the form discards its in-memory custody key and does not reverse completed transfers; after reopening, enter the same claimed fname to finish a pending profile update. Tests use public fixture keys and mocked transfers only.
 
 The preferred-fname action is restricted to loopback hosts and loopback peers on the server, and independently verifies that the node's proof belongs to the approved FID. Existing hosted approval configuration can remain in `.env` while connecting locally; local and hosted sessions remain bound to their own origins.
 
@@ -231,9 +232,9 @@ For your own casts, choose **Post to Twitter** in the three-dot menu while conne
 
 Profile follower and following totals come from `https://api.farcaster.xyz/v2/user?fid=…` through `/api/profile/counts`, with a one-minute server cache. If that provider is unavailable, the profile falls back to the node's loaded connection counts (`+` when more pages exist). Clicking either count still opens the node-backed followers or following list, which may differ while the services catch up.
 
-The conversation's Likes and Recasts lists show **via @clientusername** for each reaction using that reaction's signer requester. Client links open the requester's profile in Freecast; unresolved or missing signers show **Unknown client**. Attribution loads as rows approach the viewport and uses the existing signer cache. The key requester may differ from the app brand.
+The conversation's Likes and Recasts lists show **via @clientusername** for each reaction using that reaction's signer requester. Client links open the requester's profile in Kite; unresolved or missing signers show **Unknown client**. Attribution loads as rows approach the viewport and uses the existing signer cache. The key requester may differ from the app brand.
 
-Profiles show **Connected clients** from the node's unified `signersByFid` endpoint, covering both onchain and gasless keys. Keys are grouped by their requester FID so one client appears once, and expired keys are excluded. Client names and avatars link to their Freecast profiles. Active keys with missing requester attribution appear together as **Unknown client**. The list reads all signer pages before displaying results; failures show a retry action. Refreshing the profile reloads connections. This identifies signer requesters, which may differ from app brands, and does not revoke or modify any key.
+Profiles show **Connected clients** from the node's unified `signersByFid` endpoint, covering both onchain and gasless keys. Keys are grouped by their requester FID so one client appears once, and expired keys are excluded. Client names and avatars link to their Kite profiles. Active keys with missing requester attribution appear together as **Unknown client**. The list reads all signer pages before displaying results; failures show a retry action. Refreshing the profile reloads connections. This identifies signer requesters, which may differ from app brands, and does not revoke or modify any key.
 
 **Delete previous and cast again** prepares and validates the signed replacement first, confirms deletion of the previous cast, then publishes and confirms the new cast. Pro requirements are checked before deletion. This is a new cast with a new hash: engagement does not transfer. If deletion fails, no replacement is submitted. If publication fails, the draft and signed replacement remain available on this open page; **Close and keep draft → Resume cast edit** reopens it. Retries reuse the same signed message and check for inclusion before resubmitting to avoid duplicate replacements. Refreshing or closing the browser page discards this in-memory recovery state. Tests use mocked writes and never delete or publish real casts.
 
@@ -252,3 +253,7 @@ The first configured viewer is the signed-out feed preview. Connecting an accoun
 Checkpoints commit atomically with processed events. Imports are idempotent, and deletion tombstones prevent backfill from resurrecting a removed cast. Failed author imports retry independently. Streams reconnect using saved per-shard checkpoints. If a checkpoint is older than two days, the worker clears indexed current state for tracked authors, invalidates old cursors, and rebuilds recent history so missed deletions are not retained. Periodic checks refresh signer metadata and reconcile each author's newest cast page. History is retained for the configured window; this is not a permanent archive or an algorithmically ranked feed.
 
 Run the regular suite with `npm test`. Set `FREECAST_TEST_DATABASE_URL` to run PostgreSQL integration tests as well; they create and remove an isolated temporary schema rather than modifying feed tables.
+
+## Branding and compatibility
+
+The app is Kite, with `kiteapp` as its project name and handle. Use `./kiteapp` for the command-line entry point; `./freecast` remains a compatibility alias. Existing deployment identifiers, `FREECAST_*` operator settings, `.freecast/` runtime paths, database table names, browser theme/app-key storage, and session cookies are retained so the rebrand preserves saved keys, approved sessions, feed enrollment, and indexed posts. The GitHub repository URL remains the existing repository URL. Changing the app brand does not change any Farcaster account or registered app identity.

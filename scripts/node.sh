@@ -31,4 +31,4 @@ docker compose config --quiet
 docker compose pull snapchain
 docker compose up -d --no-deps snapchain
 echo 'Read node started. Snapshot download and initial sync may take hours.'
-echo 'Check progress: ./freecast status (from the repository root).'
+echo 'Check progress: ./kiteapp status (from the repository root).'

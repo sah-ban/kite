@@ -1,43 +1,4 @@
 #!/usr/bin/env bash
+# Compatibility entry point for existing installations.
 set -euo pipefail
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT"
-case "${1:-help}" in
-  doctor) exec python3 scripts/resources.py ;;
-  provision)
-    case "${2:-}" in
-      --existing) exec bash scripts/provision.sh ;;
-      --aws) command -v terraform >/dev/null || { echo 'Install Terraform 1.6+ first.' >&2; exit 1; }
-        terraform -chdir=infra/aws init
-        terraform -chdir=infra/aws plan -out=freecast.tfplan
-        echo 'Review the plan and cloud cost. Apply it with: terraform -chdir=infra/aws apply freecast.tfplan'
-        ;;
-      *) echo 'Use ./freecast provision --existing (prepare this Linux server) or --aws (plan new compute).'; exit 1 ;;
-    esac ;;
-  node) exec bash scripts/node.sh ;;
-  status) exec python3 scripts/status.py ;;
-  client)
-    if [[ -n "${2:-}" ]]; then echo 'Configure your read node in .env, then run ./freecast client with no arguments.' >&2; exit 1; fi
-    command -v node >/dev/null || { echo 'Install Node.js 22.13+.' >&2; exit 1; }
-    node -e 'const [a,b]=process.versions.node.split(".").map(Number);if(a<22||(a===22&&b<13)){console.error("Node.js 22.13+ is required");process.exit(1)}'
-    if [[ ! -f .env ]]; then
-      cp .env.example .env
-    fi
-    if [[ ! -d node_modules ]]; then npm ci; fi
-    echo 'Reads use NEXT_PUBLIC_HUBURL in .env. Set VALIDATOR_URL separately to enable writes.'
-    exec npm run dev ;;
-  *) cat <<'HELP'
-Freecast — your node, your feed
-
-  ./freecast doctor                  Check this machine for a full read node
-  ./freecast provision --existing    Check resources and install Docker on Ubuntu
-  ./freecast provision --aws         Create a reviewable Terraform plan (no charges yet)
-  ./freecast node                    Start a mainnet read node (large download)
-  ./freecast status                  Inspect node version and per-shard sync delay
-  ./freecast client                  Start the local client, defaulting to your node
-
-The client initializes a missing .env; it never overwrites existing configuration.
-See README.md for prerequisites, remote nodes, costs, and account setup.
-HELP
-  ;;
-esac
+exec "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/kiteapp" "$@"

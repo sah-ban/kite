@@ -10,7 +10,7 @@ export function gifSearch(dependencies={}) {
     const query=(url.searchParams.get('q')||'').trim(),pos=url.searchParams.get('pos')||'';
     if(query.length>100||pos.length>512)return reply(400,{error:'GIF search is too long.'});
     const target=new URL(`https://tenor.bhopp.ing/v2/${query?'search':'featured'}`);
-    target.search=new URLSearchParams({limit:'20',media_filter:'gif,tinygif',contentfilter:'medium',client_key:'freecast',...(query?{q:query}:{}),...(pos?{pos}: {})}).toString();
+    target.search=new URLSearchParams({limit:'20',media_filter:'gif,tinygif',contentfilter:'medium',client_key:'kiteapp',...(query?{q:query}:{}),...(pos?{pos}: {})}).toString();
     const key=target.href,cached=cache.get(key);if(cached&&cached.expires>now())return reply(200,cached.body);
     try{
       const response=await send(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});

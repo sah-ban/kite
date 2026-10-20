@@ -26,7 +26,7 @@ export const localOrigin = () => ['localhost', '127.0.0.1', '[::1]'].includes(wi
 export async function getConfig(): Promise<Config> {
   const response = await fetch('/api/config');
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-    throw new Error('Start the Freecast server and configure your read node in its local .env.');
+    throw new Error('Start the Kite server and configure your read node in its local .env.');
   }
   const config: Config = await response.json();
   for (const label of ['readUrl', 'validatorUrl', 'optimismRpcUrl'] as const) {

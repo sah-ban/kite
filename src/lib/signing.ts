@@ -14,7 +14,7 @@ export type LocalSession = { fid: number; address: Hex; key: Hex; signer: NobleE
 export type RemoteSession = { fid: number; address: Hex; key: Hex; remote: true };
 export type Session = LocalSession | RemoteSession;
 export type PreparedKey = { fid: number; address: Hex; key: Hex; ttlSeconds: number; register: () => Promise<LocalSession>; discard: () => void };
-function requireLocal() { if (!localOrigin()) throw new Error('Run Freecast on localhost to import or use an account.'); }
+function requireLocal() { if (!localOrigin()) throw new Error('Run Kite on localhost to import or use an account.'); }
 const publicClient = (config: Config) => createPublicClient({ chain: optimism, transport: http(config.optimismRpcUrl) });
 function result<T>(r: { isErr: () => boolean; error?: unknown; value?: T }): T { if (r.isErr()) throw new Error(String(r.error)); return r.value!; }
 

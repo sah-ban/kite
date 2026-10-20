@@ -29,6 +29,7 @@ const server = createListener((req, res) => feedMiddleware(req,res,() => gifMidd
     if (file !== root && !file.startsWith(root + sep)) { res.statusCode = 403; res.end(); return; }
     if (!extname(file)) file = resolve(root, 'index.html');
     const content = await readFile(file);
+    if(extname(file)==='.html')res.setHeader('Cache-Control','no-cache');
     res.setHeader('Content-Type', types[extname(file)] || 'application/octet-stream');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -36,4 +37,4 @@ const server = createListener((req, res) => feedMiddleware(req,res,() => gifMidd
   } catch { res.statusCode = 404; res.end('Not found'); }
 })))))));
 const host=process.env.FREECAST_HOST||'127.0.0.1',port=Number(process.env.PORT||5173);
-server.listen(port,host,()=>console.log(`Freecast ${tls?'HTTPS':'HTTP'} listener ready on port ${port}`));
+server.listen(port,host,()=>console.log(`Kite ${tls?'HTTPS':'HTTP'} listener ready on port ${port}`));

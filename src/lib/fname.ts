@@ -15,7 +15,7 @@ export type FnameCheck={fid:number;name:string;currentName:string|null;available
 export type FnameStage='ready'|'release-submitted'|'released'|'claim-submitted'|'claimed'|'complete';
 export type PreparedFnameChange={review:FnameCheck&{owner:Hex};readonly stage:FnameStage;run:(progress:(message:string)=>void,signal?:AbortSignal)=>Promise<string>;discard:()=>void};
 type Dependencies={custody?:(fid:number)=>Promise<Hex>;pause?:(signal?:AbortSignal)=>Promise<void>;selectPreferred?:(name:string)=>Promise<unknown>};
-function requireLocal(){if(!localOrigin())throw new Error('Open Freecast on localhost to change an fname.');}
+function requireLocal(){if(!localOrigin())throw new Error('Open Kite on localhost to change an fname.');}
 const bounded=(signal?:AbortSignal)=>AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(20_000)]);
 function transfer(value:unknown):FnameTransfer {
   const data=value as Record<string,unknown>|null;

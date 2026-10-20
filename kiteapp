@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+case "${1:-help}" in
+  doctor) exec python3 scripts/resources.py ;;
+  provision)
+    case "${2:-}" in
+      --existing) exec bash scripts/provision.sh ;;
+      --aws) command -v terraform >/dev/null || { echo 'Install Terraform 1.6+ first.' >&2; exit 1; }
+        terraform -chdir=infra/aws init
+        terraform -chdir=infra/aws plan -out=kiteapp.tfplan
+        echo 'Review the plan and cloud cost. Apply it with: terraform -chdir=infra/aws apply kiteapp.tfplan'
+        ;;
+      *) echo 'Use ./kiteapp provision --existing (prepare this Linux server) or --aws (plan new compute).'; exit 1 ;;
+    esac ;;
+  node) exec bash scripts/node.sh ;;
+  status) exec python3 scripts/status.py ;;
+  client)
+    if [[ -n "${2:-}" ]]; then echo 'Configure your read node in .env, then run ./kiteapp client with no arguments.' >&2; exit 1; fi
+    command -v node >/dev/null || { echo 'Install Node.js 22.13+.' >&2; exit 1; }
+    node -e 'const [a,b]=process.versions.node.split(".").map(Number);if(a<22||(a===22&&b<13)){console.error("Node.js 22.13+ is required");process.exit(1)}'
+    if [[ ! -f .env ]]; then
+      cp .env.example .env
+    fi
+    if [[ ! -d node_modules ]]; then npm ci; fi
+    echo 'Reads use NEXT_PUBLIC_HUBURL in .env. Set VALIDATOR_URL separately to enable writes.'
+    exec npm run dev ;;
+  *) cat <<'HELP'
+Kite — your node, your feed
+
+  ./kiteapp doctor                  Check this machine for a full read node
+  ./kiteapp provision --existing    Check resources and install Docker on Ubuntu
+  ./kiteapp provision --aws         Create a reviewable Terraform plan (no charges yet)
+  ./kiteapp node                    Start a mainnet read node (large download)
+  ./kiteapp status                  Inspect node version and per-shard sync delay
+  ./kiteapp client                  Start the local client, defaulting to your node
+
+The client initializes a missing .env; it never overwrites existing configuration.
+See README.md for prerequisites, node configuration, costs, and account setup.
+HELP
+  ;;
+esac

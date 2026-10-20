@@ -13,7 +13,7 @@ export function imageUploads(config,dependencies={}) {
     if(new URL(req.url||'/','http://localhost').pathname!=='/api/images/upload')return next();
     const reply=(status,error)=>{res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error}));};
     if(req.method!=='POST')return reply(405,'Use POST to upload an image.');
-    try{const origin=writeOrigin(req,config);if(origin.host!==req.headers.host||req.headers.origin!==origin.origin)return reply(403,'Origin mismatch. Open Freecast at its configured address.');}catch{return reply(403,'Invalid request origin.');}
+    try{const origin=writeOrigin(req,config);if(origin.host!==req.headers.host||req.headers.origin!==origin.origin)return reply(403,'Origin mismatch. Open Kite at its configured address.');}catch{return reply(403,'Invalid request origin.');}
     if(!config.IMGBB_API_KEY)return reply(503,'Image uploads are not configured. Set IMGBB_API_KEY in the server .env and restart.');
     const declaredType=String(req.headers['content-type']||'').toLowerCase();
     if(!['image/jpeg','image/png','image/gif','image/webp'].includes(declaredType))return reply(415,'Choose a JPEG, PNG, GIF or WebP image.');
