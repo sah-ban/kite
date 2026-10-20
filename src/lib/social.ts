@@ -3,7 +3,7 @@ import { hub, HubError, type Cast, type Config } from './hub';
 export type Page<T> = { items: T[]; next: string };
 export type Reaction = { hash: string; signer?:string; data: { fid: number; timestamp: number; type: string | number; reactionBody: { type: string | number; targetCastId?: {fid: number; hash: string} } } };
 export type ActivityTab = 'replies' | 'likes' | 'recasts';
-export type Activity = { replies?: Page<Cast>; likes?: Page<Reaction>; recasts?: Page<Reaction>; errors: Partial<Record<ActivityTab,string>> };
+export type Activity = { replies?: Page<Cast>; likes?: Page<Reaction>; recasts?: Page<Reaction>; errors: Partial<Record<ActivityTab,string>>; readAt?:number };
 export const castPath = (cast: Pick<Cast,'hash'|'data'>) => `/cast/${cast.data.fid}/${cast.hash}`;
 export const countLabel = (page?: Page<unknown>) => page ? `${page.items.length.toLocaleString()}${page.next ? '+' : ''}` : '—';
 export function mergePage<T>(previous: Page<T>, next: Page<T>, key: (item: T) => string | number): Page<T> {
@@ -45,7 +45,7 @@ export function readActivity(config: Config, cast: Cast, revision: number|string
   const cached=activityCache.get(key);
   if(cached && cached.expires>Date.now()) return cached.value;
   const value=(async()=>{
-    const result:Activity={errors:{}};
+    const result:Activity={errors:{},readAt:Date.now()};
     await Promise.all((['replies','likes','recasts'] as const).map(async tab=>{
       try {
         const page=await queued<Page<Cast>|Page<Reaction>>(()=>tab==='replies'?readReplies(config,cast):readReactions(config,cast,tab));

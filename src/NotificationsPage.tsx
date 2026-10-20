@@ -6,6 +6,7 @@ import {hasMoreNotifications,mergeNotifications,readNotifications,type Notificat
 import {Avatar,useProfile} from './social-ui';
 import {CastText} from './CastText';
 import {CastTime} from './CastTime';
+import {FeedSkeleton} from './FeedSkeleton';
 
 const kinds=[['all','All'],['mention','Mentions'],['reply','Replies'],['like','Likes'],['recast','Recasts'],['follow','Follows']] as const;
 const labels:Record<NotificationKind,string>={mention:'mentioned you',reply:'replied to your cast',like:'liked your cast',recast:'recast your cast',follow:'followed you'};
@@ -26,7 +27,7 @@ export function NotificationsPage({config,fid,onConnect,onProfile,onCast}:{confi
  const [filter,setFilter]=useState<NotificationKind|'all'>('all'),[page,setPage]=useState<NotificationPage>(),[limit,setLimit]=useState(50),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
  const generation=useRef(0),request=useRef<AbortController|null>(null),reading=useRef(false);
  useEffect(()=>{
-  const id=++generation.current,controller=new AbortController();request.current=controller;setPage(undefined);setError('');setLimit(50);
+  const id=++generation.current,controller=new AbortController();request.current=controller;setError('');setLimit(50);
   if(!fid)return;
   reading.current=true;setBusy(true);
   readNotifications(config,fid,undefined,controller.signal).then(value=>{if(id===generation.current)setPage(value);}).catch(error=>{if(!controller.signal.aborted&&id===generation.current)setError((error as Error).message);}).finally(()=>{if(id===generation.current){reading.current=false;setBusy(false);}});
@@ -49,7 +50,7 @@ export function NotificationsPage({config,fid,onConnect,onProfile,onCast}:{confi
    <div className="notification-filters" role="group" aria-label="Filter notifications">{kinds.map(([kind,label])=><button key={kind} className={filter===kind?'selected':''} aria-pressed={filter===kind} onClick={()=>setFilter(kind)}>{label}</button>)}</div>
    {(error||!!page?.errors.length)&&<div className="feed-message error" role="alert"><span>{error||`Some activity could not load: ${page!.errors.join(', ')}.`}</span><button className="text-button" disabled={busy} onClick={()=>page?void more(true):setRefresh(value=>value+1)}>Retry</button></div>}
    <div className="notification-list" aria-live="polite" aria-busy={busy}>
-    {busy&&!page?<div className="loading"><span className="loader"/><p>Reading your activity…</p></div>:filtered.length?filtered.slice(0,limit).map(item=><NotificationRow key={item.id} config={config} item={item} onProfile={onProfile} onCast={onCast}/>):<div className="empty"><Bell size={30}/><h3>{error?'Activity is unavailable':filter==='all'?'No notifications in loaded activity':`No ${kinds.find(([kind])=>kind===filter)?.[1].toLowerCase()} in loaded activity`}</h3><p>{error?'Refresh or retry to check again.':'Refresh to check for new activity, or load more to check older activity.'}</p></div>}
+    {busy&&!page?<FeedSkeleton label="Loading notifications…"/>:filtered.length?filtered.slice(0,limit).map(item=><NotificationRow key={item.id} config={config} item={item} onProfile={onProfile} onCast={onCast}/>):<div className="empty"><Bell size={30}/><h3>{error?'Activity is unavailable':filter==='all'?'No notifications in loaded activity':`No ${kinds.find(([kind])=>kind===filter)?.[1].toLowerCase()} in loaded activity`}</h3><p>{error?'Refresh or retry to check again.':'Refresh to check for new activity, or load more to check older activity.'}</p></div>}
    </div>
    {page&&(filtered.length>limit||hasMoreNotifications(page.cursor))&&<button className="load-more" disabled={busy} onClick={()=>void more()}>{busy?'Reading…':'Load more activity'}</button>}
    {page&&<p className="feed-limit notification-coverage">Replies, likes and recasts checked on {page.cursor.scanned} of your most recent casts. Mentions and follows load separately. This view shows activity still available on your node.</p>}

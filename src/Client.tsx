@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
-import { Home, PenLine, Settings, Bell, Radio, UserRound, Server, ArrowUpRight, RefreshCw, SlidersHorizontal, Search, ArrowRight, Users, Lock, KeyRound, AlertCircle } from 'lucide-react';
+import { Home, PenLine, Bell, Radio, UserRound, ArrowUpRight, RefreshCw, Search, ArrowRight, AlertCircle } from 'lucide-react';
 import { hub, profile, following, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
 import { attribute } from './lib/attribution';
 import type { Session } from './lib/signing';
@@ -9,6 +9,9 @@ const deleteCast=async(...args:Parameters<typeof import('./lib/signing')['delete
 const react=async(...args:Parameters<typeof import('./lib/signing')['react']>)=>(await import('./lib/signing')).react(...args);
 const follow=async(...args:Parameters<typeof import('./lib/signing')['follow']>)=>(await import('./lib/signing')).follow(...args);
 import { Modal } from './components';
+import { FeedSkeleton } from './FeedSkeleton';
+import { Toast } from './Toast';
+import { reactionKey, type ReactionOverride } from './lib/reaction-feedback';
 import { CastComposer } from './CastComposer';
 import { AppHeader } from './AppHeader';
 import { AccountMenu } from './AccountMenu';
@@ -37,7 +40,8 @@ import { readLikedCasts } from './lib/profile-likes';
 import { clientRoute } from './lib/routes';
 import { castPath, type ActivityTab } from './lib/social';
 
-function Avatar({p}:{p?:Profile}) {const [broken,setBroken]=useState(false);return <div className="avatar">{p?.avatar&&!broken?<img src={p.avatar} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)}/>:<span>{(p?.name||'F').slice(0,1).toUpperCase()}</span>}</div>;}
+type FeedSnapshot={casts:Cast[];pageToken:string;hasMore:boolean;followPage:number;followFids:number[];status:FeedStatus|null;newPosts:boolean;autoPages:number;refresh:number};
+
 export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   const [info,setInfo]=useState<NodeInfo|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false);
   const [fid,setFid]=useState(37),[homeFid,setHomeFid]=useState(config.defaultFeedFid||37),[fidInput,setFidInput]=useState(String(config.defaultFeedFid||37)),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[selfRegistered,setSelfRegistered]=useState(false),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
@@ -45,13 +49,14 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   const [images,setImages]=useState<string[]>([]),[replyImages,setReplyImages]=useState<string[]>([]),[uploading,setUploading]=useState(false),[replyUploading,setReplyUploading]=useState(false);
   const [editingCast,setEditingCast]=useState<Cast|null>(null),[editCastOpen,setEditCastOpen]=useState(false);
   const [editProfileOpen,setEditProfileOpen]=useState(false),[composeOpen,setComposeOpen]=useState(false);
+  const [toastError,setToastError]=useState(''),[reactionOverrides,setReactionOverrides]=useState<Record<string,ReactionOverride>>({});
+  const reactionRequests=useRef(new Set<string>());
   const [feedPickerOpen,setFeedPickerOpen]=useState(false),[fidError,setFidError]=useState('');
   const [deletePending,setDeletePending]=useState<Cast|null>(null),[deleting,setDeleting]=useState(false);
   const [view,setView]=useState(()=>clientRoute(location.pathname,location.search));
   const limits=useCastLimits(config,session?.fid,refresh),maximum=limits.maxEmbeds;
   const links=useComposerLinks(text,images,maximum-images.length);
   const replyLinks=useComposerLinks(replyText,replyImages,maximum-(quote?1:0)-replyImages.length);
-  const usage=composerUsage(text,draftMentions,images.length+links.urls.length,limits);
   const replyUsage=composerUsage(replyText,replyMentions,replyImages.length+replyLinks.urls.length+(quote?1:0),limits);
   const composing=reply||quote;
   const feed=view.kind==='profile'?'profile':'following';
@@ -74,18 +79,42 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
     return()=>controller.abort();
   },[config.indexedFeedEnabled,feedFid,session?.fid,indexedFids]);
   const [feedStatus,setFeedStatus]=useState<FeedStatus|null>(null),[newPosts,setNewPosts]=useState(false);
-  function navigate(path:string){history.pushState({freecast:true},'',path);setView(clientRoute(location.pathname,location.search));window.scrollTo(0,0);}
+  const feedCache=useRef(new Map<string,FeedSnapshot>()),loadedFeedKey=useRef(''),loadedFeedRevision=useRef(-1),scrollPositions=useRef(new Map<string,number>()),pendingScroll=useRef<number|null>(null),currentPath=useRef(location.pathname+location.search);
+  function rememberScroll(){const path=currentPath.current;scrollPositions.current.set(path,window.scrollY);history.replaceState({...history.state,kiteScrollY:window.scrollY},'');}
+  useEffect(()=>{const previous=history.scrollRestoration;history.scrollRestoration='manual';return()=>{history.scrollRestoration=previous;};},[]);
+  useEffect(()=>{let frame=0;const save=()=>{if(pendingScroll.current!==null||frame)return;frame=requestAnimationFrame(()=>{frame=0;rememberScroll();});};window.addEventListener('scroll',save,{passive:true});return()=>{window.removeEventListener('scroll',save);cancelAnimationFrame(frame);};},[]);
+  function navigate(path:string){
+    rememberScroll();const next=new URL(path,location.origin),key=next.pathname+next.search;
+    const target=key===currentPath.current?0:scrollPositions.current.get(key)||0;
+    history.pushState({freecast:true,kiteScrollY:target},'',path);currentPath.current=key;pendingScroll.current=target;setView(clientRoute(location.pathname,location.search));
+  }
   function openProfile(n:number){setFid(n);navigate(`/profile/${n}`);}
   function openCast(c:Cast,tab:ActivityTab='replies'){navigate(`${castPath(c)}${tab==='replies'?'':`?tab=${tab}`}`);}
   function published(fid:number,hash:string){const path=`/cast/${fid}/${hash}`;setNotice(<>Cast published <a className="published-cast-link" href={path} onClick={event=>{event.preventDefault();navigate(path);}}>View cast →</a></>);}
-  function openFollowing(){navigate(selectedFeedFid?`/following?fid=${selectedFeedFid}`:'/following');}
-  useEffect(()=>{const pop=()=>setView(clientRoute(location.pathname,location.search));window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
+  useEffect(()=>{const pop=()=>{scrollPositions.current.set(currentPath.current,window.scrollY);const key=location.pathname+location.search;currentPath.current=key;pendingScroll.current=Number(history.state?.kiteScrollY??scrollPositions.current.get(key)??0);setView(clientRoute(location.pathname,location.search));};window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
   useEffect(()=>{if(view.kind==='profile'){setFid(view.fid);}},[view]);
   const [order,setOrder]=useState<'newest'|'oldest'>('newest');
   const [profileCastType,setCastType]=useState<'posts'|'replies'|'likes'>('posts');
   const castType=feed==='profile'?profileCastType:'posts';
   const likesView=castType==='likes';
   const autoPages=useRef(0);
+  const feedKey=JSON.stringify([feed,feed==='profile'?fid:feedFid,castType,feed==='profile'||indexed?order:'',indexed?[mode,clientFids,signerKeys,selfRegistered]:null,session?.fid||0,indexed]);
+  const feedView=['home','following','profile'].includes(view.kind);
+  useEffect(()=>{
+    if(pendingScroll.current===null)return;
+    const target=pendingScroll.current,path=currentPath.current;let frame=0;
+    const release=()=>{if(currentPath.current===path)pendingScroll.current=null;observer.disconnect();};
+    const restore=()=>{if(currentPath.current!==path||pendingScroll.current===null)return;if(feedView&&busy&&!casts.length)return;cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{if(currentPath.current!==path||pendingScroll.current===null)return;window.scrollTo(0,target);if(document.documentElement.scrollHeight-innerHeight>=target)release();});};
+    const observer=new ResizeObserver(restore),column=document.querySelector('.feed-column');if(column)observer.observe(column);restore();
+    const interrupt=(event:Event)=>{if(event instanceof KeyboardEvent&&!['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))return;release();};
+    const timeout=setTimeout(release,3000);window.addEventListener('wheel',interrupt,{passive:true});window.addEventListener('touchstart',interrupt,{passive:true});window.addEventListener('keydown',interrupt);
+    return()=>{clearTimeout(timeout);cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('wheel',interrupt);window.removeEventListener('touchstart',interrupt);window.removeEventListener('keydown',interrupt);};
+  },[view,busy,casts.length]);
+  useEffect(()=>{
+    if(!feedView||busy||reading.current||error||loadedFeedKey.current!==feedKey)return;
+    feedCache.current.delete(feedKey);feedCache.current.set(feedKey,{casts,pageToken,hasMore,followPage,followFids,status:feedStatus,newPosts,autoPages:autoPages.current,refresh:loadedFeedRevision.current});
+    if(feedCache.current.size>10)feedCache.current.delete(feedCache.current.keys().next().value!);
+  },[feedView,feedKey,casts,pageToken,hasMore,followPage,followFids,feedStatus,newPosts,refresh,busy,error]);
   const profileOrder=feed==='profile'?order:'newest';
   const requestId=useRef(0), reading=useRef(false), replyComposer=useRef<HTMLTextAreaElement>(null);
   useEffect(()=>{
@@ -103,7 +132,9 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   useEffect(()=>{let active=true;hub<NodeInfo>(config,'info').then(v=>{if(active){setInfo(v);setNodeError('');}}).catch(e=>{if(active)setNodeError(e.message);});return()=>{active=false;};},[config,refresh]);
   useEffect(()=>{if(!session){setFollowed(new Set());return;}let active=true;following(config,session.fid).then(fids=>{if(active)setFollowed(new Set(fids));}).catch(e=>{if(active)setNotice(`Follow list unavailable: ${e.message}`);});return()=>{active=false;};},[session,config,refresh]);
-  useEffect(()=>{if(view.kind==='cast'||view.kind==='connections'||view.kind==='notifications'||view.kind==='settings'||view.kind==='search')return;if(enrolling){setCasts([]);setFeedStatus(null);setHasMore(false);setBusy(false);return;}const id=++requestId.current;reading.current=true;autoPages.current=0;setCasts([]);setPageToken('');setHasMore(false);setFollowPage(0);setBusy(true);setError('');(async()=>{
+  useEffect(()=>{if(view.kind==='cast'||view.kind==='connections'||view.kind==='notifications'||view.kind==='settings'||view.kind==='search')return;if(enrolling){setCasts([]);setFeedStatus(null);setHasMore(false);setBusy(false);return;}const id=++requestId.current;setError('');const cached=feedCache.current.get(feedKey);
+    if(cached&&cached.refresh===refresh){reading.current=false;loadedFeedKey.current=feedKey;loadedFeedRevision.current=cached.refresh;autoPages.current=cached.autoPages;setCasts(cached.casts);setPageToken(cached.pageToken);setHasMore(cached.hasMore);setFollowPage(cached.followPage);setFollowFids(cached.followFids);setFeedStatus(cached.status);setNewPosts(cached.newPosts);setBusy(false);return()=>{requestId.current++;};}
+    reading.current=true;autoPages.current=0;if(loadedFeedKey.current!==feedKey){setCasts([]);setPageToken('');setHasMore(false);setFollowPage(0);}setBusy(true);(async()=>{
     if(indexed){
       const page=await indexedFollowing(feedFid,{mode,clientFids,signerKeys,selfRegistered},order);if(id!==requestId.current)return;
       setCasts(page.messages);setPageToken(page.nextPageToken);setHasMore(Boolean(page.nextPageToken));setFeedStatus(page.status);setNewPosts(false);
@@ -119,7 +150,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
       const page=likesView?await readLikedCasts(config,fid,profileOrder):await hub<{messages:Cast[];nextPageToken?:string}>(config,'castsByFid',{fid,pageSize:30,reverse:String(profileOrder==='newest')});if(id!==requestId.current)return;
       setCasts(page.messages);setPageToken(page.nextPageToken||'');setHasMore(!!page.nextPageToken);
     }
-  })().catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current){reading.current=false;setBusy(false);}});return()=>{requestId.current++;};},[fid,feed,feedFid,config,refresh,profileOrder,view.kind,likesView,indexed,enrolling,indexed?order:null,indexed?mode:null,indexed?clientFids:null,indexed?signerKeys:null,indexed?selfRegistered:null]);
+  })().then(()=>{if(id===requestId.current)loadedFeedRevision.current=refresh;}).catch(e=>{if(id===requestId.current)setError(e.message);}).finally(()=>{if(id===requestId.current){loadedFeedKey.current=feedKey;reading.current=false;setBusy(false);}});return()=>{requestId.current++;};},[feedKey,fid,feed,feedFid,config,refresh,profileOrder,view.kind,likesView,indexed,enrolling,indexed?order:null,indexed?mode:null,indexed?clientFids:null,indexed?signerKeys:null,indexed?selfRegistered:null]);
   useEffect(()=>{const fids=[...new Set([fid,feedFid,...(session?[session.fid]:[]),...casts.map(c=>c.data.fid)])];let active=true;(async()=>{for(let i=0;i<fids.length;i+=5)await Promise.all(fids.slice(i,i+5).map(async f=>{try{const p=await profile(config,f);if(active)setProfiles(v=>({...v,[f]:p}));}catch{/* FID remains usable without profile data */}}));})();return()=>{active=false;};},[casts,fid,feedFid,config,session?.fid]);
   useEffect(()=>{if(indexed||mode==='all'||(!clientFids.trim()&&!selfRegistered)){setAttributing(false);return;}let active=true;setAttributing(true);attribute(config,casts).then(map=>{if(active)setAttribution(map);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setAttributing(false);});return()=>{active=false;};},[casts,mode,clientFids,selfRegistered,config,indexed]);
   const typedCasts=likesView?casts:casts.filter(c=>Boolean(c.data.castAddBody.parentCastId)===(castType==='replies'));
@@ -150,17 +181,34 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
       const batch=followFids.slice(followPage,followPage+12);const pages=await Promise.all(batch.map(f=>hub<{messages:Cast[]}>(config,'castsByFid',{fid:f,pageSize:15,reverse:'true'})));if(id!==requestId.current)return;setCasts(v=>[...v,...pages.flatMap(p=>p.messages)].sort((a,b)=>b.data.timestamp-a.data.timestamp));setFollowPage(v=>v+12);setHasMore(followPage+12<followFids.length);
     }
   }catch(e){if(id===requestId.current)setError((e as Error).message);}finally{if(id===requestId.current){reading.current=false;setBusy(false);}}}
-  async function action(id:string,fn:(s:Session)=>Promise<unknown>){if(!session){setAccountOpen(true);return;}setActionBusy(id);setError('');try{await fn(session);setNotice('Submitted to node. Refresh to see the updated state.');}catch(e){setError((e as Error).message);}finally{setActionBusy('');}}
+  async function performReaction(cast:Cast,kind:'like'|'recast',remove:boolean){
+    if(!session){setAccountOpen(true);return;}
+    const key=reactionKey(session.fid,cast,kind);if(reactionRequests.current.has(key))return;
+    reactionRequests.current.add(key);setToastError('');const previous=reactionOverrides[key],optimistic={active:!remove,pending:true,startedAt:Date.now()};
+    setReactionOverrides(values=>({...values,[key]:optimistic}));
+    try{await react(config,session,cast,kind,remove);setReactionOverrides(values=>({...values,[key]:{...optimistic,pending:false}}));}
+    catch(error){setReactionOverrides(values=>{const next={...values};if(previous)next[key]=previous;else delete next[key];return next;});setToastError((error as Error).message);}
+    finally{reactionRequests.current.delete(key);}
+  }
+
   const handlers:CastHandlers={
-    onProfile:openProfile,onOpen:openCast,
+    onProfile:openProfile,onOpen:openCast,reactionOverrides,
+    onReactionSynced:(key,override)=>setReactionOverrides(values=>{if(values[key]!==override)return values;const next={...values};delete next[key];return next;}),
     onEdit:cast=>{if(session?.fid===cast.data.fid){setError('');if(!editingCast)setEditingCast(cast);setEditCastOpen(true);}},
     onDelete:cast=>{if(session?.fid===cast.data.fid){setError('');setDeletePending(cast);}},
     onQuote:c=>{setQuote(c);setReply(null);setReplyText('');setReplyMentions([]);setReplyImages([]);replyLinks.reset();setError('');setTimeout(()=>replyComposer.current?.focus(),0);},
     onReply:c=>{setQuote(null);setReply(c);setReplyText('');setReplyMentions([]);setReplyImages([]);replyLinks.reset();setError('');setTimeout(()=>replyComposer.current?.focus(),0);},
-    onReact:(c,kind,remove)=>{void action(`${kind}-${c.hash}`,async session=>{await react(config,session,c,kind,remove);setRefresh(v=>v+1);});},
+    onReact:(c,kind,remove)=>{void performReaction(c,kind,remove);},
   };
   const renderCast=(c:Cast)=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={refresh} sessionFid={session?.fid} busy={Boolean(actionBusy)}/>;
-  const toggleFollow=()=>action('follow',async s=>{await follow(config,s,fid,followed.has(fid));setFollowed(prev=>{const next=new Set(prev);if(next.has(fid))next.delete(fid);else next.add(fid);return next;});setRefresh(v=>v+1);});
+  async function toggleFollow(){
+    if(!session){setAccountOpen(true);return;}if(actionBusy==='follow')return;
+    const target=fid,wasFollowed=followed.has(target);setActionBusy('follow');setToastError('');
+    setFollowed(values=>{const next=new Set(values);wasFollowed?next.delete(target):next.add(target);return next;});
+    try{await follow(config,session,target,wasFollowed);feedCache.current.clear();setNotice(wasFollowed?'Account unfollowed':'Account followed');}
+    catch(error){setFollowed(values=>{const next=new Set(values);wasFollowed?next.add(target):next.delete(target);return next;});setToastError((error as Error).message);}
+    finally{setActionBusy('');}
+  }
   const currentFilters:Filters={mode,clientFids,signerKeys,selfRegistered};
   function applyFilters(filters:Filters){setMode(filters.mode);setClientFids(filters.clientFids);setSignerKeys(filters.signerKeys);setSelfRegistered(filters.selfRegistered);}
   const homeActive=view.kind==='home'||view.kind==='following';
@@ -181,7 +229,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   return <><AppHeader onHome={()=>navigate('/')}><AccountMenu session={session} person={session?profiles[session.fid]:undefined} onProfile={()=>session&&openProfile(session.fid)} onSettings={()=>navigate('/settings')} onConnect={()=>setAccountOpen(true)} onLock={lockSession}/></AppHeader>
   <main className="client-layout"><aside className="client-sidebar"><nav aria-label="Main navigation">{navigation.map(({label,Icon,active,action})=><button key={label} className={`sidebar-item ${active?'active':''} ${label.toLowerCase()}-nav`} aria-current={active?'page':undefined} onClick={action}><Icon size={22}/>{label}</button>)}</nav><button className="button primary sidebar-compose" disabled={publishing||uploading} onClick={startCompose}><PenLine size={19}/>New cast</button><p className="sidebar-caption">Your people. Your feed.<br/>Kite · @kiteapp</p></aside>
-  <section className="feed-column">{view.kind==='search'?<SearchPage config={config} onFound={openCast} onProfile={openProfile}/>:view.kind==='settings'?<SettingsPage config={config} session={session} info={info} nodeError={nodeError} filterMode={mode} feedStatus={feedStatus} onAccount={()=>setAccountOpen(true)} onLock={lockSession} onProfile={openProfile} onEditProfile={()=>setEditProfileOpen(true)} onFeedControls={()=>setControls(true)} onRefresh={()=>setRefresh(value=>value+1)} onGuide={openGuide}/>:view.kind==='notifications'?<NotificationsPage key={session?.fid||'signed-out'} config={config} fid={session?.fid} onConnect={()=>setAccountOpen(true)} onProfile={openProfile} onCast={openCast}/>:view.kind==='connections'?<ConnectionsPage key={`${view.fid}:${view.tab}`} config={config} fid={view.fid} kind={view.tab} onProfile={openProfile} onTab={kind=>navigate(`/profile/${view.fid}/${kind}`)}/>:view.kind==='cast'?<CastDetail config={config} fid={view.fid} hash={view.hash} tab={view.tab} onTab={tab=>{history.replaceState(history.state,'',`/cast/${view.fid}/${view.hash}${tab==='replies'?'':`?tab=${tab}`}`);setView({...view,tab});}} handlers={handlers} revision={refresh} sessionFid={session?.fid} busy={Boolean(actionBusy)} onBack={()=>{if(history.state?.freecast)history.back();else navigate(`/profile/${view.fid}`);}}/>:<><div className="feed-title"><div><div className="eyebrow">YOUR NODE. YOUR FEED.</div><h1>{view.kind==='profile'?'Profile':'Home'}<span>✳</span></h1></div><button className="icon-button" aria-label="Refresh feed" onClick={()=>setRefresh(v=>v+1)} disabled={busy}><RefreshCw size={18} className={busy?'spin':''}/></button></div><FeedToolbar filters={currentFilters} onChange={applyFilters} onOpen={()=>setControls(true)} onAnotherFeed={feed==='following'?()=>{setFidError('');setFeedPickerOpen(true);}:undefined} order={order} onOrder={setOrder} likes={likesView} indexed={indexed} following={feed==='following'}/>
+  <section className="feed-column">{view.kind==='search'?<SearchPage config={config} onFound={openCast} onProfile={openProfile}/>:view.kind==='settings'?<SettingsPage config={config} session={session} info={info} nodeError={nodeError} filterMode={mode} feedStatus={feedStatus} onAccount={()=>setAccountOpen(true)} onLock={lockSession} onProfile={openProfile} onEditProfile={()=>setEditProfileOpen(true)} onFeedControls={()=>setControls(true)} onRefresh={()=>setRefresh(value=>value+1)} onGuide={openGuide}/>:view.kind==='notifications'?<NotificationsPage key={session?.fid||'signed-out'} config={config} fid={session?.fid} onConnect={()=>setAccountOpen(true)} onProfile={openProfile} onCast={openCast}/>:view.kind==='connections'?<ConnectionsPage key={`${view.fid}:${view.tab}`} config={config} fid={view.fid} kind={view.tab} onProfile={openProfile} onTab={kind=>navigate(`/profile/${view.fid}/${kind}`)}/>:view.kind==='cast'?<CastDetail config={config} fid={view.fid} hash={view.hash} tab={view.tab} onTab={tab=>{rememberScroll();const path=`/cast/${view.fid}/${view.hash}${tab==='replies'?'':`?tab=${tab}`}`;history.replaceState(history.state,'',path);currentPath.current=path;setView({...view,tab});}} handlers={handlers} revision={refresh} sessionFid={session?.fid} busy={Boolean(actionBusy)} onBack={()=>{if(history.state?.freecast)history.back();else navigate(`/profile/${view.fid}`);}}/>:<><div className="feed-title"><div><div className="eyebrow">YOUR NODE. YOUR FEED.</div><h1>{view.kind==='profile'?'Profile':'Home'}<span>✳</span></h1></div><button className="icon-button" aria-label="Refresh feed" onClick={()=>setRefresh(v=>v+1)} disabled={busy}><RefreshCw size={18} className={busy?'spin':''}/></button></div><FeedToolbar filters={currentFilters} onChange={applyFilters} onOpen={()=>setControls(true)} onAnotherFeed={feed==='following'?()=>{setFidError('');setFeedPickerOpen(true);}:undefined} order={order} onOrder={setOrder} likes={likesView} indexed={indexed} following={feed==='following'}/>
   {feed==='following'&&(!session||feedFid!==session.fid)&&<div className="public-feed-note"><span>Following feed for {profiles[feedFid]?.username?`@${profiles[feedFid].username}`:`FID ${feedFid}`}</span>{session?<button className="text-button" onClick={()=>navigate('/')}>Your feed</button>:<button className="text-button" onClick={()=>setAccountOpen(true)}>Connect account</button>}</div>}
   {feed==='following'&&enrolling&&<div className="indexed-feed-status" role="status">{enrollmentError?.fid===feedFid?<><span>{enrollmentError.message}</span><button className="text-button" onClick={()=>setEnrollmentAttempt(value=>value+1)}>Retry feed setup</button></>:<span>Preparing your Following feed…</span>}</div>}
   {indexed&&newPosts&&<button className="new-posts-button" onClick={()=>setRefresh(value=>value+1)}>New posts available · Refresh feed <RefreshCw size={14}/></button>}
@@ -189,7 +237,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {view.kind==='profile'&&<ProfileHeader key={fid} onProfile={openProfile} config={config} fid={fid} viewerFid={session?.fid} onConnections={kind=>navigate(`/profile/${fid}/${kind}`)} onFollow={toggleFollow} followed={followed.has(fid)} busy={Boolean(actionBusy)} ownProfile={session?.fid===fid} revision={refresh} onEdit={()=>setEditProfileOpen(true)}/>}
   {(view.kind!=='profile'||session?.fid===fid)&&!composeOpen&&<CastComposer {...composerProps}/>}
 
-  {error&&<div className="feed-message error" role="alert"><AlertCircle size={17}/><span>{error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}>×</button></div>}{notice&&<div className="feed-message notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={()=>setNotice('')}>×</button></div>}
+  {error&&<div className="feed-message error" role="alert"><AlertCircle size={17}/><span>{error}</span><button className="text-button" disabled={busy} onClick={()=>setRefresh(value=>value+1)}>Retry</button><button aria-label="Dismiss error" onClick={()=>setError('')}>×</button></div>}
   {feed==='profile'&&<div className="cast-type-tabs" role="tablist" aria-label="Posts, replies and likes" onKeyDown={e=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
     e.preventDefault();
@@ -204,13 +252,12 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   </div>}
   <div className="feed-count"><span>{busy&&!filtered.length?'READING FROM YOUR NODE':`${filtered.length} ${castType.toUpperCase()}${mode!=='all'?' · FILTERED':''}`}</span>{attributing&&<span role="status">Resolving client keys…</span>}</div>
   <div id="cast-feed" role={feed==='profile'?'tabpanel':'region'} aria-labelledby={feed==='profile'?`${castType}-tab`:undefined} aria-label={feed==='following'?'Following posts':undefined} aria-busy={busy}>
-  {enrolling?<div className="loading">{enrollmentError?.fid!==feedFid&&<span className="loader"/>}<p>{enrollmentError?.fid===feedFid?'Feed setup needs another try.':'Setting up your Following feed…'}</p></div>:indexed&&feedStatus?.initializing&&!filtered.length?<div className="loading"><span className="loader"/><p>{feedStatus.queued?'Loading your following list…':'Importing recent posts from accounts you follow…'}</p></div>:busy&&!filtered.length?<div className="loading"><span className="loader"/><p>Reading the network…</p></div>:filtered.length?filtered.map(renderCast):<div className="empty"><Radio size={30}/><h3>{error?'The feed is unavailable':`No ${castType} in this view`}</h3><p>{error?'Check your node connection and refresh.':hasMore?`No ${castType} match the loaded pages. Load more or adjust your client filter.`:feed==='following'?(session?'Follow some accounts to fill your home feed, or adjust your client filter.':'Try another public FID or connect your account to see casts from accounts you follow.'):`Try another FID or adjust your client filter.`}</p></div>}
+  {enrolling?<div className="loading">{enrollmentError?.fid!==feedFid&&<span className="loader"/>}<p>{enrollmentError?.fid===feedFid?'Feed setup needs another try.':'Setting up your Following feed…'}</p></div>:indexed&&feedStatus?.initializing&&!filtered.length?<div className="loading"><span className="loader"/><p>{feedStatus.queued?'Loading your following list…':'Importing recent posts from accounts you follow…'}</p></div>:busy&&!filtered.length?<FeedSkeleton/>:filtered.length?filtered.map(renderCast):<div className="empty"><Radio size={30}/><h3>{error?'The feed is unavailable':`No ${castType} in this view`}</h3><p>{error?'Check your node connection and refresh.':hasMore?`No ${castType} match the loaded pages. Load more or adjust your client filter.`:feed==='following'?(session?'Follow some accounts to fill your home feed, or adjust your client filter.':'Try another public FID or connect your account to see casts from accounts you follow.'):`Try another FID or adjust your client filter.`}</p></div>}
   {hasMore&&<button className="load-more" disabled={busy} onClick={()=>loadMore()}>{busy?'Reading…':indexed?(order==='newest'?'Load older posts':'Load newer posts'):feed==='following'?'Load next 12 followed profiles':likesView?(order==='newest'?'Load older likes':'Load newer likes'):order==='newest'?'Load older casts':'Load newer casts'} <ArrowRight size={15}/></button>}{feed==='following'&&!indexed&&<p className="feed-limit">Showing up to 15 recent casts per followed account, loaded in batches of 12 accounts.</p>}
   </div>
   </>}
 
   {(view.kind==='cast'||view.kind==='settings')&&error&&<div className="feed-message error" role="alert">{error}</div>}
-  {(view.kind==='cast'||view.kind==='settings')&&notice&&<div className="feed-message notice" role="status">{notice}</div>}
   {editingCast&&!editCastOpen&&session?.fid===editingCast.data.fid&&<div className="feed-message notice" role="status"><span>Your cast edit is still pending.</span><button type="button" className="text-button" onClick={()=>setEditCastOpen(true)}>Resume cast edit</button></div>}
   </section>
   {feedPickerOpen&&<Modal title="View another feed" onClose={()=>setFeedPickerOpen(false)}><p>Read an account’s public Following feed without switching your connected account.</p><form className="feed-picker-form" onSubmit={event=>{event.preventDefault();const next=Number(fidInput);if(!Number.isSafeInteger(next)||next<=0){setFidError('Enter a positive numeric FID.');return;}setHomeFid(next);setFeedPickerOpen(false);navigate(`/following?fid=${next}`);}}><label>Account FID<input autoFocus aria-label="Following feed FID" type="number" min="1" step="1" value={fidInput} onChange={event=>{setFidInput(event.target.value);setFidError('');}} required/></label>{fidError&&<p className="danger" role="alert">{fidError}</p>}<button className="button primary full" type="submit">View following feed <ArrowRight size={16}/></button></form></Modal>}
@@ -236,5 +283,5 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {editProfileOpen&&session&&<EditProfile key={session.key} config={config} session={session} onClose={()=>setEditProfileOpen(false)} onConnect={()=>{setEditProfileOpen(false);setAccountOpen(true);}} onSaved={()=>{setNotice('Profile updated');profile(config,session.fid).then(person=>setProfiles(value=>({...value,[person.fid]:person}))).catch(()=>{});setRefresh(value=>value+1);}}/>}
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys,selfRegistered}} onClose={()=>setControls(false)} onApply={filters=>{applyFilters(filters);setControls(false);}}/>}
-  </main><button className="compose-fab" aria-label="New cast" title="New cast" disabled={publishing||uploading} onClick={startCompose}><PenLine size={23}/></button><nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map(({label,Icon,active,action})=><button key={label} className={active?'active':''} aria-current={active?'page':undefined} onClick={action}><Icon size={22}/><span>{label}</span></button>)}</nav></>;
+  </main><div className="toast-stack">{toastError&&<Toast error onDismiss={()=>setToastError('')}>{toastError}</Toast>}{notice&&<Toast onDismiss={()=>setNotice('')}>{notice}</Toast>}</div><button className="compose-fab" aria-label="New cast" title="New cast" disabled={publishing||uploading} onClick={startCompose}><PenLine size={23}/></button><nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map(({label,Icon,active,action})=><button key={label} className={active?'active':''} aria-current={active?'page':undefined} onClick={action}><Icon size={22}/><span>{label}</span></button>)}</nav></>;
 }

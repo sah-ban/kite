@@ -10,8 +10,11 @@ import { CastEmbeds } from './CastEmbeds';
 import { CastText } from './CastText';
 import { CastMenu } from './CastMenu';
 import { CastTime } from './CastTime';
+import { reactionKey, reactionCount, type ReactionOverride } from './lib/reaction-feedback';
 
 export type CastHandlers = {
+  reactionOverrides?:Record<string,ReactionOverride>;
+  onReactionSynced?:(key:string,override:ReactionOverride)=>void;
   onProfile:(fid:number)=>void;
   onOpen:(cast:Cast,tab?:ActivityTab)=>void;
   onReply:(cast:Cast)=>void;
@@ -34,9 +37,15 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
   },[visible]);
   useEffect(()=>{let active=true;setLoaded(undefined);if(visible&&!provided)readActivity(config,cast,revision).then(value=>{if(active)setLoaded(value);});return()=>{active=false;};},[config,cast,revision,visible,provided]);
   const activity=provided||loaded;
-  const liked=Boolean(sessionFid&&activity?.likes?.items.some(m=>m.data.fid===sessionFid));
-  const recast=Boolean(sessionFid&&activity?.recasts?.items.some(m=>m.data.fid===sessionFid));
-  const count=(tab:ActivityTab)=>activity?countLabel(activity[tab]):'…';
+  const likeKey=sessionFid?reactionKey(sessionFid,cast,'like'):'',recastKey=sessionFid?reactionKey(sessionFid,cast,'recast'):'';
+  const likeOverride=handlers.reactionOverrides?.[likeKey],recastOverride=handlers.reactionOverrides?.[recastKey];
+  const liked=likeOverride?.active??Boolean(sessionFid&&activity?.likes?.items.some(m=>m.data.fid===sessionFid));
+  const recast=recastOverride?.active??Boolean(sessionFid&&activity?.recasts?.items.some(m=>m.data.fid===sessionFid));
+  const previousActivity=useRef<Activity|undefined>(undefined);
+  useEffect(()=>{if(!activity||activity===previousActivity.current)return;previousActivity.current=activity;
+    for(const [key,override] of [[likeKey,likeOverride],[recastKey,recastOverride]] as const)if(override&&!override.pending&&activity.readAt&&override.startedAt&&activity.readAt>override.startedAt)handlers.onReactionSynced?.(key,override);
+  },[activity,likeKey,recastKey,likeOverride,recastOverride,handlers]);
+  const count=(tab:ActivityTab)=>!activity?'…':tab==='replies'?countLabel(activity.replies):reactionCount(activity[tab],sessionFid,tab==='likes'?likeOverride:recastOverride);
   return <article ref={root} className={`cast${detailed?' cast-expanded':' cast-interactive'}`} tabIndex={detailed?undefined:0} aria-label={detailed?undefined:`Cast by ${person?.name||`FID ${cast.data.fid}`}. Press Enter to open conversation.`} onClick={event=>{
     if(detailed||event.defaultPrevented||event.button!==0)return;
     const target=event.target as HTMLElement;
@@ -56,8 +65,8 @@ export function CastCard({config,cast,handlers,revision=0,sessionFid,busy=false,
       <div className="cast-actions">
         <div className="reaction-group"><button title="Reply to cast" aria-label="Reply to cast" onClick={()=>handlers.onReply(cast)}><MessageCircle size={17}/></button><button className="reaction-count" aria-label={`View replies (${count('replies')})`} onClick={()=>handlers.onOpen(cast,'replies')}>{count('replies')}</button></div>
         <button title="Quote cast" aria-label="Quote cast" onClick={()=>handlers.onQuote(cast)}><Quote size={17}/></button>
-        <div className="reaction-group"><button title={recast?'Undo recast':'Recast'} aria-label={recast?'Undo recast':'Recast cast'} aria-pressed={recast} disabled={busy} onClick={()=>handlers.onReact(cast,'recast',recast)}><Repeat2 size={17}/></button><button className="reaction-count" aria-label={`View recasts (${count('recasts')})`} onClick={()=>handlers.onOpen(cast,'recasts')}>{count('recasts')}</button></div>
-        <div className="reaction-group"><button title={liked?'Unlike':'Like'} aria-label={liked?'Unlike cast':'Like cast'} aria-pressed={liked} disabled={busy} onClick={()=>handlers.onReact(cast,'like',liked)}><Heart size={17}/></button><button className="reaction-count" aria-label={`View likes (${count('likes')})`} onClick={()=>handlers.onOpen(cast,'likes')}>{count('likes')}</button></div>
+        <div className="reaction-group"><button title={recast?'Undo recast':'Recast'} aria-label={recast?'Undo recast':'Recast cast'} aria-pressed={recast} aria-busy={recastOverride?.pending||undefined} disabled={busy||recastOverride?.pending} onClick={()=>handlers.onReact(cast,'recast',recast)}><Repeat2 size={17}/></button><button className="reaction-count" aria-label={`View recasts (${count('recasts')})`} onClick={()=>handlers.onOpen(cast,'recasts')}>{count('recasts')}</button></div>
+        <div className="reaction-group"><button title={liked?'Unlike':'Like'} aria-label={liked?'Unlike cast':'Like cast'} aria-pressed={liked} aria-busy={likeOverride?.pending||undefined} disabled={busy||likeOverride?.pending} onClick={()=>handlers.onReact(cast,'like',liked)}><Heart size={17}/></button><button className="reaction-count" aria-label={`View likes (${count('likes')})`} onClick={()=>handlers.onOpen(cast,'likes')}>{count('likes')}</button></div>
         <ClientLabel config={config} fid={cast.data.fid} signer={cast.signer} onProfile={handlers.onProfile}/>
       </div>
     </div>

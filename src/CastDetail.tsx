@@ -4,6 +4,7 @@ import { hub, type Cast, type Config } from './lib/hub';
 import { countLabel, mergePage, readActivity, readReactions, readReplies, type Activity, type ActivityTab, type Page, type Reaction } from './lib/social';
 import { CastCard, type CastHandlers } from './CastCard';
 import { ReactionRow } from './ReactionRow';
+import { FeedSkeleton } from './FeedSkeleton';
 
 export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionFid,busy,onBack}: {
   config:Config;fid:number;hash:string;tab:ActivityTab;onTab:(tab:ActivityTab)=>void;handlers:CastHandlers;revision:number;sessionFid?:number;busy:boolean;onBack:()=>void;
@@ -11,7 +12,7 @@ export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionF
   const [cast,setCast]=useState<Cast>(),[parent,setParent]=useState<Cast>(),[activity,setActivity]=useState<Activity>(),[error,setError]=useState(''),[loading,setLoading]=useState(false),[limit,setLimit]=useState(50),[retry,setRetry]=useState(0);
   const generation=useRef(0);
   useEffect(()=>{
-    const id=++generation.current,controller=new AbortController();setCast(undefined);setParent(undefined);setActivity(undefined);setError('');setLoading(false);setLimit(50);
+    const id=++generation.current,controller=new AbortController();if(cast?.data.fid!==fid||cast?.hash!==hash){setCast(undefined);setParent(undefined);setActivity(undefined);}setError('');setLoading(false);setLimit(50);
     hub<Cast>(config,'castById',{fid,hash},controller.signal).then(async c=>{
       if(id!==generation.current)return;setCast(c);
       const parentId=c.data.castAddBody.parentCastId;
@@ -54,12 +55,12 @@ export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionF
         {(['replies','likes','recasts'] as const).map(t=><button role="tab" key={t} id={`activity-${t}`} aria-selected={tab===t} aria-controls="activity-panel" onClick={()=>onTab(t)}>{t[0].toUpperCase()+t.slice(1)} <span>{activity?countLabel(activity[t]):'…'}</span></button>)}
       </div>
       <div id="activity-panel" role="tabpanel" aria-labelledby={`activity-${tab}`}>
-        {!activity?<div className="loading"><span className="loader"/><p>Reading cast activity…</p></div>:activity.errors[tab]?<div className="feed-message error" role="alert">Could not read {tab}. <button className="text-button" onClick={()=>setRetry(v=>v+1)}>Retry</button></div>:page?.items.length?
+        {!activity?<FeedSkeleton count={2} label="Loading cast activity…"/>:activity.errors[tab]?<div className="feed-message error" role="alert">Could not read {tab}. <button className="text-button" onClick={()=>setRetry(v=>v+1)}>Retry</button></div>:page?.items.length?
           tab==='replies'?(page.items as Cast[]).slice(0,limit).map(c=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={revision} sessionFid={sessionFid} busy={busy}/>):(page.items as Reaction[]).slice(0,limit).map(m=><ReactionRow key={m.hash} config={config} reaction={m} onProfile={handlers.onProfile}/>)
           :<div className="empty"><h3>No {tab} yet</h3><p>{tab==='replies'?'Start the conversation with a reply.':'Accounts will appear here when they react.'}</p></div>}
         {page&&(page.items.length>limit||page.next)&&<button className="load-more" disabled={loading} onClick={more}>{loading?'Reading…':`Load more ${tab}`}</button>}
         {page?.next&&<p className="feed-limit">{countLabel(page)} {tab} loaded. More results are available.</p>}
       </div>
-    </>:!error&&<div className="loading"><span className="loader"/><p>Opening cast…</p></div>}
+    </>:!error&&<FeedSkeleton count={2} label="Opening cast…"/>}
   </section>;
 }

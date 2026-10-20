@@ -1,0 +1,3 @@
+export function FeedSkeleton({count=3,label='Loading posts…',people=false}:{count?:number;label?:string;people?:boolean}) {
+  return <div className={`feed-skeleton${people?' people-skeleton':''}`} role="status" aria-label={label}><span className="sr-only">{label}</span>{Array.from({length:count},(_,index)=><div className="skeleton-card" key={index} aria-hidden="true"><span className="skeleton-avatar skeleton"/><div><span className="skeleton skeleton-name"/><span className="skeleton skeleton-line"/>{!people&&<><span className="skeleton skeleton-line short"/><span className="skeleton skeleton-actions"/></>}</div></div>)}</div>;
+}
