@@ -1,6 +1,6 @@
 import { xHandle } from './x-handle';
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; parentUrl?:string; embedsDeprecated?:string[]; type?:number|string; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
-export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string;twitterUsername?:string };
+export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string;twitterUsername?:string;githubUsername?:string;location?:string;primaryEthereumAddress?:string;primarySolanaAddress?:string;profileToken?:string;liveActivityUrl?:string };
 export type Config = { readUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean; indexedFeedEnabled?:boolean; indexedFeedFids?:number[]; defaultFeedFid?:number };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
@@ -61,7 +61,7 @@ export function profile(config: Config, fid: number): Promise<Profile> {
   const cached=profiles.get(fid);if(cached)return cached;
   const pending=hub<{ messages: HubMessage[] }>(config,'userDataByFid',{fid}).then(({messages}) => {
     const value = (type: string, n: number) => messages.find(m => m.data.userDataBody?.type === type || m.data.userDataBody?.type === n)?.data.userDataBody?.value || '';
-    return {fid, displayName:value('USER_DATA_TYPE_DISPLAY',2),website:value('USER_DATA_TYPE_URL',5),name:value('USER_DATA_TYPE_DISPLAY',2)||`FID ${fid}`, username:value('USER_DATA_TYPE_USERNAME',6),avatar:value('USER_DATA_TYPE_PFP',1),bio:value('USER_DATA_TYPE_BIO',3),banner:value('USER_DATA_TYPE_BANNER',10),twitterUsername:xHandle(value('USER_DATA_TYPE_TWITTER',8))};
+    return {fid, displayName:value('USER_DATA_TYPE_DISPLAY',2),website:value('USER_DATA_TYPE_URL',5),name:value('USER_DATA_TYPE_DISPLAY',2)||`FID ${fid}`, username:value('USER_DATA_TYPE_USERNAME',6),avatar:value('USER_DATA_TYPE_PFP',1),bio:value('USER_DATA_TYPE_BIO',3),banner:value('USER_DATA_TYPE_BANNER',10),twitterUsername:xHandle(value('USER_DATA_TYPE_TWITTER',8)),githubUsername:value('USER_DATA_TYPE_GITHUB',9),location:value('USER_DATA_TYPE_LOCATION',7),primaryEthereumAddress:value('USER_DATA_PRIMARY_ADDRESS_ETHEREUM',11),primarySolanaAddress:value('USER_DATA_PRIMARY_ADDRESS_SOLANA',12),profileToken:value('USER_DATA_TYPE_PROFILE_TOKEN',13),liveActivityUrl:value('USER_DATA_TYPE_LIVE_AT',14)};
   }).catch(error=>{if(profiles.get(fid)===pending)profiles.delete(fid);throw error;});
   profiles.set(fid,pending);return pending;
 }

@@ -3,7 +3,7 @@ import { joinedDates } from './joined.mjs';
 import { profileCounts } from './profile-counts.mjs';
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
-const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'castsByMention', 'userDataByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
+const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'castsByMention', 'userDataByFid', 'verificationsByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
 import {writeOrigin} from './origin.mjs';
 export {writeOrigin} from './origin.mjs';
 export function gateway(config) {

@@ -4,7 +4,7 @@
 
 Kite is an open source Farcaster client (project name and handle: `kiteapp`) with chronological Following feeds, client filters, rich profiles, notifications, and account tools. It also includes a responsive tutorial for running your own Snapchain read node. MIT licensed.
 
-The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. Local account actions are signed in the browser; approved-account actions are signed by the server. Reads and signed submissions use the same configured Snapchain HTTP API.
+The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, with social accounts, linked wallets, and connected clients at `/profile/FID/about`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. Local account actions are signed in the browser; approved-account actions are signed by the server. Reads and signed submissions use the same configured Snapchain HTTP API.
 
 ## Try the client
 
