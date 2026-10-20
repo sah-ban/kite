@@ -32,8 +32,8 @@ export function ProfileHeader({config,fid,viewerFid,onConnections,onFollow,follo
       <div className="profile-top"><Avatar person={person}/>{ownProfile&&<button className="button small-button" onClick={onEdit}>Edit profile</button>}{!ownProfile&&<button className="button small-button" disabled={busy} onClick={onFollow}>{followed?'Unfollow':'Follow'}</button>}</div>
       <h2>{person?.name||`FID ${fid}`} <ProBadge config={config} fid={fid}/></h2><div className="profile-handle">{person?.username?`@${person.username}`:`FID ${fid}`} <span>· FID {fid}</span>{followsYou&&<span className="follows-you">Follows you</span>}</div>
       {person?.bio&&<p className="profile-bio">{person.bio}</p>}
-      <JoinedDate fid={fid} revision={revision}/>
-      <div className="profile-meta">{person?.website&&embedURL(person.website)&&<a href={embedURL(person.website)} target="_blank" rel="noreferrer">{person.website} <ArrowUpRight size={12}/></a>}<ProfileCounts config={config} fid={fid} revision={revision} onConnections={onConnections}/><a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
+      <div className="profile-info"><JoinedDate fid={fid} revision={revision}/>{person?.website&&embedURL(person.website)&&<a className="profile-website" href={embedURL(person.website)} target="_blank" rel="noreferrer"><span>{person.website}</span><ArrowUpRight size={12}/></a>}</div>
+      <div className="profile-meta"><ProfileCounts config={config} fid={fid} revision={revision} onConnections={onConnections}/><a href={`https://farcaster.xyz/${person?.username||fid}`} target="_blank" rel="noreferrer">Farcaster <ArrowUpRight size={12}/></a></div>
       <ConnectedClients config={config} fid={fid} revision={revision} onProfile={onProfile}/>
     </section>
 
