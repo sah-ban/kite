@@ -16,5 +16,5 @@ export function ProBadge({config,fid,visible=true}:{config:Config;fid:number;vis
   },[config,fid,visible]);
   if(!visible||status?.fid!==fid||status.config!==config||status.expiresAt<=status.now/1000)return null;
   const title=proExpiryLabel(status.expiresAt,status.now);
-  return <span className="pro-badge" role="img" tabIndex={0} title={title} aria-label={`Farcaster Pro. ${title}`} onMouseEnter={()=>setStatus({...status,now:Date.now()})} onFocus={()=>setStatus({...status,now:Date.now()})}>PRO</span>;
+  return <span className="pro-badge" role="img" tabIndex={0} title={title} aria-label={`Farcaster Pro. ${title}`} onMouseEnter={()=>setStatus({...status,now:Date.now()})} onFocus={()=>setStatus({...status,now:Date.now()})}><img src="/pro-badge.svg" width={16} height={16} alt="" aria-hidden="true"/></span>;
 }
