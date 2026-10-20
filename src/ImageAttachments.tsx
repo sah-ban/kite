@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import { GifPicker } from './GifPicker';
 import { uploadImage } from './lib/images';
-export function ImageAttachments({images,onChange,onBusy,disabled=false,max=2,reserved=0}:{images:string[];onChange:(images:string[])=>void;onBusy:(busy:boolean)=>void;disabled?:boolean;max?:number;reserved?:number}) {
+export function ImageAttachments({images,onChange,onBusy,disabled=false,max=2,reserved=0,compact=false}:{images:string[];onChange:(images:string[])=>void;onBusy:(busy:boolean)=>void;disabled?:boolean;max?:number;reserved?:number;compact?:boolean}) {
   const input=useRef<HTMLInputElement>(null),controller=useRef<AbortController|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[gifOpen,setGifOpen]=useState(false);
   useEffect(()=>()=>{controller.current?.abort();controller.current=null;onBusy(false);},[onBusy]);
@@ -16,7 +16,7 @@ export function ImageAttachments({images,onChange,onBusy,disabled=false,max=2,re
       catch(e){if(controller.current===abort)setError(abort.signal.aborted?'Image upload timed out. Please try again.':(e as Error).message);}
       finally{clearTimeout(timeout);if(controller.current===abort){controller.current=null;setBusy(false);onBusy(false);}}
     }}/>
-    <div className="attachment-toolbar"><button type="button" className="text-button" disabled={disabled||busy||images.length+reserved>=max} onClick={()=>input.current?.click()}><ImagePlus size={17}/>{busy?'Uploading image…':'Add image'}</button><button type="button" className="text-button gif-toggle" disabled={disabled||busy||images.length+reserved>=max} aria-expanded={gifOpen} onClick={()=>setGifOpen(value=>!value)}>GIF</button><span className="small muted">{images.length+reserved}/{max} · up to 10 MB each</span></div>
+    <div className="attachment-toolbar"><button type="button" className={compact?'composer-tool':'text-button'} aria-label={busy?'Uploading image':'Add image'} title="Add image · up to 10 MB" disabled={disabled||busy||images.length+reserved>=max} onClick={()=>input.current?.click()}><ImagePlus size={19}/>{!compact&&(busy?'Uploading image…':'Add image')}</button><button type="button" className={compact?'composer-tool gif-toggle':'text-button gif-toggle'} aria-label="Choose a GIF" title="Choose a GIF" disabled={disabled||busy||images.length+reserved>=max} aria-expanded={gifOpen} onClick={()=>setGifOpen(value=>!value)}>GIF</button>{!compact&&<span className="small muted">{images.length+reserved}/{max} · up to 10 MB each</span>}</div>
     {gifOpen&&<GifPicker disabled={disabled||busy||images.length+reserved>=max} onClose={()=>setGifOpen(false)} onSelect={url=>{if(disabled||busy||images.length+reserved>=max)return;onChange([...images,url]);setGifOpen(false);setError('');}}/>}
     {error&&<p className="small danger" role="alert">{error}</p>}
   </div>;
