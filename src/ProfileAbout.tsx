@@ -7,6 +7,7 @@ import { Avatar } from './social-ui';
 import { ConnectedClients } from './ConnectedClients';
 import { JoinedDate } from './JoinedDate';
 import { ProBadge } from './ProBadge';
+import { ProfileStorage } from './ProfileStorage';
 
 function WalletLink({wallet,primary=false}:{wallet:Wallet;primary?:boolean}) {
   const name=wallet.protocol==='ethereum'?'Ethereum':'Solana';
@@ -40,6 +41,7 @@ export function ProfileAbout({config,fid,revision,onProfile}:{config:Config;fid:
         <section className="about-section"><h2>Profile details</h2><dl className="about-fields"><div><dt>FID</dt><dd>{fid}</dd></div>{person.username&&<div><dt>Username</dt><dd>@{person.username}</dd></div>}{website&&<div><dt>Website</dt><dd><a href={website} target="_blank" rel="noreferrer">{person.website}<ArrowUpRight size={14}/></a></dd></div>}{person.location&&<div><dt>Location</dt><dd>{person.location}</dd></div>}{live&&<div><dt>Live activity</dt><dd><a href={live} target="_blank" rel="noreferrer">{person.liveActivityUrl}<ArrowUpRight size={14}/></a></dd></div>}{person.profileToken&&<div><dt>Profile token</dt><dd><code>{person.profileToken}</code></dd></div>}</dl><JoinedDate fid={fid} revision={revision+retry}/></section>
         <section className="about-section"><h2>Social accounts</h2>{person.twitterUsername||github?<div className="about-socials">{person.twitterUsername&&<a href={`https://x.com/${person.twitterUsername}`} target="_blank" rel="noreferrer"><span><strong>X</strong><small>@{person.twitterUsername}</small></span><ArrowUpRight size={16}/></a>}{github&&<a href={`https://github.com/${github}`} target="_blank" rel="noreferrer"><span><strong>GitHub</strong><small>{github}</small></span><ArrowUpRight size={16}/></a>}</div>:<p className="about-status">No social accounts shared on this profile.</p>}</section>
       </>}
+      <ProfileStorage key={retry} config={config} fid={fid} revision={revision}/>
       <section className="about-section"><h2>Linked wallets</h2>{primary.map(wallet=><WalletLink key={`${wallet.protocol}:${wallet.address}`} wallet={wallet} primary/>)}{walletError?<p className="about-status" role="status">Couldn’t load additional wallets. <button className="text-button" onClick={()=>setWalletRetry(value=>value+1)}>Retry wallets</button></p>:!wallets?<p className="about-status" role="status">Loading linked wallets…</p>:<>{otherWallets?.map(wallet=><WalletLink key={`${wallet.protocol}:${wallet.address}`} wallet={wallet}/>)}{!primary.length&&!wallets.length&&<p className="about-status">No linked wallets shared on this profile.</p>}</>}</section>
       <div className="about-section"><ConnectedClients key={retry} config={config} fid={fid} revision={revision} onProfile={onProfile}/></div>
     </div>
