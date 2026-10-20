@@ -14,11 +14,15 @@ import { imageUploads } from './uploads.mjs';
 // @ts-expect-error Server-only GIF search middleware.
 import { gifSearch } from './gifs.mjs';
 
+// @ts-expect-error Server-only indexed feed middleware.
+import { indexedFeed } from './feed/api.mjs';
+
 export default defineConfig(({mode})=>{
   const config={...loadEnv(mode,process.cwd(),''),...process.env};
   const savedSigners=normalizePath(resolve(config.FREECAST_SESSION_DIR||'.freecast/sessions'));
   return {
     plugins:[react(),{name:'freecast-gateway',configureServer(server){
+      server.middlewares.use(indexedFeed(config));
       server.middlewares.use(gifSearch());
       server.middlewares.use(imageUploads(config));
       server.middlewares.use(approval(config));

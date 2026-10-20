@@ -1,0 +1,16 @@
+[Unit]
+Description=Freecast Following feed worker
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/freecast
+ExecStart=/path/to/node /path/to/freecast/feed/worker.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

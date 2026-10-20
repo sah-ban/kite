@@ -10,19 +10,22 @@
     "build": "tsc -b && vite build",
     "start": "node server.mjs",
     "test": "tsx --test test/*.test.ts",
-    "check": "tsc -b && npm test"
+    "check": "tsc -b && npm test",
+    "feed:worker": "node feed/worker.mjs"
   },
   "dependencies": {
+    "@faker-js/faker": "10.6.0",
     "@farcaster/core": "0.15.3",
     "@farcaster/core-gasless": "npm:@farcaster/core@0.20.0",
+    "@grpc/grpc-js": "^1.14.6",
     "hls.js": "1.7.3",
     "htmlparser2": "12.0.0",
     "lucide-react": "^0.468.0",
+    "pg": "^8.23.1",
     "qrcode-generator": "2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "viem": "^2.38.0",
-    "@faker-js/faker": "10.6.0"
+    "viem": "^2.38.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

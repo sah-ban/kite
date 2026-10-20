@@ -33,12 +33,14 @@ test('cross-origin writes are rejected',async()=>{
 });
 test('browser configuration exposes gateway paths rather than upstream endpoints',async()=>{
   const {req,res}=await request('/api/config');
-  await gateway({NEXT_PUBLIC_HUBURL:'https://private-read.example',VALIDATOR_URL:'https://private-write.example'})(req,res,()=>{});
+  await gateway({NEXT_PUBLIC_HUBURL:'https://private-read.example',VALIDATOR_URL:'https://private-write.example',DATABASE_URL:'postgres://private-db.example/freecast',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'https://private-stream.example:3383',FREECAST_FEED_HTTP_URL:'https://private-feed.example'})(req,res,()=>{});
   const config=JSON.parse(String(res.body));
   assert.equal(config.readUrl,'/api/read');
   assert.equal(config.validatorUrl,'/api/write');
   assert.ok(!String(res.body).includes('private-read.example'));
   assert.ok(!String(res.body).includes('private-write.example'));
+  assert.deepEqual(config.indexedFeedFids,[268438]);assert.equal(config.defaultFeedFid,268438);
+  for(const privateHost of ['private-db.example','private-stream.example','private-feed.example'])assert.ok(!String(res.body).includes(privateHost));
 });
 test('protobuf write goes only to the configured validator',async()=>{
   const original=globalThis.fetch;let seen='',payload:unknown;
