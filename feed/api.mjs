@@ -1,5 +1,6 @@
 import {createPool,enrollViewer,parseFeedQuery,queryFeed,validFid} from './store.mjs';
 import {localFeedEnrollment} from './enrollment.mjs';
+import {queryNotifications} from './notifications.mjs';
 export const feedFids=config=>(config.FREECAST_FEED_FIDS||'').split(',').filter(validFid).map(Number);
 export function indexedFeed(config,{pool,...dependencies}={}) {
   if(!config.DATABASE_URL)return (req,res,next)=>next();
@@ -10,7 +11,7 @@ export function indexedFeed(config,{pool,...dependencies}={}) {
   const prove=localFeedEnrollment(config,enroll,dependencies);
   const middleware=async(req,res,next)=>{
     const url=new URL(req.url,'http://localhost');
-    if(!['/api/feed/following','/api/feed/enrollment','/api/feed/challenge','/api/feed/enroll'].includes(url.pathname))return next();
+    if(!['/api/feed/following','/api/feed/notifications','/api/feed/enrollment','/api/feed/challenge','/api/feed/enroll'].includes(url.pathname))return next();
     res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
     const send=(code,body)=>{res.statusCode=code;res.end(JSON.stringify(body));};
     try{
@@ -21,6 +22,7 @@ export function indexedFeed(config,{pool,...dependencies}={}) {
       const enrolled=seeds.has(fid)||(await pool.query('SELECT fid FROM freecast_feed_users WHERE fid=$1',[fid])).rows.length>0;
       if(url.pathname==='/api/feed/enrollment')return send(200,{enrolled,fid});
       if(!enrolled)return send(404,{error:'Connect this account to enable its indexed feed'});
+      if(url.pathname==='/api/feed/notifications')return send(200,{...await queryNotifications(pool,fid,url.searchParams),historyDays:Number(config.FREECAST_FEED_HISTORY_DAYS||30)});
       const page=await queryFeed(pool,query,url.searchParams.get('cursor')||'');return send(200,{...page,status:{...page.status,historyDays:Number(config.FREECAST_FEED_HISTORY_DAYS||30)}});
     }catch(error){
       if(error.status)return send(error.status,{error:error.message});

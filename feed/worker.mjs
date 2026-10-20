@@ -2,6 +2,7 @@ import {Client,credentials} from '@grpc/grpc-js';
 import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid} from './store.mjs';
 import {castOf,dataOf,hex,requesterOf,subscriptionRequest,decodeEvent} from './protocol.mjs';
 import {feedFids} from './api.mjs';
+import {indexNotification} from './notifications.mjs';
 import {pathToFileURL} from 'node:url';
 
 export async function startWorker(config,{pool=createPool(config.DATABASE_URL),fetcher=fetch,log=console.log}={}) {
@@ -27,7 +28,14 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   if(!(await lock.query('SELECT pg_try_advisory_lock(hashtext(current_schema()),268438) AS locked')).rows[0].locked){lock.release();throw new Error('A feed worker is already running');}
   lock.on('error',()=>{stopped=true;stopController.abort();for(const stream of streams)stream.cancel();log('Feed database connection lost; stopping');process.exit(1);});
   for(const viewer of viewers)await enrollViewer(pool,viewer);
+  let notificationViewers=new Map();
+  async function activateNotifications(){
+    await pool.query('UPDATE freecast_feed_users SET notifications_started_at=clock_timestamp() WHERE notifications_started_at IS NULL');
+    notificationViewers=new Map((await pool.query('SELECT fid,notifications_started_at FROM freecast_feed_users')).rows.map(row=>[Number(row.fid),Math.ceil(new Date(row.notifications_started_at).getTime()/1000)-1609459200]));
+  }
+  await activateNotifications();
   async function syncGraph(){
+    await activateNotifications();
     viewers=new Set((await pool.query('SELECT fid FROM freecast_feed_users')).rows.map(row=>Number(row.fid)));
     const pending=(await pool.query(`SELECT fid FROM freecast_feed_users WHERE (follows_retry_after IS NULL OR follows_retry_after<now())
       AND (follows_synced_at IS NULL OR follows_synced_at<now()-interval '5 minutes' OR fid=ANY($1::bigint[]))
@@ -76,6 +84,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
       const merge=event.mergeMessageBody,pruned=event.pruneMessageBody?.message||event.revokeMessageBody?.message;
       const apply=async(message,removed=false)=>{
         const data=dataOf(message);if(!data)return;
+        await indexNotification(db,message,notificationViewers,removed);
         if(viewers.has(Number(data.fid))&&[5,6,14].includes(data.type))dirtyViewers.set(Number(data.fid),(dirtyViewers.get(Number(data.fid))||0)+1);
         if(!tracked.has(Number(data.fid)))return;
         if(removed&&data.castAddBody)await deleteCast(db,hex(message.hash),data.fid);
@@ -105,7 +114,11 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
               await db.query('DELETE FROM freecast_feed_casts WHERE author_fid=ANY($1::bigint[])',[[...tracked]]);
               await db.query('UPDATE freecast_feed_authors SET backfill_done=false,backfill_cursor=NULL,backfilled_at=NULL,retry_after=NULL,epoch=epoch+1 WHERE fid=ANY($1::bigint[])',[[...tracked]]);
               await db.query('UPDATE freecast_feed_users SET generation=generation+1');
+              // Missed removals cannot be reconstructed without a history import.
+              await db.query('DELETE FROM freecast_notifications');
+              await db.query('UPDATE freecast_feed_users SET notifications_started_at=clock_timestamp()');
               await db.query('COMMIT');
+              await activateNotifications();
             }catch(error){await db.query('ROLLBACK');lastRecovery=0;throw error;}finally{db.release();}
           }
           await pool.query('INSERT INTO freecast_feed_checkpoints(shard,event_id) VALUES($1,$2) ON CONFLICT(shard) DO UPDATE SET event_id=EXCLUDED.event_id,updated_at=now()',[shard,String(latest)]);
@@ -150,7 +163,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
       if(Date.now()-lastGraph>2000)await syncGraph();
       const authors=(await pool.query(`SELECT a.* FROM freecast_feed_authors a WHERE EXISTS(SELECT 1 FROM freecast_feed_follows f WHERE f.author_fid=a.fid) AND (retry_after IS NULL OR retry_after<now()) ORDER BY backfill_done,failed,backfilled_at NULLS FIRST,fid LIMIT 4`)).rows;
       await Promise.all(authors.map(backfill));
-      if(Date.now()-lastCleanup>3600000){await pool.query('DELETE FROM freecast_feed_casts WHERE (NOT deleted AND timestamp<$1) OR (deleted AND updated_at<now()-interval \'45 days\')',[cutoff()]);lastCleanup=Date.now();}
+      if(Date.now()-lastCleanup>3600000){await pool.query('DELETE FROM freecast_feed_casts WHERE (NOT deleted AND timestamp<$1) OR (deleted AND updated_at<now()-interval \'45 days\')',[cutoff()]);await pool.query('DELETE FROM freecast_notifications WHERE timestamp<$1',[cutoff()]);await pool.query("DELETE FROM freecast_notification_deleted_casts WHERE deleted_at<now()-interval '45 days'");lastCleanup=Date.now();}
       await pause(authors.length?100:1000);
     }catch{if(!stopped)log('Feed sync retrying');await pause(5000);}
   }})();

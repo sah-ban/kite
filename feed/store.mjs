@@ -10,6 +10,13 @@ export async function migrate(pool) {
     ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
     ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS follows_failed boolean NOT NULL DEFAULT false;
     ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS follows_retry_after timestamptz;
+    ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS notifications_started_at timestamptz;
+    CREATE TABLE IF NOT EXISTS freecast_notifications(id bigserial UNIQUE,viewer_fid bigint REFERENCES freecast_feed_users(fid),identity text NOT NULL,source_hash text NOT NULL,actor_fid bigint NOT NULL,kind text NOT NULL,timestamp bigint NOT NULL,target_fid bigint,target_hash text,payload jsonb,received_at timestamptz NOT NULL DEFAULT clock_timestamp(),PRIMARY KEY(viewer_fid,identity));
+    CREATE INDEX IF NOT EXISTS freecast_notifications_page ON freecast_notifications(viewer_fid,id DESC);
+    CREATE INDEX IF NOT EXISTS freecast_notifications_unread ON freecast_notifications(viewer_fid,received_at);
+    CREATE INDEX IF NOT EXISTS freecast_notifications_source ON freecast_notifications(source_hash);
+    CREATE INDEX IF NOT EXISTS freecast_notifications_target ON freecast_notifications(target_fid,target_hash);
+    CREATE TABLE IF NOT EXISTS freecast_notification_deleted_casts(fid bigint NOT NULL,hash text NOT NULL,deleted_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(fid,hash));
     CREATE TABLE IF NOT EXISTS freecast_feed_follows(viewer_fid bigint REFERENCES freecast_feed_users(fid),author_fid bigint NOT NULL,PRIMARY KEY(viewer_fid,author_fid));
     CREATE INDEX IF NOT EXISTS freecast_feed_follow_author ON freecast_feed_follows(author_fid);
     CREATE TABLE IF NOT EXISTS freecast_feed_authors(fid bigint PRIMARY KEY,backfill_cursor text,backfill_done boolean NOT NULL DEFAULT false,backfilled_at timestamptz,signers_synced_at timestamptz,retry_after timestamptz,failed boolean NOT NULL DEFAULT false,epoch bigint NOT NULL DEFAULT 0);

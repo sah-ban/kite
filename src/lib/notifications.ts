@@ -2,7 +2,7 @@ import {fullHash,hub,onlyCastAdds,type Cast,type Config} from './hub';
 import type {Reaction} from './social';
 
 export type NotificationKind='mention'|'reply'|'like'|'recast'|'follow';
-export type NotificationItem={id:string;kind:NotificationKind;actor:number;timestamp:number;cast?:Cast};
+export type NotificationItem={id:string;kind:NotificationKind;actor:number;timestamp:number;cast?:Cast;target?:{fid:number;hash:string};receivedAt?:string};
 type ActivityTask={kind:'replies'|'reactions';cast:Cast;token:string};
 export type NotificationCursor={mentions:string|null;followers:string|null;casts:string|null;activity:ActivityTask[];scanned:number};
 export type NotificationPage={items:NotificationItem[];cursor:NotificationCursor;errors:string[]};
