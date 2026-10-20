@@ -11,7 +11,7 @@ import { FNAME_COOLDOWN, claimableFname, ownsFnameProof } from '../fname-utils.m
 
 // Public deterministic fixture; never used for a live registry request.
 const phrase='test test test test test test test test test test test junk',account=mnemonicToAccount(phrase),fid=123,now=2_000_000_000;
-const config:Config={readUrl:'/api/read',validatorUrl:'/api/write',optimismRpcUrl:'https://rpc.example',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'https://rpc.example',useGateway:true};
 const session={fid,address:account.address,key:'0x11' as const,remote:true as const};
 Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
 async function environment(run:(env:ReturnType<typeof state>)=>Promise<void>){
@@ -36,7 +36,7 @@ function state(){
         if(url.pathname==='/transfers')return Response.json({transfers:env.target.filter(item=>item.id>Number(url.searchParams.get('from_id')||0))});
       }
       if(url.pathname.endsWith('/userNameProofByName'))return Response.json({fid:env.proofFid,type:'USERNAME_TYPE_FNAME',name:'newfname'});
-      if(url.pathname.endsWith('/userDataByFid'))return Response.json({messages:[{data:{userDataBody:{type:6,value:env.preferred}}}]});
+      if(url.pathname.endsWith('/userDataByFid'))throw new Error('Unexpected preferred-name confirmation read');
       throw new Error('Unexpected request '+url.pathname);
     },
   };return env;

@@ -4,7 +4,7 @@ import { readActivity, readConnections, followsAccount, readReactions, readRepli
 import { clientRoute } from '../src/lib/routes';
 import type { Cast, Config } from '../src/lib/hub';
 
-const config:Config={readUrl:'https://social.example',validatorUrl:'',optimismRpcUrl:'https://rpc.example'};
+const config:Config={readUrl:'https://social.example',optimismRpcUrl:'https://rpc.example'};
 const hash='0x'+'ab'.repeat(20);
 const cast:Cast={hash,signer:'0x'+'11'.repeat(32),data:{fid:37,timestamp:100,castAddBody:{text:'parent',mentions:[],mentionsPositions:[],embeds:[]}}};
 Object.defineProperty(globalThis,'window',{value:{location:{hostname:'test.example'}},configurable:true});

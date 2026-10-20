@@ -14,7 +14,7 @@ test('Pro status accepts actual snake_case node responses and camelCase SDK resp
 test('banner save rechecks Pro before any profile write and blocks expired, absent and unknown status',async()=>{
   const original=globalThis.fetch;let status:unknown={tier_subscriptions:[{tier_type:'Pro',expires_at:1}]},writes=0;
   Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
-  const config:Config={readUrl:'/api/read',validatorUrl:'/api/write',optimismRpcUrl:'https://rpc.example',useGateway:true};
+  const config:Config={readUrl:'/api/read',optimismRpcUrl:'https://rpc.example',useGateway:true};
   const session={fid:123,address:'0x0000000000000000000000000000000000000001' as const,key:'0x11' as const,remote:true as const};
   const draft:ProfileDraft={name:'Before',bio:'',avatar:'',banner:'https://example.com/old.png',website:''};
   globalThis.fetch=async(input)=>{
@@ -43,7 +43,7 @@ test('Pro expiry tooltip uses calendar months, clamped month ends and singular/p
 });
 test('badge lookups deduplicate per node/FID and limit request concurrency',async()=>{
   const {cachedProExpiry}=await import('../src/lib/pro');const original=globalThis.fetch;
-  const config:Config={readUrl:'https://badge-fixture.example',validatorUrl:'',optimismRpcUrl:'https://rpc.example'};
+  const config:Config={readUrl:'https://badge-fixture.example',optimismRpcUrl:'https://rpc.example'};
   let calls=0,active=0,maximum=0;const releases:(()=>void)[]=[];
   globalThis.fetch=async()=>{calls++;active++;maximum=Math.max(maximum,active);await new Promise<void>(resolve=>releases.push(resolve));active--;return Response.json({tierSubscriptions:[{tierType:1,expiresAt:9999999999}]});};
   try{

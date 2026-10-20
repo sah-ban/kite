@@ -6,7 +6,7 @@ import { encodeForSnapchain, deleteCast } from '../src/lib/signing';
 import { requester, metadataAbi } from '../src/lib/attribution';
 import { filterBySigner, resolveCast, onlyCastAdds, type Cast, type Config } from '../src/lib/hub';
 
-const config: Config={readUrl:'https://read.example',validatorUrl:'https://write.example',optimismRpcUrl:'https://rpc.example'};
+const config: Config={readUrl:'https://read.example',optimismRpcUrl:'https://rpc.example'};
 const cast=(hash:string,signer='0xabc'):Cast=>({hash,signer,data:{fid:37,timestamp:1,castAddBody:{text:'hello',mentions:[],mentionsPositions:[],embeds:[]}}});
 test('signed cast survives Snapchain dataBytes encoding and signature validation',async()=>{
   const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
@@ -59,7 +59,7 @@ test('cast feeds omit CAST_REMOVE tombstones and malformed records',()=>{
   assert.deepEqual(onlyCastAdds([visible,removal,{data:null},{}]),[visible]);
 });
 
-test('local cast deletion signs the target and waits for the read node to report it missing',async()=>{
+test('local cast deletion signs the target and succeeds without read-node confirmation',async()=>{
   const originalFetch=globalThis.fetch;
   Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
   const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
@@ -73,12 +73,12 @@ test('local cast deletion signs the target and waits for the read node to report
       assert.ok((await validations.validateMessage({...message,data})).isOk());
       return Response.json({accepted:true});
     }
-    reads++;return Response.json({errCode:'not_found'},{status:404});
+    reads++;return Response.json(target);
   };
   try{
     await assert.rejects(deleteCast(config,{...session,fid:999},target),/only delete your own/);
     assert.equal(submissions,0);assert.equal(reads,0);
-    await deleteCast(config,session,target);assert.equal(submissions,1);assert.equal(reads,1);
+    await deleteCast(config,session,target);assert.equal(submissions,1);assert.equal(reads,0);
   }finally{globalThis.fetch=originalFetch;}
 });
 

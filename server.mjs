@@ -10,7 +10,7 @@ import { gifSearch } from './gifs.mjs';
 import { indexedFeed } from './feed/api.mjs';
 try { process.loadEnvFile('.env'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 const root = resolve('dist');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2' };
 const middleware = gateway(process.env);
 const feedMiddleware = indexedFeed(process.env);
 const accountMiddleware = approval(process.env,{enrollFeed:feedMiddleware.enroll});

@@ -9,15 +9,14 @@ export {writeOrigin} from './origin.mjs';
 export function gateway(config) {
   const joinedMiddleware=joinedDates();
   const countsMiddleware=profileCounts();
-  const readUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
-  const validatorUrl = config.VALIDATOR_URL || '';
+  const nodeUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
   return async (req, res, next) => {
     const url = new URL(req.url || '/', 'http://localhost');
     if(url.pathname==='/api/profile/joined')return joinedMiddleware(req,res,next);
     if(url.pathname==='/api/profile/counts')return countsMiddleware(req,res,next);
     if (url.pathname === '/api/config') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ indexedFeedEnabled:Boolean(config.DATABASE_URL),indexedFeedFids:config.DATABASE_URL?feedFids(config):[],defaultFeedFid:config.DATABASE_URL?feedFids(config)[0]:undefined,readUrl: '/api/read', validatorUrl: validatorUrl ? '/api/write' : '', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io', approvalConfigured: Boolean(config.FARCASTER_APP_ENV_FILE || (config.FARCASTER_APP_FID && config.FARCASTER_APP_MNEMONIC)) })); return;
+      res.end(JSON.stringify({ indexedFeedEnabled:Boolean(config.DATABASE_URL),indexedFeedFids:config.DATABASE_URL?feedFids(config):[],defaultFeedFid:config.DATABASE_URL?feedFids(config)[0]:undefined,readUrl: '/api/read', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io', approvalConfigured: Boolean(config.FARCASTER_APP_ENV_FILE || (config.FARCASTER_APP_FID && config.FARCASTER_APP_MNEMONIC)) })); return;
     }
     const read = url.pathname.startsWith('/api/read/v1/');
     const write = url.pathname === '/api/write/v1/submitMessage';
@@ -28,9 +27,8 @@ export function gateway(config) {
       try { expected=writeOrigin(req,config); } catch { res.statusCode=403;res.end('Invalid request origin');return; }
       if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch. Open the app at its configured origin, or set FREECAST_PUBLIC_URL to the exact browser origin and restart.'); return; }
     }
-    if (write && !validatorUrl) { res.statusCode = 503; res.end('Set VALIDATOR_URL to a validator HTTP endpoint before posting.'); return; }
     try {
-      const target = new URL(url.pathname.replace(/^\/api\/(read|write)/, '') + url.search, read ? readUrl : validatorUrl);
+      const target = new URL(url.pathname.replace(/^\/api\/(read|write)/, '') + url.search, nodeUrl);
       const chunks = []; let size = 0;
       if (write) for await (const chunk of req) { size += chunk.length; if (size > 100_000) { res.statusCode = 413; res.end('Message too large'); return; } chunks.push(chunk); }
       const response = await fetch(target, { method: req.method, headers: write ? { 'Content-Type': 'application/octet-stream' } : {}, body: write ? Buffer.concat(chunks) : undefined, signal: AbortSignal.timeout(25_000), redirect: 'error' });

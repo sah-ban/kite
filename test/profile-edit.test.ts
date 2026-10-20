@@ -7,7 +7,7 @@ import { updateProfileField } from '../src/lib/signing';
 import { loadGaslessSdk } from '../src/lib/gasless-sdk';
 import { profile, invalidateProfile, type Config } from '../src/lib/hub';
 const sdk=await loadGaslessSdk();
-const config:Config={readUrl:'/api/read',validatorUrl:'/api/write',optimismRpcUrl:'https://rpc.example',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'https://rpc.example',useGateway:true};
 const original:ProfileDraft={name:'Tester',bio:'Original',avatar:'https://example.com/avatar.png',banner:'',website:''};
 const remote={fid:98765,address:'0x0000000000000000000000000000000000000001' as const,key:'0x'+'11'.repeat(32) as `0x${string}`,remote:true as const};
 const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
@@ -41,25 +41,26 @@ test('local profile messages support modern banner type and retain valid dataByt
   try{await updateProfileField(config,local,10,'https://example.com/banner.png');assert.equal(writes,1);await assert.rejects(updateProfileField(config,local,6,'unowned-name'),/Invalid profile/);assert.equal(writes,1);}
   finally{globalThis.fetch=fetch;}
 });
-test('remote profile save sends only changed fields, confirms reads and invalidates cached profiles',async()=>{
-  const fetch=globalThis.fetch;const values=new Map<number,string>([[2,'Tester'],[3,'Original']]);const writes:unknown[]=[];
+test('remote profile save accepts changed fields without confirmation reads and invalidates cached profiles',async()=>{
+  const fetch=globalThis.fetch;const values=new Map<number,string>([[2,'Tester'],[3,'Original']]);const writes:unknown[]=[];let reads=0;
   globalThis.fetch=async(input,init)=>{
     if(String(input).includes('storageLimitsByFid'))return Response.json({tier_subscriptions:[{tier_type:'Pro',expires_at:Date.now()/1000+3600}]});
     if(String(input).endsWith('/action')){const body=JSON.parse(String(init?.body));writes.push(body);values.set(body.type,body.value);return Response.json({hash:'0x'+'ab'.repeat(20)});}
-    return Response.json({messages:[...values].map(([type,value])=>({data:{userDataBody:{type,value}}}))});
+    reads++;return Response.json({messages:[...values].map(([type,value])=>({data:{userDataBody:{type,value}}}))});
   };
   try{
     invalidateProfile(remote.fid);assert.equal((await profile(config,remote.fid)).name,'Tester');
     await saveProfile(config,remote,original,{...original,name:'Updated',banner:'https://example.com/banner.png',website:'https://example.com'});
+    assert.equal(reads,1,'Only the initial profile read is needed; saving must not confirm each field.');
     assert.deepEqual(writes,[{kind:'profile',type:2,value:'Updated'},{kind:'profile',type:10,value:'https://example.com/banner.png'},{kind:'profile',type:5,value:'https://example.com'}]);assert.equal((await profile(config,remote.fid)).name,'Updated');assert.equal((await profile(config,remote.fid)).banner,'https://example.com/banner.png');
   }finally{globalThis.fetch=fetch;invalidateProfile(remote.fid);}
 });
-test('partial profile failure reports confirmed fields and keeps the refreshed read-node state',async()=>{
+test('partial profile failure reports accepted fields',async()=>{
   const fetch=globalThis.fetch;let writes=0;
   globalThis.fetch=async(input)=>{
     if(String(input).endsWith('/action')){writes++;return writes===1?Response.json({hash:'0x'+'ab'.repeat(20)}):Response.json({error:'Fixture submission failed'},{status:502});}
-    return Response.json({messages:[{data:{userDataBody:{type:2,value:'Updated'}}}]});
+    throw new Error('Unexpected confirmation read');
   };
-  try{await assert.rejects(saveProfile(config,remote,original,{...original,name:'Updated',bio:'New'}),/1 of 2 changes confirmed.*Fixture submission failed/);assert.equal(writes,2);}
+  try{await assert.rejects(saveProfile(config,remote,original,{...original,name:'Updated',bio:'New'}),/1 of 2 changes saved.*Fixture submission failed/);assert.equal(writes,2);}
   finally{globalThis.fetch=fetch;invalidateProfile(remote.fid);}
 });

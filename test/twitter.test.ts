@@ -32,7 +32,7 @@ test('X handles accept platform username characters and never treat URLs or Farc
   for(const value of ['',undefined,null,'alice.eth','two words','https://x.com/alice','a'.repeat(16),'@@alice'])assert.equal(xHandle(value),undefined);
 });
 test('linked X handles are read only from Snapchain user data type 8, accepting enum names and numeric types',async()=>{
-  const original=globalThis.fetch,config:Config={readUrl:'/api/read',validatorUrl:'',optimismRpcUrl:'',useGateway:true};let twitterType:string|number=8,value='alice_on_x',calls=0;
+  const original=globalThis.fetch,config:Config={readUrl:'/api/read',optimismRpcUrl:'',useGateway:true};let twitterType:string|number=8,value='alice_on_x',calls=0;
   globalThis.fetch=async input=>{calls++;const url=new URL(String(input),'https://freecast.example');assert.equal(url.pathname,'/api/read/v1/userDataByFid');assert.equal(url.searchParams.get('fid'),'456789');return Response.json({messages:[{data:{userDataBody:{type:6,value:'alice.eth'}}},{data:{userDataBody:{type:twitterType,value}}}]});};
   try{
     for(const [type,raw,expected] of [[8,'alice_on_x','alice_on_x'],['USER_DATA_TYPE_TWITTER','@Alice_X','Alice_X'],[8,'',undefined],[8,'alice.eth',undefined],[9,'github_user',undefined]] as const){twitterType=type;value=raw;invalidateProfile(456789);const person=await profile(config,456789);assert.equal(person.twitterUsername,expected);assert.equal(person.username,'alice.eth');}

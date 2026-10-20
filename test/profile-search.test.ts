@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseProfileSearch, resolveProfileSearch } from '../src/lib/profile-search';
 import type { Config } from '../src/lib/hub';
 
-const config: Config = { readUrl: '/api/read', validatorUrl: '', optimismRpcUrl: '', useGateway: true };
+const config: Config = { readUrl: '/api/read', optimismRpcUrl: '', useGateway: true };
 
 test('profile search accepts exact usernames, FIDs and current or legacy profile URLs', () => {
   for (const input of [' @BALAJIS.eth ', 'balajis.eth', 'https://farcaster.xyz/balajis.eth', 'https://www.warpcast.com/balajis.eth/?ref=share']) {

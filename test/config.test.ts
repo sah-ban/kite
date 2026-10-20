@@ -9,7 +9,7 @@ test('a browser on the server IP reads through the gateway and cannot import an 
   globalThis.fetch=async input=>{
     calls.push(String(input));
     return String(input)==='/api/config'
-      ? Response.json({readUrl:'/api/read',validatorUrl:'',optimismRpcUrl:'https://rpc.example'})
+      ? Response.json({readUrl:'/api/read',optimismRpcUrl:'https://rpc.example'})
       : Response.json({messages:[]});
   };
   try{

@@ -5,7 +5,7 @@ import { FarcasterNetwork, ID_REGISTRY_ADDRESS, KEY_REGISTRY_ADDRESS, Message, M
 import { createPublicClient, http, bytesToHex, hexToBytes, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
-import { hub, HubError, localOrigin, type Config, type Cast } from './hub';
+import { hub, localOrigin, type Config, type Cast } from './hub';
 import { encodeMentionText, type DraftMention } from './mentions';
 import { saveAppKey, unlockAppKey } from './vault';
 import { buildGaslessKey, checkGaslessSigner, gaslessState, GASLESS_TTL } from './gasless';
@@ -57,7 +57,7 @@ export async function importExistingSigner(config: Config, fid: number, privateK
 export async function prepareKey(config: Config, phrase: string, password: string, accountIndex: number): Promise<PreparedKey> {
   requireLocal();
   if (password.length < 12) throw new Error('Use a passphrase of at least 12 characters to encrypt your app key.');
-  if (!config.validatorUrl) throw new Error('Set VALIDATOR_URL to a node accepting writes and restart before registering a gasless app key.');
+  if (!config.readUrl) throw new Error('Configure your node before registering a gasless app key.');
   if (!Number.isSafeInteger(accountIndex) || accountIndex < 0 || accountIndex > 100) throw new Error('Account index must be between 0 and 100.');
   const account = mnemonicToAccount(phrase.trim().toLowerCase().replace(/\s+/g,' '), { addressIndex: accountIndex });
   const address = account.address;
@@ -80,21 +80,13 @@ export async function prepareKey(config: Config, phrase: string, password: strin
       if (Date.now()/1000 >= deadline+1609459200) throw new Error('This authorization expired. Prepare a fresh registration.');
       registering=true;
       try {
-        // Persist before submission, so an interrupted confirmation is recoverable.
+        // Persist before submission, so an interrupted request is recoverable.
         await saveAppKey(password,privateKey,{fid,address,key,registration:'gasless'});
         if (used) throw new Error('Registration was cancelled. Prepare a fresh registration.');
         if (!(await checkGaslessSigner(config,fid,key))) await submit(config,message);
-        for (let i=0;i<12;i++) {
-          if (used) throw new Error('Registration was cancelled.');
-          try {
-            if (await checkGaslessSigner(config,fid,key)) {
-              const session={fid,address,key,signer:new NobleEd25519Signer(privateKey.slice())};
-              used=true;privateKey.fill(0);return session;
-            }
-          }catch{/* Acceptance is not inclusion; wait for the read node. */}
-          if(i<11)await new Promise(resolve=>setTimeout(resolve,1500));
-        }
-        throw new Error('Gasless registration submitted, but inclusion is not confirmed yet. Your encrypted key is saved; try Unlock saved app key after your read node catches up.');
+        if (used) throw new Error('Registration was cancelled.');
+        const session={fid,address,key,signer:new NobleEd25519Signer(privateKey.slice())};
+        used=true;privateKey.fill(0);return session;
       }finally{registering=false;}
     }};
   }catch(error){privateKey.fill(0);throw error;}
@@ -122,10 +114,10 @@ export function encodeForSnapchain(message: Message): Uint8Array {
 }
 export async function submit(config: Config, message: Message): Promise<string> {
   requireLocal();
-  if (!config.validatorUrl) throw new Error('Set VALIDATOR_URL in .env and restart the client to enable posting.');
+  if (!config.readUrl) throw new Error('Configure your node before posting.');
   const bytes = encodeForSnapchain(message);
   const response = await fetch('/api/write/v1/submitMessage',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:new Uint8Array(bytes),signal:AbortSignal.timeout(25_000)});
-  if (!response.ok) throw new Error(`Validator returned ${response.status}: ${(await response.text()).slice(0,350)}`);
+  if (!response.ok) throw new Error(`Node returned ${response.status}: ${(await response.text()).slice(0,350)}`);
   return bytesToHex(message.hash);
 }
 export async function postCast(config: Config, session: Session, text: string, parent?: Cast, quote?: Cast, mentions:DraftMention[]=[], images:string[]=[], links:string[]=[]): Promise<string> {
@@ -141,12 +133,7 @@ export async function postCast(config: Config, session: Session, text: string, p
     const message=await buildCastMessage(body,session.fid,session.signer);
     hash=await submit(config,message);
   }
-  // Acceptance is not inclusion. Poll our read node and never claim success early.
-  for (let i=0;i<12;i++) {
-    await new Promise(r=>setTimeout(r,2500));
-    try { await hub(config,'castById',{fid:session.fid,hash}); return hash; } catch { /* node may still be syncing */ }
-  }
-  throw new Error(`Accepted by validator; inclusion is not confirmed yet. Check FID ${session.fid}, hash ${hash} before retrying.`);
+  return hash;
 }
 export async function deleteCast(config:Config,session:Session,cast:Cast,onSubmitted?:()=>void):Promise<void> {
   if(session.fid!==cast.data.fid)throw new Error('You can only delete your own casts.');
@@ -157,16 +144,6 @@ export async function deleteCast(config:Config,session:Session,cast:Cast,onSubmi
     await submit(config,message);
   }
   onSubmitted?.();
-  for(let i=0;i<12;i++){
-    await new Promise(resolve=>setTimeout(resolve,2500));
-    try{await hub(config,'castById',{fid:session.fid,hash:cast.hash});}
-    catch(error){
-      const message=(error as Error).message;
-      if(error instanceof HubError&&(error.notFound||error.status===410))return;
-      if(/^Node returned (404|410):/.test(message)||/^Node returned 400:.*"errCode"\s*:\s*"not_found"/s.test(message))return;
-    }
-  }
-  throw new Error('Deletion submitted, but removal is not confirmed yet. Refresh your profile before trying again.');
 }
 export async function react(config: Config, session: Session, cast: Cast, kind: 'like'|'recast', remove = false) {
   if (session.remote) return serverAction({kind:'reaction',reaction:kind,targetFid:cast.data.fid,targetHash:cast.hash,remove});

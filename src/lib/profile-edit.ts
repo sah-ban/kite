@@ -33,25 +33,13 @@ export async function saveProfile(config:Config,session:Session,original:Profile
   const changes=profileChanges(original,draft);if(!changes.length)return;
   if(!await canEditProfile(config,session,signal))throw new Error('This signer cannot edit profiles. Connect a fresh signer with profile editing permission.');
   if(changes.some(change=>change.type===10)&&!await getProStatus(config,session.fid,signal))throw new Error('Banner editing requires Farcaster Pro.');
-  const {updateProfileField}=await import('./signing');let confirmed=0;
+  const {updateProfileField}=await import('./signing');let saved=0;
   try{
     for(const change of changes){
       signal?.throwIfAborted();onProgress(`Saving ${change.label.toLowerCase()}…`);
       await updateProfileField(config,session,change.type,change.value);
-      let included=false;
-      for(let attempt=0;attempt<10;attempt++){
-        signal?.throwIfAborted();
-        if(attempt)await new Promise<void>((resolve,reject)=>{const done=()=>{signal?.removeEventListener('abort',cancel);resolve();};const timer=setTimeout(done,1500);const cancel=()=>{clearTimeout(timer);reject(signal?.reason);};signal?.addEventListener('abort',cancel,{once:true});});
-        try{
-          const page=await hub<{messages:{data:{userDataBody?:{type:number|string;value:string}}}[]}>(config,'userDataByFid',{fid:session.fid},signal);
-          const name=({1:'USER_DATA_TYPE_PFP',2:'USER_DATA_TYPE_DISPLAY',3:'USER_DATA_TYPE_BIO',5:'USER_DATA_TYPE_URL',10:'USER_DATA_TYPE_BANNER'} as Record<number,string>)[change.type];
-          included=page.messages.some(m=>{const body=m.data.userDataBody;return (body?.type===change.type||body?.type===name)&&body.value===change.value;});
-          if(included)break;
-        }catch{/* Read node may still be syncing. */}
-      }
-      if(!included)throw new Error(`${change.label} was submitted, but your read node has not confirmed it yet. Wait and check before saving again.`);
-      confirmed++;
+      saved++;
     }
-  }catch(error){throw new Error(`${confirmed?`${confirmed} of ${changes.length} changes confirmed. `:''}${(error as Error).message}`);}
+  }catch(error){throw new Error(`${saved?`${saved} of ${changes.length} changes saved. `:''}${(error as Error).message}`);}
   finally{invalidateProfile(session.fid);}
 }

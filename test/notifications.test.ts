@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readNotifications,hasMoreNotifications,mergeNotifications} from '../src/lib/notifications';
 import {clientRoute} from '../src/lib/routes';
 import type {Cast,Config} from '../src/lib/hub';
-const config:Config={readUrl:'/api/read',validatorUrl:'',optimismRpcUrl:'',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'',useGateway:true};
 const hash=(n:number)=>'0x'+n.toString(16).padStart(40,'0');
 const cast=(fid:number,timestamp:number,parent?:{fid:number;hash:string},mentions:number[]=[]):Cast=>({hash:hash(fid),signer:'0x'+'11'.repeat(32),data:{fid,timestamp,castAddBody:{text:`Cast ${fid}`,mentions,mentionsPositions:mentions.map(()=>0),embeds:[],...(parent?{parentCastId:parent}:{})}}});
 const own=cast(37,10),parent={fid:37,hash:own.hash};

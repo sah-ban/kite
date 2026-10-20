@@ -1,0 +1,7 @@
+# Kite icon — enlarged with curves
+
+Asset: `public/kite-icon-v5.png`. Edited from v4 using the built-in imagegen tool. Enlarged the symbol and added three flowing interior lines. Saved as a separate design variant; original PNG preserved without raster edits.
+
+## Edit prompt
+
+Use case: precise-object-edit. Edit the supplied Kite logo. Keep its pale lime #CEFF8D kite body, angled quadrilateral silhouette pointing upward-right, attached curved ribbon tail, and forest-green #203B32 square background. Make two changes: (1) ZOOM IN substantially: scale the entire kite and tail together about 1.6 times so the complete symbol fills roughly 80–85 percent of the square, with balanced modest margins and no clipping. The kite BODY should be large and visually dominant. (2) Add exactly three elegant gently curved parallel forest-green lines INSIDE the lime kite body. These are smooth flowing wind-like arcs, medium consistent stroke weight, rounded ends, separated by generous equal gaps, following the kite's upward-right direction. Keep the arcs contained within the body with breathing room from its outer edges. Use a simple flowing pattern, no triangular cutout, no enclosed triangular shapes, no cross-grid, no letters. The body remains one solid kite shape with only the three graceful line accents. Preserve the original outer shape proportions, colors, angle and tail character. Clean minimal app-icon design, crisp edges, strong silhouette, no new objects, text, border, mockup or shadows. Deliver a single finished square icon.

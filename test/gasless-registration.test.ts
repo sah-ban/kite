@@ -16,7 +16,7 @@ const phrase='test test test test test test test test test test test junk';
 const password='gasless fixture passphrase';
 const address=mnemonicToAccount(phrase).address;
 const fid=123;
-const config:Config={readUrl:'/api/read',validatorUrl:'/api/write',optimismRpcUrl:'https://rpc.example',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'https://rpc.example',useGateway:true};
 type Options={units?:number;nonce?:number;limit?:number;count?:number;submitFails?:boolean;saveFails?:boolean;unregistered?:boolean;networkOrigin?:boolean;delayMerge?:boolean};
 async function environment(options:Options,run:(env:{writes:GaslessSdk.Message[];reads:string[];setSigner:(value:any)=>void})=>Promise<void>){
   const original=globalThis.fetch,saved=new Map<string,string>(),writes:GaslessSdk.Message[]=[],reads:string[]=[];
@@ -77,7 +77,7 @@ test('gasless setup validates prerequisites and does not submit before explicit 
     await environment(options,async({writes})=>{await assert.rejects(prepareKey(config,phrase,password,0),expected);assert.equal(writes.length,0);assert.equal(storedAccount(),null);});
   }
   await environment({},async({writes,reads})=>{
-    await assert.rejects(prepareKey({...config,validatorUrl:''},phrase,password,0),/VALIDATOR_URL/);
+    await assert.rejects(prepareKey({...config,readUrl:''},phrase,password,0),/Configure your node/);
     await assert.rejects(prepareKey(config,phrase,'short',0),/12 characters/);
     await assert.rejects(prepareKey(config,phrase,password,-1),/index/);
     assert.equal(reads.length,0);
@@ -109,19 +109,15 @@ test('gasless unlock rejects revoked, expired, wrong-FID or insufficient-scope k
 });
 
 
-test('unconfirmed submission stays recoverable, and registration cannot run twice concurrently',async()=>{
-  await environment({delayMerge:true},async({writes,setSigner})=>{
+test('gasless registration succeeds on acceptance without post-submission reads and cannot run twice concurrently',async()=>{
+  await environment({delayMerge:true},async({writes,reads})=>{
     const prepared=await prepareKey(config,phrase,password,0);
-    const originalTimer=globalThis.setTimeout;
-    globalThis.setTimeout=((callback:any,delay?:number,...args:any[])=>originalTimer(callback,delay===1500?0:delay,...args)) as typeof setTimeout;
-    try{
-      const registering=prepared.register();
-      await assert.rejects(prepared.register(),/already in progress/);
-      await assert.rejects(registering,/inclusion is not confirmed/);
-    }finally{globalThis.setTimeout=originalTimer;}
+    const registering=prepared.register();
+    await assert.rejects(prepared.register(),/already in progress/);
+    const session=await registering;assert.equal(session.key,prepared.key);
     assert.equal(writes.length,1);assert.equal(storedAccount()?.key,prepared.key);
-    setSigner({fid,key:prepared.key,keyType:1,source:2,scopes:GASLESS_SCOPES,expiresAt:Math.floor(Date.now()/1000)+GASLESS_TTL});
-    const session=await prepared.register();assert.equal(session.key,prepared.key);assert.equal(writes.length,1,'retry after merge must not broadcast another key');
+    assert.equal(reads.at(-1),'/api/write/v1/submitMessage','No read should follow submission success.');
+    await assert.rejects(prepared.register(),/fresh registration/);assert.equal(writes.length,1);
   });
 });
 

@@ -14,7 +14,7 @@ import {sessionStore,SessionStorageError} from '../session-store.mjs';
 // Public deterministic development fixture. Never used for a live approval.
 const mnemonic='test test test test test test test test test test test junk';
 const custody='0x0000000000000000000000000000000000000001';
-const config={FARCASTER_APP_FID:'1234',FARCASTER_APP_MNEMONIC:mnemonic,VALIDATOR_URL:'https://submit.example'};
+const config={FARCASTER_APP_FID:'1234',FARCASTER_APP_MNEMONIC:mnemonic,NEXT_PUBLIC_HUBURL:'https://node.example'};
 type ResponseState={statusCode:number;headers:Record<string,string>;body:unknown;setHeader:(k:string,v:string)=>void;end:(value:unknown)=>void};
 
 async function call(middleware:ReturnType<typeof approval>,path:string,options:{cookie?:string;body?:unknown;origin?:string;host?:string;ip?:string;method?:string}={}) {
@@ -42,7 +42,7 @@ function harness(extra:Record<string,string>={}) {
       if(new URL(url).pathname==='/v1/storageLimitsByFid')return Response.json(proStatus);
       if(url.endsWith('/signed-key-requests'))return Response.json({result:{signedKeyRequest:{token:'0xdeadbeef',deeplinkUrl:'farcaster://signed-key-request?token=0xdeadbeef'}}});
       if(url.includes('/signed-key-request?'))return Response.json({result:{signedKeyRequest:{state,userFid:approvedFid}}});
-      if(url==='https://submit.example/v1/submitMessage'){
+      if(url===new URL('/v1/submitMessage',extra.NEXT_PUBLIC_HUBURL||config.NEXT_PUBLIC_HUBURL).href){
         submitted.push(Message.decode(init!.body as Uint8Array));return Response.json({accepted:true});
       }
       throw new Error('Unexpected network request: '+url);
@@ -362,7 +362,8 @@ test('approved Pro accounts publish four embeds and 10k-byte casts, replies and 
     if('quote' in body)assert.equal(data.castAddBody?.embeds.at(-1)?.castId?.fid,37);
     if(!body.text.startsWith('Escaped'))assert.equal(data.castAddBody?.embeds.length,4);
   }
-  const checks=h.calls.filter(value=>value.url.startsWith('https://read.example/'));assert.equal(checks.length,6);assert.ok(checks.every(value=>value.url==='https://read.example/v1/storageLimitsByFid?fid=123'));
+  const checks=h.calls.filter(value=>new URL(value.url).pathname==='/v1/storageLimitsByFid');assert.equal(checks.length,6);assert.ok(checks.every(value=>value.url==='https://read.example/v1/storageLimitsByFid?fid=123'));
+  const submissions=h.calls.filter(value=>new URL(value.url).pathname==='/v1/submitMessage');assert.equal(submissions.length,6);assert.ok(submissions.every(value=>value.url==='https://read.example/v1/submitMessage'));
   const before=h.submitted.length;
   for(const body of [{text:'😀'.repeat(2500)+'x'},{text:'Too many',links:[...links,...links,'https://example.com/five']},{text:'Too many quoted',quote,images,links}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body}})).status,400);
   assert.equal(h.submitted.length,before);

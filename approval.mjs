@@ -255,7 +255,6 @@ export function approval(config, dependencies = {}) {
         try{return send(res,200,await dependencies.enrollFeed(session.fid));}
         catch(error){throw new Failure(error.status===429?429:503,error.status===429?error.message:'Could not enroll your feed. Please retry.');}
       }
-      if (!config.VALIDATOR_URL) throw new Failure(503, 'Configure the server submission endpoint before publishing.');
       const action = await readBody(req);
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const message = await buildAction(session,action,async body=>{
@@ -277,7 +276,7 @@ export function approval(config, dependencies = {}) {
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();
       if(action.kind==='prepareCastReplacement')return send(res,200,{hash:bytesToHex(message.hash),message:Buffer.from(bytes).toString('base64')});
-      const response = await request(new URL('/v1/submitMessage',config.VALIDATOR_URL),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
+      const response = await request(new URL('/v1/submitMessage',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381'),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
       if (!response.ok) throw new Failure(502, `Submission endpoint rejected the message (${response.status}).`);
       return send(res,200,{hash:bytesToHex(message.hash),accepted:true});
     } catch (error) {

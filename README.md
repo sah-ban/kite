@@ -4,7 +4,7 @@
 
 Kite is an open source Farcaster client (project name and handle: `kiteapp`) with chronological Following feeds, client filters, rich profiles, notifications, and account tools. It also includes a responsive tutorial for running your own Snapchain read node. MIT licensed.
 
-The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. It signs protocol messages in the browser and submits them to a separately configured validator.
+The client is the homepage at `/`; the tutorial lives at `/guide`. Public profiles live at `/profile/FID`, and conversations at `/cast/FID/FULL_HASH`. The previous `/client` URL opens the homepage for compatibility. The client reads directly from a configured node through a small local gateway. Local account actions are signed in the browser; approved-account actions are signed by the server. Reads and signed submissions use the same configured Snapchain HTTP API.
 
 ## Try the client
 
@@ -14,7 +14,7 @@ From your repository checkout:
 ./kiteapp client
 ```
 
-Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `NEXT_PUBLIC_HUBURL` and a submission endpoint through `VALIDATOR_URL`; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
+Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `NEXT_PUBLIC_HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
 
 ## Three-command quickstart on suitable existing compute
 
@@ -30,7 +30,7 @@ First clone this repository. The node host needs Ubuntu 22.04/24.04, Python 3, c
 
 1. Provision checks hardware before installing Docker. It supports an existing Ubuntu server and stops if an installed Docker daemon is inaccessible. If it adds your user to the Docker group, reconnect before continuing. It does not provision a new paid VM.
 2. Node resolves the latest stable upstream release on first run, pins that release and image, and starts the canonical mainnet read-node configuration. Later runs retain the same release. Set `SNAPCHAIN_REF=0.x.y` explicitly to change it after reviewing upstream release notes. The full initial sync downloads a very large snapshot and can take hours.
-3. Client installs locked dependencies if missing, creates a local-node `.env` if needed, and starts a localhost-only Vite server. Set the validator URL before account actions. These three shell invocations do not eliminate prerequisite installation, configuration, browser account registration, or initial sync.
+3. Client installs locked dependencies if missing, creates a local-node `.env` if needed, and starts a localhost-only Vite server. The configured node handles both reads and signed submissions. These three shell invocations do not eliminate prerequisite installation, configuration, browser account registration, or initial sync.
 
 Check progress with `./kiteapp status`. Each shard should have advancing heights and a delay approaching zero. The script exits 2 while catching up and 1 when unavailable. A low-delay sample is not proof of sustained health; check it again later.
 
@@ -48,7 +48,6 @@ In another terminal, configure `.env` from `.env.example`:
 
 ```dotenv
 NEXT_PUBLIC_HUBURL=http://127.0.0.1:3381
-VALIDATOR_URL=https://YOUR-VALIDATOR-HTTP-ENDPOINT
 OPTIMISM_RPC_URL=https://mainnet.optimism.io
 ```
 
@@ -87,7 +86,7 @@ An existing FID must have active storage. The imported phrase must derive its cu
 2. Enter the custody seed phrase and an app-key encryption passphrase of at least 12 characters.
 3. Review the derived address, FID, Ed25519 public key, permissions, and 30-day inactivity expiry.
 4. Choose **Register app key (gasless)**. The browser submits a custody-authorized `KEY_ADD` message to the configured write node. Signer registration requires no ETH or Optimism transaction.
-5. Wait for the key to appear in the read node's unified signer list, then publish.
+5. Registration completes when Snapchain accepts the message; no post-submission signer polling is performed.
 
 The account must already exist and have active storage; gasless signer registration does not create an FID or buy storage. This key can publish/delete casts, add/remove likes and recasts, and follow/unfollow accounts. It cannot create other keys or change custody. Its 30-day sliding expiry refreshes when it signs merged messages. The node must support gasless signers and report its current user nonce and capacity through `signersByFid`.
 
@@ -95,7 +94,7 @@ The phrase and custody key stay in browser memory. Public custody lookup calls g
 
 If a write reports **Origin mismatch**, check that `FREECAST_PUBLIC_URL` matches the exact browser origin (scheme, host, and port), then restart the server. For local-only development you can leave it unset. Verified same-origin loopback writes also work when a hosted public URL remains configured.
 
-The encrypted key is saved **before** submission. If confirmation is interrupted, select **Unlock saved app key** after the read node catches up; unlocking checks that the gasless key is still active, unexpired, and has the required scopes. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes authorization. Gasless revocation uses a `KEY_REMOVE` message, not the Optimism Key Registry; see the [official signer documentation](https://snapchain.farcaster.xyz/guides/writing-messages).
+The encrypted key is saved **before** submission. If the request is interrupted, select **Unlock saved app key** after the node catches up; unlocking checks that the gasless key is still active, unexpired, and has the required scopes. **Lock** ends the active session; **Forget** deletes the local encrypted copy. Neither operation revokes authorization. Gasless revocation uses a `KEY_REMOVE` message, not the Optimism Key Registry; see the [official signer documentation](https://snapchain.farcaster.xyz/guides/writing-messages).
 
 No analytics are added. The optional QR approval flow uses Farcaster's signed-key-request API. Images and videos load from their original hosts; YouTube and Vimeo players load only after Play. Google Fonts are loaded for the visual design. Self-host fonts for a fully disconnected asset path.
 
@@ -104,9 +103,8 @@ No analytics are added. The optional QR approval flow uses Farcaster's signed-ke
 - Profile feeds are chronological, paginated, and keyed by numeric FID. Following feeds load up to 15 current casts per author in batches of 12; this is intentionally a bounded feed rather than an exhaustive network index.
 - A short hash like `0x50184b62` is resolved by paging FID 37's casts and then calling `castById` with `0x50184b62b4c52fd76628713562e1eda3dccaf63d`.
 - Casts, replies, likes, recasts, follows, and unfollows are signed with the Ed25519 app key. `dataBytes` is explicitly encoded for Snapchain compatibility.
-- Cast publishing polls the read node for inclusion after validator acceptance. If the poll expires, the error gives the hash; look it up before retrying. Follow and reaction actions report acceptance only.
-- `VALIDATOR_URL` must point at an actual validator's HTTP API that permits unauthenticated submission. No working default validator is asserted. A docs website, a gRPC URL, or an arbitrary read hub is not an interchangeable substitute.
-- Current read nodes can validate and relay writes over gossip. This client sends writes directly to the separately configured validator to follow the contest brief.
+- Casts, deletions, profile updates, gasless signer registration, follows, and reactions finish when Snapchain accepts their signed message. No post-submission inclusion queries or delays block success. Cast success includes the hash and a view link; rejected submissions retain the draft.
+- `NEXT_PUBLIC_HUBURL` is the single Snapchain HTTP endpoint for reads and `/v1/submitMessage`. The gateway keeps read requests and signed submissions on separate same-origin routes to enforce method, endpoint, payload-size, and origin checks; both routes target the same configured node.
 
 ## Filtering by client
 
@@ -132,7 +130,7 @@ npm start
 This is an implementation to test, not a claim of contest qualification. Complete these external steps:
 
 1. Run a full read node on suitable compute and record sync evidence.
-2. Configure and test a real validator submission endpoint.
+2. Verify that the configured node supports signed message submissions.
 3. Use an actual funded custody account with storage to register the app key, post, reply, follow/unfollow, and react.
 4. Have an independent human follow the tutorial from a clean machine. Use `docs/human-test.md` and fix problems they report.
 5. Publish the MIT-licensed repository on GitHub and the tutorial with public access.
@@ -142,7 +140,7 @@ This is an implementation to test, not a claim of contest qualification. Complet
 
 - [Snapchain source and hardware requirements](https://github.com/farcasterxyz/snapchain)
 - [Official getting started guide](https://snapchain.farcaster.xyz/getting-started)
-- [Read nodes vs. validators](https://snapchain.farcaster.xyz/node-types)
+- [Snapchain node types](https://snapchain.farcaster.xyz/node-types)
 - [HTTP API](https://snapchain.farcaster.xyz/reference/httpapi/httpapi)
 - [Farcaster core SDK](https://github.com/farcasterxyz/hub-monorepo/tree/main/packages/core)
 - [Farcaster contracts](https://github.com/farcasterxyz/contracts)
@@ -202,7 +200,7 @@ HTTP and HTTPS links typed or pasted into the cast, reply, quote, or edit compos
 
 Open **My profile → Edit profile** to update your display name, bio, profile picture, banner, or website. Pictures and banners accept image URLs or uploads through the configured ImgBB integration. Fname changes have a separate localhost-only flow described below.
 
-Updates use signed `USER_DATA_ADD` messages for the connected FID, and the client waits for each field to appear on the read node before reporting success. Multi-field edits are separate messages; an interrupted save can partially succeed and the editor reports how many fields were confirmed. Profile caches refresh after edits. Display names allow 32 UTF-8 bytes; the other editable values allow 256.
+Updates use signed `USER_DATA_ADD` messages for the connected FID, and the client reports success for each field when Snapchain accepts it. Multi-field edits are separate messages; an interrupted save can partially succeed and the editor reports how many fields were saved. Profile caches refresh after edits. Display names allow 32 UTF-8 bytes; the other editable values allow 256.
 
 Existing gasless keys without `MESSAGE_TYPE_USER_DATA_ADD` (scope 11) retain their current posting access but cannot edit profiles. New gasless registrations include scope 11 and show profile editing in the permission review. Approved onchain signers support profile edits.
 
@@ -214,7 +212,7 @@ Open Kite at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then cho
 
 Availability, known reserved names, and the registry's [28-day cooldown](https://github.com/farcasterxyz/fname-registry/blob/main/src/transfers.ts) are checked before review and again before submission. The new name's complete transfer history is checked too: a released name can still be cooling down. Review the current and new fnames and custody address, then explicitly confirm the release. Releasing the old name and claiming the new one are separate registry writes; the new name is not reserved by an availability check, and the old name may not be reclaimable for 28 days. Both custody proofs are prepared before releasing anything, with the claim timestamp later than the release.
 
-After claiming, Kite waits for the fname proof on the read node, submits the preferred username (`USER_DATA_ADD`, type 6), and waits for inclusion. A failed release never proceeds to claiming. A failed or ambiguous submission can be retried on the open page: registry ownership is checked first, so confirmed releases or claims are not repeated. If a name is already claimed by this FID, the flow can finish only the preferred-name update. Closing the form discards its in-memory custody key and does not reverse completed transfers; after reopening, enter the same claimed fname to finish a pending profile update. Tests use public fixture keys and mocked transfers only.
+After claiming, Kite waits for the fname proof on the read node, submits the preferred username (`USER_DATA_ADD`, type 6), and finishes when Snapchain accepts it. A failed release never proceeds to claiming. A failed or ambiguous submission can be retried on the open page: registry ownership is checked first, so confirmed releases or claims are not repeated. If a name is already claimed by this FID, the flow can finish only the preferred-name update. Closing the form discards its in-memory custody key and does not reverse completed transfers; after reopening, enter the same claimed fname to finish a pending profile update. Tests use public fixture keys and mocked transfers only.
 
 The preferred-fname action is restricted to loopback hosts and loopback peers on the server, and independently verifies that the node's proof belongs to the approved FID. Existing hosted approval configuration can remain in `.env` while connecting locally; local and hosted sessions remain bound to their own origins.
 
@@ -236,7 +234,7 @@ The conversation's Likes and Recasts lists show **via @clientusername** for each
 
 Profiles show **Connected clients** from the node's unified `signersByFid` endpoint, covering both onchain and gasless keys. Keys are grouped by their requester FID so one client appears once, and expired keys are excluded. Client names and avatars link to their Kite profiles. Active keys with missing requester attribution appear together as **Unknown client**. The list reads all signer pages before displaying results; failures show a retry action. Refreshing the profile reloads connections. This identifies signer requesters, which may differ from app brands, and does not revoke or modify any key.
 
-**Delete previous and cast again** prepares and validates the signed replacement first, confirms deletion of the previous cast, then publishes and confirms the new cast. Pro requirements are checked before deletion. This is a new cast with a new hash: engagement does not transfer. If deletion fails, no replacement is submitted. If publication fails, the draft and signed replacement remain available on this open page; **Close and keep draft → Resume cast edit** reopens it. Retries reuse the same signed message and check for inclusion before resubmitting to avoid duplicate replacements. Refreshing or closing the browser page discards this in-memory recovery state. Tests use mocked writes and never delete or publish real casts.
+**Delete previous and cast again** prepares and validates the signed replacement first, submits deletion of the previous cast, then publishes the new cast as soon as the deletion is accepted. Pro requirements are checked before deletion. This is a new cast with a new hash: engagement does not transfer. If deletion fails, no replacement is submitted. If publication fails, the draft and signed replacement remain available on this open page; **Close and keep draft → Resume cast edit** reopens it. Retries reuse the same signed replacement to preserve its hash and skip an already accepted deletion. Accepted replacements are remembered in memory, so repeated completion does not resubmit. No inclusion queries follow either successful submission. Refreshing or closing the browser page discards this in-memory recovery state. Tests use mocked writes and never delete or publish real casts.
 
 ## Indexed Following feed
 

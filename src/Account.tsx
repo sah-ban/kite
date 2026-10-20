@@ -64,14 +64,14 @@ export function Account({ config, onSession, onClose }: {
           <dt>Key expiry</dt><dd>{pending.ttlSeconds / 86400} days of inactivity</dd>
           <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow, unfollow and edit your profile</dd>
         </dl>
-        <p className="small muted">The encrypted app key is saved before submission so you can unlock it if confirmation is interrupted. Active use refreshes its expiry.</p>
+        <p className="small muted">The encrypted app key is saved before submission so you can unlock it if the request is interrupted. Active use refreshes its expiry.</p>
         <button className="button primary full" disabled={busy} onClick={() => run(async () => {
           const session = await pending.register();
           setPassword('');
           onSession(session);
           onClose();
         })}>
-          {busy ? 'Confirming registration…' : 'Register app key (gasless)'} <ArrowRight size={16} />
+          {busy ? 'Registering app key…' : 'Register app key (gasless)'} <ArrowRight size={16} />
         </button>
       </> : <><label>Connection method
         <select disabled={busy} value={mode} onChange={e => changeMode(e.target.value as Mode)}>

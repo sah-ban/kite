@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readLikedCasts } from '../src/lib/profile-likes';
 import type { Config } from '../src/lib/hub';
-const config:Config={readUrl:'/api/read',validatorUrl:'',optimismRpcUrl:'',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'',useGateway:true};
 const hash=(fid:number)=>'0x'+fid.toString(16).padStart(40,'0');
 const cast=(fid:number)=>({hash:hash(fid),signer:'0xabc',data:{fid,timestamp:fid,castAddBody:{text:`Cast ${fid}`,mentions:[],mentionsPositions:[],embeds:[]}}});
 const reaction=(target:number,type:string|number=3,kind:string|number=1,owner=37)=>({data:{fid:owner,type,timestamp:100-target,reactionBody:{type:kind,targetCastId:{fid:target,hash:hash(target)}}}});

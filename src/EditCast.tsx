@@ -37,7 +37,7 @@ export function EditCast({config,session,cast,open,onClose,onPublished,onDeleted
       <div className="previous-cast-counts" aria-label="Previous cast engagement">{([['likes',Heart],['recasts',Repeat2],['replies',MessageCircle]] as const).map(([kind,Icon])=><span key={kind}><Icon size={14}/><strong>{activity?countLabel(activity[kind]):'…'}</strong> {kind}</span>)}</div>
       {activity&&Object.keys(activity.errors).length>0&&<p className="small muted">Some previous cast counts are unavailable.</p>}
     </section>
-    <p className="edit-cast-warning">{originalDeleted?'The previous cast has been deleted. Your replacement draft is kept here until publication is confirmed.':'This deletes the previous cast and publishes a new cast. Likes, recasts and replies do not transfer to the replacement.'}</p>
+    <p className="edit-cast-warning">{originalDeleted?'The previous cast has been deleted. Your replacement draft is kept here until Snapchain accepts it.':'This deletes the previous cast and publishes a new cast. Likes, recasts and replies do not transfer to the replacement.'}</p>
     {draft?<form onSubmit={async event=>{
       event.preventDefault();if(busy||uploading||!activity||validation)return;setBusy(true);setError('');
       try{

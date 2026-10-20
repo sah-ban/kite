@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {encodeAbiParameters} from 'viem';
 import {attribute,metadataAbi,signerRequester} from '../src/lib/attribution';
 import type {Cast,Config} from '../src/lib/hub';
-const config:Config={readUrl:'https://read.example',validatorUrl:'',optimismRpcUrl:'',useGateway:true};
+const config:Config={readUrl:'https://read.example',optimismRpcUrl:'',useGateway:true};
 const key=(n:number)=>'0x'+n.toString(16).padStart(64,'0');
 const metadata=(fid:number)=>encodeAbiParameters(metadataAbi,[{requestFid:BigInt(fid),requestSigner:'0x'+'11'.repeat(20) as `0x${string}`,signature:'0x1234',deadline:2000000000n}]);
 

@@ -7,7 +7,7 @@ import type { Config } from '../src/lib/hub';
 const key=(n:number)=>'0x'+n.toString(16).padStart(64,'0');
 const metadata=(fid:number)=>encodeAbiParameters(metadataAbi,[{requestFid:BigInt(fid),requestSigner:'0x'+'11'.repeat(20) as `0x${string}`,signature:'0x1234',deadline:2000000000n}]);
 const signer=(n:number,requestFid:unknown=900)=>({fid:37,key:key(n),keyType:1,source:2,requestFid});
-const config:Config={readUrl:'/api/read',validatorUrl:'',optimismRpcUrl:'',useGateway:true};
+const config:Config={readUrl:'/api/read',optimismRpcUrl:'',useGateway:true};
 
 test('connected clients group distinct active keys by requester across onchain and gasless sources',()=>{
   const encoded=metadata(900),base64=Buffer.from(encoded.slice(2),'hex').toString('base64');

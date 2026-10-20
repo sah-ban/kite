@@ -74,7 +74,7 @@ async function sendTransfer(payload:{name:string;from:number;to:number;fid:numbe
 }
 export async function prepareFnameChange(config:Config,session:Session,value:string,phrase:string,index:number,signal?:AbortSignal,dependencies:Dependencies={}):Promise<PreparedFnameChange> {
   requireLocal();if(!Number.isSafeInteger(index)||index<0||index>100)throw new Error('Address derivation index must be between 0 and 100.');
-  if(!config.validatorUrl)throw new Error('Publishing must be configured to update your preferred username.');
+  if(!config.readUrl)throw new Error('Configure your node to update your preferred username.');
   const check=await inspectFnameChange(session.fid,value,signal),problem=fnameCheckError(check);if(problem)throw new Error(problem);
   if(!await canEditProfile(config,session,signal))throw new Error('Connect a signer with profile editing permission before changing your fname.');
   let account:ReturnType<typeof mnemonicToAccount>|undefined;
@@ -113,14 +113,9 @@ export async function prepareFnameChange(config:Config,session:Session,value:str
         if(proofReady)break;if(i<11)await wait(runSignal);
       }
       if(!proofReady)throw new Error('The new fname is claimed, but your read node has not confirmed its proof yet. Retry to finish your profile update.');
-      progress('Updating preferred username…');const profileSignal=bounded(runSignal);
-      for(let i=0;i<12;i++){
-        runSignal?.throwIfAborted();if(profileSignal.aborted)break;const data=await hub<{messages:{data:{userDataBody?:{type:number|string;value:string}}}[]}>(config,'userDataByFid',{fid:session.fid},profileSignal);
-        if(data.messages.some(message=>{const field=message.data.userDataBody;return (field?.type===6||field?.type==='USER_DATA_TYPE_USERNAME')&&field.value===check.name;})){stage='complete';account=undefined;return check.name;}
-        if(!preferredSubmitted){const {setPreferredFname}=await import('./signing');await (dependencies.selectPreferred?dependencies.selectPreferred(check.name):setPreferredFname(config,session,check.name));preferredSubmitted=true;}
-        if(i<11)await wait(runSignal);
-      }
-      throw new Error('Preferred username submitted, but your read node has not confirmed it yet. Retry to check it.');
+      runSignal?.throwIfAborted();progress('Updating preferred username…');
+      if(!preferredSubmitted){const {setPreferredFname}=await import('./signing');await (dependencies.selectPreferred?dependencies.selectPreferred(check.name):setPreferredFname(config,session,check.name));preferredSubmitted=true;}
+      stage='complete';account=undefined;return check.name;
     }catch(error){
       const context=stage==='claimed'?'Your new fname is claimed. ':stage==='released'||stage==='claim-submitted'?(check.currentName?'Your previous fname was released. ':'The claim may be unconfirmed. '):stage==='release-submitted'?'Release was submitted; its state may be unconfirmed. ':'';
       throw new Error(context+(error as Error).message);

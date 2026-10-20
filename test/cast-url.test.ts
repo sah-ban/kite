@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseCastUrl, resolveCastUrl } from '../src/lib/cast-url';
 import type { Config } from '../src/lib/hub';
 
-const config: Config = { readUrl: '/api/read', validatorUrl: '', optimismRpcUrl: '', useGateway: true };
+const config: Config = { readUrl: '/api/read', optimismRpcUrl: '', useGateway: true };
 const full = '0x50184b62b4c52fd76628713562e1eda3dccaf63d';
 
 test('parses Farcaster and legacy Warpcast cast links, queries and trailing slashes', () => {

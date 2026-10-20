@@ -1,7 +1,7 @@
 import { xHandle } from './x-handle';
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; parentUrl?:string; embedsDeprecated?:string[]; type?:number|string; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
 export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string;twitterUsername?:string };
-export type Config = { readUrl: string; validatorUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean; indexedFeedEnabled?:boolean; indexedFeedFids?:number[]; defaultFeedFid?:number };
+export type Config = { readUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean; indexedFeedEnabled?:boolean; indexedFeedFids?:number[]; defaultFeedFid?:number };
 export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
 export class HubError extends Error {
@@ -26,12 +26,11 @@ export const localOrigin = () => ['localhost', '127.0.0.1', '[::1]'].includes(wi
 export async function getConfig(): Promise<Config> {
   const response = await fetch('/api/config');
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-    throw new Error('Start the Kite server and configure your read node in its local .env.');
+    throw new Error('Start the Kite server and configure your node in its local .env.');
   }
   const config: Config = await response.json();
-  for (const label of ['readUrl', 'validatorUrl', 'optimismRpcUrl'] as const) {
+  for (const label of ['readUrl', 'optimismRpcUrl'] as const) {
     const value = config[label];
-    if (!value && label === 'validatorUrl') continue;
     try {
       if (typeof value !== 'string' || !value) throw new Error();
       const url = new URL(value, window.location.origin);

@@ -11,7 +11,7 @@ const privateKey = `0x${'07'.repeat(32)}`;
 const fid = 123;
 const custody = '0x0000000000000000000000000000000000000001';
 const password = 'test fixture passphrase';
-const config: Config = {readUrl:'https://read.example',validatorUrl:'',optimismRpcUrl:'https://rpc.example',useGateway:true};
+const config: Config = {readUrl:'https://read.example',optimismRpcUrl:'https://rpc.example',useGateway:true};
 
 async function withEnvironment(options: { state?: number; units?: number; networkOrigin?: boolean }, run: (requests: string[]) => Promise<void>) {
   const originalFetch = globalThis.fetch;

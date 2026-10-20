@@ -7,7 +7,7 @@ import { loadGaslessSdk } from '../src/lib/gasless-sdk';
 import { composerUsage } from '../src/lib/cast-limits';
 import type { Cast,Config } from '../src/lib/hub';
 
-const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7)),config:Config={readUrl:'/api/read',validatorUrl:'/api/write',optimismRpcUrl:'https://rpc.example',useGateway:true};
+const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7)),config:Config={readUrl:'/api/read',optimismRpcUrl:'https://rpc.example',useGateway:true};
 const session={fid:123,address:'0x0000000000000000000000000000000000000001' as const,key:bytesToHex((await signer.getSignerKey())._unsafeUnwrap()),signer};
 const target={hash:'0x'+'ab'.repeat(20),signer:session.key,data:{fid:37,timestamp:1,castAddBody:{text:'Original',mentions:[],mentionsPositions:[],embeds:[]}}} satisfies Cast;
 Object.defineProperty(globalThis,'window',{value:{location:{hostname:'localhost'}},configurable:true});
@@ -17,7 +17,6 @@ test('local signing publishes valid 10k casts, four-embed replies and three-embe
   globalThis.fetch=async(input,init)=>{
     if(String(input).includes('storageLimitsByFid'))return Response.json({tier_subscriptions:[{tier_type:'Pro',expires_at:Date.now()/1000+86400}]});
     if(String(input).includes('submitMessage')){messages.push(sdk.Message.decode(init!.body as Uint8Array));return Response.json({});}
-    if(String(input).includes('castById'))return Response.json(target);
     throw new Error('Unexpected request');
   };
   try{
@@ -29,6 +28,27 @@ test('local signing publishes valid 10k casts, four-embed replies and three-embe
     assert.equal(sdk.MessageData.decode(messages[0].dataBytes!).castAddBody?.type,sdk.CastType.TEN_K_CAST);
     assert.equal(sdk.MessageData.decode(messages[1].dataBytes!).castAddBody?.parentCastId?.fid,37);
     assert.equal(sdk.MessageData.decode(messages[2].dataBytes!).castAddBody?.embeds.at(-1)?.castId?.fid,37);
+  }finally{globalThis.fetch=original;}
+});
+test('casts, replies and quotes finish on submission success without confirmation reads for local and approved accounts',async()=>{
+  const original=globalThis.fetch;
+  try{
+    for(const remote of [false,true])for(const kind of ['cast','reply','quote']){
+      const castSession=remote?{...session,remote:true as const}:session,calls:string[]=[];
+      let release!:(response:Response)=>void,started!:()=>void,expected='0x'+'cd'.repeat(20),settled=false;
+      const response=new Promise<Response>(resolve=>{release=resolve;}),sending=new Promise<void>(resolve=>{started=resolve;});
+      globalThis.fetch=async(input,init)=>{
+        calls.push(String(input));assert.equal(init?.method,'POST','No confirmation GET should be sent.');
+        assert.equal(String(input),remote?'/api/auth/action':'/api/write/v1/submitMessage');
+        if(!remote){const sdk=await loadGaslessSdk();expected=bytesToHex(sdk.Message.decode(init!.body as Uint8Array).hash);}
+        started();return response;
+      };
+      const posting=postCast(config,castSession,'Fixture',kind==='reply'?target:undefined,kind==='quote'?target:undefined).then(hash=>{settled=true;return hash;});
+      await sending;assert.equal(settled,false,'Publishing must wait for the submission response.');
+      release(Response.json({hash:expected}));assert.equal(await posting,expected);assert.equal(calls.length,1);
+      globalThis.fetch=async()=>Response.json({error:'Fixture rejected'},{status:400});
+      await assert.rejects(postCast(config,castSession,'Rejected'),remote?/Fixture rejected/:/Node returned 400/);
+    }
   }finally{globalThis.fetch=original;}
 });
 test('posting checks current Pro status and never submits over-limit or expired drafts',async()=>{
