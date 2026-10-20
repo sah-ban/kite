@@ -4,15 +4,8 @@ import { profileCounts } from './profile-counts.mjs';
 // One same-origin gateway for local development and the production Node server.
 // URLs come from operator configuration, never from request input.
 const readPaths = new Set(['info', 'castsByFid', 'castById', 'castsByParent', 'castsByMention', 'userDataByFid', 'linksByFid', 'linkById', 'linksByTargetFid', 'reactionsByFid', 'reactionsByCast', 'storageLimitsByFid', 'onChainSignersByFid', 'signersByFid', 'onChainIdRegistryEventByAddress', 'userNameProofByName']);
-export function writeOrigin(req, config) {
-  const direct = new URL(`${req.socket?.encrypted?'https':'http'}://${req.headers.host}`);
-  const localHost = ['localhost','127.0.0.1','[::1]'].includes(direct.hostname);
-  const localPeer = ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress);
-  const configured = config.FREECAST_PUBLIC_URL ? new URL(config.FREECAST_PUBLIC_URL) : direct;
-  // A hosted origin may remain in .env when the app is also opened locally.
-  // Trust loopback only when both the request host and TCP peer are loopback.
-  return localHost && localPeer && configured.host!==direct.host ? direct : configured;
-}
+import {writeOrigin} from './origin.mjs';
+export {writeOrigin} from './origin.mjs';
 export function gateway(config) {
   const joinedMiddleware=joinedDates();
   const countsMiddleware=profileCounts();
@@ -24,7 +17,7 @@ export function gateway(config) {
     if(url.pathname==='/api/profile/counts')return countsMiddleware(req,res,next);
     if (url.pathname === '/api/config') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ indexedFeedFids:config.DATABASE_URL?feedFids(config):[],defaultFeedFid:config.DATABASE_URL?feedFids(config)[0]:undefined,readUrl: '/api/read', validatorUrl: validatorUrl ? '/api/write' : '', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io', approvalConfigured: Boolean(config.FARCASTER_APP_ENV_FILE || (config.FARCASTER_APP_FID && config.FARCASTER_APP_MNEMONIC)) })); return;
+      res.end(JSON.stringify({ indexedFeedEnabled:Boolean(config.DATABASE_URL),indexedFeedFids:config.DATABASE_URL?feedFids(config):[],defaultFeedFid:config.DATABASE_URL?feedFids(config)[0]:undefined,readUrl: '/api/read', validatorUrl: validatorUrl ? '/api/write' : '', optimismRpcUrl: config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io', approvalConfigured: Boolean(config.FARCASTER_APP_ENV_FILE || (config.FARCASTER_APP_FID && config.FARCASTER_APP_MNEMONIC)) })); return;
     }
     const read = url.pathname.startsWith('/api/read/v1/');
     const write = url.pathname === '/api/write/v1/submitMessage';

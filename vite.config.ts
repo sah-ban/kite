@@ -22,10 +22,11 @@ export default defineConfig(({mode})=>{
   const savedSigners=normalizePath(resolve(config.FREECAST_SESSION_DIR||'.freecast/sessions'));
   return {
     plugins:[react(),{name:'freecast-gateway',configureServer(server){
-      server.middlewares.use(indexedFeed(config));
+      const feedMiddleware=indexedFeed(config);
+      server.middlewares.use(feedMiddleware);
       server.middlewares.use(gifSearch());
       server.middlewares.use(imageUploads(config));
-      server.middlewares.use(approval(config));
+      server.middlewares.use(approval(config,{enrollFeed:feedMiddleware.enroll}));
       server.middlewares.use(embedPreviews());
       server.middlewares.use(gateway(config));
     }}],

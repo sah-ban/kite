@@ -1,18 +1,19 @@
 import {Client,credentials} from '@grpc/grpc-js';
-import {createPool,migrate,replaceFollows,saveCast,deleteCast,validFid} from './store.mjs';
+import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid} from './store.mjs';
 import {castOf,dataOf,hex,requesterOf,subscriptionRequest,decodeEvent} from './protocol.mjs';
 import {feedFids} from './api.mjs';
 import {pathToFileURL} from 'node:url';
 
 export async function startWorker(config,{pool=createPool(config.DATABASE_URL),fetcher=fetch,log=console.log}={}) {
-  const viewers=feedFids(config),days=Number(config.FREECAST_FEED_HISTORY_DAYS||30);
-  if(!config.DATABASE_URL||!viewers.length||!config.FREECAST_FEED_GRPC_URL)throw new Error('Configure DATABASE_URL, FREECAST_FEED_FIDS and FREECAST_FEED_GRPC_URL');
+  let viewers=new Set(feedFids(config));
+  const days=Number(config.FREECAST_FEED_HISTORY_DAYS||30);
+  if(!config.DATABASE_URL||!config.FREECAST_FEED_GRPC_URL)throw new Error('Configure DATABASE_URL and FREECAST_FEED_GRPC_URL');
   if(!Number.isInteger(days)||days<1||days>365)throw new Error('Invalid feed history days');
   const grpcUrl=new URL(config.FREECAST_FEED_GRPC_URL);
   if(!['http:','https:'].includes(grpcUrl.protocol)||grpcUrl.username||grpcUrl.password)throw new Error('Invalid feed gRPC URL');
   const httpUrl=config.FREECAST_FEED_HTTP_URL||config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381';
   const cutoff=()=>Math.floor(Date.now()/1000)-1609459200-days*86400;
-  const stopController=new AbortController();let stopped=false,tracked=new Set(),graphDirty=true,lastGraph=0,lastCleanup=0,lastRecovery=0;
+  const stopController=new AbortController();let stopped=false,tracked=new Set(),dirtyViewers=new Map(),lastGraph=0,lastCleanup=0,lastRecovery=0;
   const connected=new Set(),clients=new Set(),streams=new Set();
   async function read(endpoint,params={}) {
     const url=new URL('/v1/'+endpoint,httpUrl);url.search=new URLSearchParams(Object.entries(params).map(([key,value])=>[key,String(value)])).toString();
@@ -25,18 +26,29 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   const lock=await pool.connect();
   if(!(await lock.query('SELECT pg_try_advisory_lock(hashtext(current_schema()),268438) AS locked')).rows[0].locked){lock.release();throw new Error('A feed worker is already running');}
   lock.on('error',()=>{stopped=true;stopController.abort();for(const stream of streams)stream.cancel();log('Feed database connection lost; stopping');process.exit(1);});
+  for(const viewer of viewers)await enrollViewer(pool,viewer);
   async function syncGraph(){
-    for(const viewer of viewers){
-      const authors=[];let token='';const seen=new Set();
-      do{const page=await read('linksByFid',{fid:viewer,link_type:'follow',pageSize:100,...(token?{pageToken:token}:{})});
-        if(!Array.isArray(page.messages))throw new Error('Invalid follow page');
-        for(const message of page.messages){if((message.data?.type===5||message.data?.type==='MESSAGE_TYPE_LINK_ADD')&&validFid(message.data.linkBody?.targetFid))authors.push(Number(message.data.linkBody.targetFid));}
-        token=page.nextPageToken||'';if(token&&seen.has(token))throw new Error('Repeated follow cursor');seen.add(token);
-      }while(token);
-      await replaceFollows(pool,viewer,authors);
-    }
-    tracked=new Set((await pool.query('SELECT DISTINCT author_fid FROM freecast_feed_follows')).rows.map(row=>Number(row.author_fid)));
-    graphDirty=false;lastGraph=Date.now();log(`Feed following lists synced: ${tracked.size} authors`);
+    viewers=new Set((await pool.query('SELECT fid FROM freecast_feed_users')).rows.map(row=>Number(row.fid)));
+    const pending=(await pool.query(`SELECT fid FROM freecast_feed_users WHERE (follows_retry_after IS NULL OR follows_retry_after<now())
+      AND (follows_synced_at IS NULL OR follows_synced_at<now()-interval '5 minutes' OR fid=ANY($1::bigint[]))
+      ORDER BY follows_synced_at NULLS FIRST,enrolled_at,fid LIMIT 2`,[[...dirtyViewers.keys()]])).rows;
+    let changed=false;
+    await Promise.all(pending.map(async row=>{
+      const viewer=Number(row.fid),revision=dirtyViewers.get(Number(row.fid));
+      try{
+        const authors=[];let token='';const seen=new Set();
+        do{const page=await read('linksByFid',{fid:viewer,link_type:'follow',pageSize:100,...(token?{pageToken:token}:{})});
+          if(!Array.isArray(page.messages))throw new Error('Invalid follow page');
+          for(const message of page.messages){if((message.data?.type===5||message.data?.type==='MESSAGE_TYPE_LINK_ADD')&&validFid(message.data.linkBody?.targetFid))authors.push(Number(message.data.linkBody.targetFid));}
+          if(authors.length>20000)throw new Error('Follow list exceeds import capacity');
+          token=page.nextPageToken||'';if(token&&seen.has(token))throw new Error('Repeated follow cursor');seen.add(token);
+        }while(token);
+        await replaceFollows(pool,viewer,authors);changed=true;
+      }catch{if(!stopped)await pool.query("UPDATE freecast_feed_users SET follows_failed=true,follows_retry_after=now()+interval '30 seconds' WHERE fid=$1",[viewer]);}
+      finally{if(dirtyViewers.get(viewer)===revision)dirtyViewers.delete(viewer);}
+    }));
+    if(changed){tracked=new Set((await pool.query('SELECT DISTINCT author_fid FROM freecast_feed_follows')).rows.map(row=>Number(row.author_fid)));log(`Feed following lists synced: ${viewers.size} viewers, ${tracked.size} authors`);}
+    lastGraph=Date.now();
   }
   // Load saved tracking before any replay; refresh follow lists before backfill begins.
   tracked=new Set((await pool.query('SELECT DISTINCT author_fid FROM freecast_feed_follows')).rows.map(row=>Number(row.author_fid)));
@@ -64,7 +76,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
       const merge=event.mergeMessageBody,pruned=event.pruneMessageBody?.message||event.revokeMessageBody?.message;
       const apply=async(message,removed=false)=>{
         const data=dataOf(message);if(!data)return;
-        if(viewers.includes(Number(data.fid))&&[5,6,14].includes(data.type))graphDirty=true;
+        if(viewers.has(Number(data.fid))&&[5,6,14].includes(data.type))dirtyViewers.set(Number(data.fid),(dirtyViewers.get(Number(data.fid))||0)+1);
         if(!tracked.has(Number(data.fid)))return;
         if(removed&&data.castAddBody)await deleteCast(db,hex(message.hash),data.fid);
         else if(data.castRemoveBody)await deleteCast(db,hex(data.castRemoveBody.targetHash),data.fid);
@@ -135,14 +147,14 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   const heartbeat=setInterval(()=>{void pool.query('INSERT INTO freecast_feed_health(id,heartbeat,connected_shards) VALUES(1,now(),$1) ON CONFLICT(id) DO UPDATE SET heartbeat=now(),connected_shards=EXCLUDED.connected_shards',[[...connected]]).catch(()=>{});},10000);
   const jobs=(async()=>{while(!stopped){
     try{
-      if(graphDirty||Date.now()-lastGraph>300000)await syncGraph();
+      if(Date.now()-lastGraph>2000)await syncGraph();
       const authors=(await pool.query(`SELECT a.* FROM freecast_feed_authors a WHERE EXISTS(SELECT 1 FROM freecast_feed_follows f WHERE f.author_fid=a.fid) AND (retry_after IS NULL OR retry_after<now()) ORDER BY backfill_done,failed,backfilled_at NULLS FIRST,fid LIMIT 4`)).rows;
       await Promise.all(authors.map(backfill));
       if(Date.now()-lastCleanup>3600000){await pool.query('DELETE FROM freecast_feed_casts WHERE (NOT deleted AND timestamp<$1) OR (deleted AND updated_at<now()-interval \'45 days\')',[cutoff()]);lastCleanup=Date.now();}
       await pause(authors.length?100:1000);
     }catch{if(!stopped)log('Feed sync retrying');await pause(5000);}
   }})();
-  log(`Feed worker started for ${viewers.length} viewer(s), ${shards.length} shards`);
+  log(`Feed worker started for ${viewers.size} viewer(s), ${shards.length} shards`);
   return async()=>{stopped=true;stopController.abort();clearInterval(heartbeat);for(const stream of streams)stream.cancel();for(const client of clients)client.close();await Promise.allSettled([jobs,...subscriptions]);await lock.query('SELECT pg_advisory_unlock(hashtext(current_schema()),268438)');lock.release();await pool.end();};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){

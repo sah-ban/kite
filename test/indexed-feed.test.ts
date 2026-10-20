@@ -28,7 +28,7 @@ test('streamed casts normalize dataBytes, mentions, images, quotes and channel p
   assert.equal(result.hash,hash(1));assert.equal(result.signer,key(10));assert.equal(result.data.castAddBody.embeds[1].castId.hash,hash(2));assert.deepEqual(result.data.castAddBody.mentions,[37]);assert.equal(result.data.castAddBody.parentUrl,'https://example.com/channel');
 });
 test('feed API rejects unsupported FIDs/methods and hides database details',async()=>{
-  const middleware=indexedFeed({DATABASE_URL:'configured',FREECAST_FEED_FIDS:'268438'},{pool:{query:async()=>{throw new Error('private database URL');}}});
+  const middleware=indexedFeed({DATABASE_URL:'configured',FREECAST_FEED_FIDS:'268438'},{pool:{query:async(sql:string)=>{if(sql==='SELECT fid FROM freecast_feed_users WHERE fid=$1')return {rows:[]};throw new Error('private database URL');}}});
   async function call(path:string,method='GET'){let status=200;let body:any;await middleware({url:path,method},{setHeader(){},set statusCode(value:number){status=value;},end(value:string){body=JSON.parse(value);}},()=>{throw Error('Unexpected next');});return {status,body};}
   assert.equal((await call('/api/feed/following?fid=37')).status,404);
   assert.equal((await call('/api/feed/following?fid=268438','POST')).status,405);

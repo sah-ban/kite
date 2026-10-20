@@ -12,11 +12,11 @@ try { process.loadEnvFile('.env'); } catch (e) { if (e.code !== 'ENOENT') throw 
 const root = resolve('dist');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' };
 const middleware = gateway(process.env);
-const accountMiddleware = approval(process.env);
+const feedMiddleware = indexedFeed(process.env);
+const accountMiddleware = approval(process.env,{enrollFeed:feedMiddleware.enroll});
 const previewMiddleware = embedPreviews();
 const uploadMiddleware = imageUploads(process.env);
 const gifMiddleware = gifSearch();
-const feedMiddleware = indexedFeed(process.env);
 const certPath=process.env.FREECAST_TLS_CERT,keyPath=process.env.FREECAST_TLS_KEY;
 if(Boolean(certPath)!==Boolean(keyPath))throw new Error('Configure both FREECAST_TLS_CERT and FREECAST_TLS_KEY for HTTPS.');
 const tls=certPath?{cert:await readFile(certPath),key:await readFile(keyPath)}:undefined;

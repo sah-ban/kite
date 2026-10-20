@@ -6,7 +6,7 @@ import {HubEvent,Message} from '@farcaster/core';
 // @ts-expect-error Node worker.
 import {startWorker} from '../feed/worker.mjs';
 // @ts-expect-error Node storage.
-import {createPool,migrate,replaceFollows,saveCast} from '../feed/store.mjs';
+import {createPool,migrate,replaceFollows,enrollViewer,saveCast} from '../feed/store.mjs';
 
 const key='0x'+'11'.repeat(32),hash='0x'+'22'.repeat(20);
 const add={hash,signer:key,data:{fid:10,type:1,timestamp:Math.floor(Date.now()/1000)-1609459200,network:1,castAddBody:{text:'Worker fixture',mentions:[],mentionsPositions:[],embeds:[]}}};
@@ -31,10 +31,10 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
     const ep=url.pathname.split('/').pop();
     if(ep==='info')return Response.json({shardInfos:[{shardId:1}]});
     if(ep==='events')return Response.json({events:[{id:100}]});
-    if(ep==='linksByFid')return Response.json({messages:[{data:{type:5,linkBody:{targetFid:10}}}]});
+    if(ep==='linksByFid'){const fid=Number(url.searchParams.get('fid'));if(fid===888)throw Error('Fixture follow graph failure');return Response.json({messages:(fid===999?[10,20]:[10]).map(targetFid=>({data:{type:5,linkBody:{targetFid}}}))});}
     if(ep==='signersByFid')return Response.json({signers:[{fid:10,key,keyType:1,source:2,requestFid:9152}]});
     if(ep==='onChainSignersByFid')return Response.json({events:[]});
-    if(ep==='castsByFid')return Response.json({messages:[add]});
+    if(ep==='castsByFid'){const fid=Number(url.searchParams.get('fid'));return Response.json({messages:[fid===20?{...add,hash:'0x'+'55'.repeat(20),data:{...add.data,fid:20}}:add]});}
     throw Error('Unexpected endpoint '+ep);
   };
   try{
@@ -52,6 +52,12 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
     rpc.write({type:2,id:104,pruneMessageBody:{message:second}});
     await until(async()=>Number((await pool.query('SELECT event_id FROM freecast_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===104);
     assert.equal((await pool.query('SELECT deleted FROM freecast_feed_casts WHERE hash=$1',['0x'+'44'.repeat(20)])).rows[0].deleted,true);
+    await enrollViewer(pool,888);await enrollViewer(pool,999);
+    await until(async()=>Boolean((await pool.query('SELECT follows_synced_at FROM freecast_feed_users WHERE fid=999')).rows[0]?.follows_synced_at));
+    await until(async()=>Boolean((await pool.query('SELECT backfill_done FROM freecast_feed_authors WHERE fid=20')).rows[0]?.backfill_done));
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_authors WHERE fid=10')).rows[0].n,1);
+    assert.equal((await pool.query('SELECT author_fid FROM freecast_feed_casts WHERE hash=$1',['0x'+'55'.repeat(20)])).rows[0].author_fid,'20');
+    assert.equal((await pool.query('SELECT follows_failed FROM freecast_feed_users WHERE fid=888')).rows[0].follows_failed,true,'one failed user must not block another user import');
     assert.equal((await pool.query('SELECT requester_fid FROM freecast_feed_signers WHERE author_fid=10 AND signer=$1',[key])).rows[0].requester_fid,'9152');
   }finally{for(const timer of timers)clearTimeout(timer);if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
 });

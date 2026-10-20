@@ -176,7 +176,7 @@ export function approval(config, dependencies = {}) {
       const expectedMethod = path === '/api/auth/session' ? 'GET' : 'POST';
       if (req.method !== expectedMethod) throw new Failure(405, 'Method not allowed.');
       if (req.method === 'POST' && req.headers.origin !== origin.origin) throw new Failure(403, 'Origin mismatch.');
-      if (!['/api/auth/start','/api/auth/session','/api/auth/action','/api/auth/logout'].includes(path)) throw new Failure(404, 'Unknown account endpoint.');
+      if (!['/api/auth/start','/api/auth/session','/api/auth/action','/api/auth/logout','/api/auth/feed'].includes(path)) throw new Failure(404, 'Unknown account endpoint.');
       try{await (ready ||= restore());}catch(error){ready=undefined;throw error;}await prune();
       let id = cookieValue(req);
       let session = id && sessions.get(id);
@@ -250,6 +250,11 @@ export function approval(config, dependencies = {}) {
       }
 
       if (!session || session.state !== 'active') throw new Failure(401, 'Connect and approve an account first.');
+      if(path==='/api/auth/feed'){
+        if(!dependencies.enrollFeed)throw new Failure(503,'Indexed feeds are not configured.');
+        try{return send(res,200,await dependencies.enrollFeed(session.fid));}
+        catch(error){throw new Failure(error.status===429?429:503,error.status===429?error.message:'Could not enroll your feed. Please retry.');}
+      }
       if (!config.VALIDATOR_URL) throw new Failure(503, 'Configure the server submission endpoint before publishing.');
       const action = await readBody(req);
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');

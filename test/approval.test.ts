@@ -30,9 +30,11 @@ function harness(extra:Record<string,string>={}) {
   const calls:{url:string;body?:unknown}[]=[];
   const verified:{fid:number;key:string}[]=[];
   const submitted:Message[]=[];
+  const enrolled:number[]=[];
   const dependencies={
     ...(extra.FREECAST_SESSION_DIR?{}:{store:memoryStore()}),
     now:()=>time,
+    enrollFeed:async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},
     verify:async(fid:number,key:string)=>{if(verifyError)throw verifyError;verified.push({fid,key});return custody;},
     fetch:async(input:string|URL,init?:RequestInit)=>{
       const url=String(input);calls.push({url,body:init?.body});
@@ -47,7 +49,7 @@ function harness(extra:Record<string,string>={}) {
     },
   };
   let middleware=approval({...config,...extra},dependencies);
-  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,setPro:(value:unknown)=>{proStatus=value;},setFnameProof:(value:unknown)=>{fnameProof=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
+  return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,enrolled,setPro:(value:unknown)=>{proStatus=value;},setFnameProof:(value:unknown)=>{fnameProof=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
 }
 const cookieFrom=(result:Awaited<ReturnType<typeof call>>)=>result.headers['Set-Cookie'].split(';')[0];
 
@@ -392,4 +394,13 @@ test('hosted accounts cannot call the localhost-only fname action; fake loopback
   assert.equal((await call(h.middleware,'/api/auth/action',{...options,cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,403);
   assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173',ip:'192.0.2.20'})).status,403);
   assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'https://attacker.example',ip:'127.0.0.1'})).status,403);assert.equal(h.submitted.length,0);
+});
+
+test('feed enrollment uses only the verified session FID and performs no protocol write',async()=>{
+  const h=harness(),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+  assert.equal((await call(h.middleware,'/api/auth/feed')).status,401);
+  h.approve(456);await call(h.middleware,'/api/auth/session',{cookie});
+  const result=await call(h.middleware,'/api/auth/feed',{cookie,body:{fid:999}});
+  assert.equal(result.status,200);assert.deepEqual(result.body,{enrolled:true,fid:456});assert.deepEqual(h.enrolled,[456]);assert.equal(h.submitted.length,0);
+  await call(h.middleware,'/api/auth/logout',{cookie});assert.equal((await call(h.middleware,'/api/auth/feed',{cookie})).status,401);
 });

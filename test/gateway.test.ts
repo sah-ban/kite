@@ -39,7 +39,7 @@ test('browser configuration exposes gateway paths rather than upstream endpoints
   assert.equal(config.validatorUrl,'/api/write');
   assert.ok(!String(res.body).includes('private-read.example'));
   assert.ok(!String(res.body).includes('private-write.example'));
-  assert.deepEqual(config.indexedFeedFids,[268438]);assert.equal(config.defaultFeedFid,268438);
+  assert.equal(config.indexedFeedEnabled,true);assert.deepEqual(config.indexedFeedFids,[268438]);assert.equal(config.defaultFeedFid,268438);
   for(const privateHost of ['private-db.example','private-stream.example','private-feed.example'])assert.ok(!String(res.body).includes(privateHost));
 });
 test('protobuf write goes only to the configured validator',async()=>{

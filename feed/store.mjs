@@ -6,6 +6,10 @@ export function createPool(url,options={}) {
 }
 export async function migrate(pool) {
   await pool.query(`CREATE TABLE IF NOT EXISTS freecast_feed_users(fid bigint PRIMARY KEY,follows_synced_at timestamptz,generation bigint NOT NULL DEFAULT 0);
+    ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS enrolled_at timestamptz NOT NULL DEFAULT now();
+    ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
+    ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS follows_failed boolean NOT NULL DEFAULT false;
+    ALTER TABLE freecast_feed_users ADD COLUMN IF NOT EXISTS follows_retry_after timestamptz;
     CREATE TABLE IF NOT EXISTS freecast_feed_follows(viewer_fid bigint REFERENCES freecast_feed_users(fid),author_fid bigint NOT NULL,PRIMARY KEY(viewer_fid,author_fid));
     CREATE INDEX IF NOT EXISTS freecast_feed_follow_author ON freecast_feed_follows(author_fid);
     CREATE TABLE IF NOT EXISTS freecast_feed_authors(fid bigint PRIMARY KEY,backfill_cursor text,backfill_done boolean NOT NULL DEFAULT false,backfilled_at timestamptz,signers_synced_at timestamptz,retry_after timestamptz,failed boolean NOT NULL DEFAULT false,epoch bigint NOT NULL DEFAULT 0);
@@ -28,7 +32,7 @@ export async function replaceFollows(pool,fid,authors) {
     await db.query('DELETE FROM freecast_feed_follows WHERE viewer_fid=$1 AND NOT(author_fid=ANY($2::bigint[]))',[fid,next]);
     await db.query('INSERT INTO freecast_feed_follows(viewer_fid,author_fid) SELECT $1,unnest($2::bigint[]) ON CONFLICT DO NOTHING',[fid,next]);
     await db.query('INSERT INTO freecast_feed_authors(fid) SELECT unnest($1::bigint[]) ON CONFLICT DO NOTHING',[next]);
-    await db.query('UPDATE freecast_feed_users SET follows_synced_at=now(),generation=generation+$2 WHERE fid=$1',[fid,JSON.stringify(previous)===JSON.stringify(next)?0:1]);
+    await db.query('UPDATE freecast_feed_users SET follows_synced_at=now(),follows_failed=false,follows_retry_after=NULL,generation=generation+$2 WHERE fid=$1',[fid,JSON.stringify(previous)===JSON.stringify(next)?0:1]);
     await db.query('COMMIT');return next;
   } catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
 }
@@ -45,11 +49,11 @@ export async function deleteCast(db,hash,fid) {
     ON CONFLICT(hash) DO UPDATE SET deleted=true,payload=NULL,updated_at=now()`,[hash.toLowerCase(),fid]);
 }
 export async function status(pool,fid) {
-  const user=(await pool.query('SELECT follows_synced_at,generation FROM freecast_feed_users WHERE fid=$1',[fid])).rows[0];
+  const user=(await pool.query('SELECT follows_synced_at,generation,follows_failed FROM freecast_feed_users WHERE fid=$1',[fid])).rows[0];
   const counts=(await pool.query(`SELECT count(*)::int AS following,count(*) FILTER(WHERE a.backfill_done)::int AS imported,count(*) FILTER(WHERE a.failed)::int AS failed FROM freecast_feed_follows f JOIN freecast_feed_authors a ON a.fid=f.author_fid WHERE f.viewer_fid=$1`,[fid])).rows[0];
   const health=(await pool.query('SELECT heartbeat,connected_shards FROM freecast_feed_health WHERE id=1')).rows[0];
   const checkpoints=(await pool.query('SELECT shard,updated_at FROM freecast_feed_checkpoints ORDER BY shard')).rows;
-  return {following:counts.following,imported:counts.imported,failed:counts.failed,initializing:!user?.follows_synced_at||counts.imported<counts.following,
+  return {queued:!user?.follows_synced_at,followingFailed:Boolean(user?.follows_failed),following:counts.following,imported:counts.imported,failed:counts.failed,initializing:!user?.follows_synced_at||counts.imported<counts.following,
     followsSyncedAt:user?.follows_synced_at||null,workerOnline:Boolean(health&&Date.now()-new Date(health.heartbeat).getTime()<60000),connectedShards:health?.connected_shards||[],checkpoints:checkpoints.map(c=>({shard:c.shard,lastEventAt:c.updated_at})),generation:Number(user?.generation||0)};
 }
 export function parseFeedQuery(search) {
@@ -89,4 +93,18 @@ export async function queryFeed(pool,query,cursor='') {
   const visible=rows.slice(0,30),last=visible.at(-1);
   const nextPageToken=rows.length>30?Buffer.from(JSON.stringify({fingerprint,ceiling,timestamp:Number(last.timestamp),hash:last.hash})).toString('base64url'):'';
   return {messages:visible.map(row=>row.payload),nextPageToken,status:state};
+}
+
+export async function enrollViewer(pool,fid,{maxUsers=1000}={}) {
+  if(!validFid(fid))throw new Error('Invalid enrollment FID');
+  const db=await pool.connect();
+  try{await db.query('BEGIN');
+    await db.query('SELECT pg_advisory_xact_lock(hashtext(current_schema()),268439)');
+    const existing=(await db.query('SELECT fid FROM freecast_feed_users WHERE fid=$1',[fid])).rows.length>0;
+    if(!existing&&Number((await db.query('SELECT count(*) AS count FROM freecast_feed_users')).rows[0].count)>=maxUsers){
+      const error=new Error('Feed enrollment is currently at capacity. Please try again later.');error.status=429;throw error;
+    }
+    await db.query('INSERT INTO freecast_feed_users(fid) VALUES($1) ON CONFLICT(fid) DO UPDATE SET last_seen_at=now()',[fid]);
+    await db.query('COMMIT');return {enrolled:true,fid:Number(fid)};
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
 }
