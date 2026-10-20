@@ -12,5 +12,5 @@ export function relativeCastTime(timestamp:number,now=Date.now()):string {
 }
 
 export function fullCastTime(timestamp:number):string {
-  return castDate(timestamp).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'});
+  return castDate(timestamp).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'});
 }
