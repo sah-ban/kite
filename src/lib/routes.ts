@@ -1,5 +1,5 @@
 import type { ActivityTab } from './social';
-export type ClientRoute = {kind:'home'} | {kind:'following'} | {kind:'notifications'} | {kind:'settings'} | {kind:'search'} | {kind:'profile';fid:number} | {kind:'connections';fid:number;tab:'followers'|'following'} | {kind:'cast';fid:number;hash:string;tab:ActivityTab};
+export type ClientRoute = {kind:'home';feedFid?:number} | {kind:'following';feedFid?:number} | {kind:'notifications'} | {kind:'settings'} | {kind:'search'} | {kind:'profile';fid:number} | {kind:'connections';fid:number;tab:'followers'|'following'} | {kind:'cast';fid:number;hash:string;tab:ActivityTab};
 export function clientRoute(pathname:string,search=''):ClientRoute {
   if(/^\/settings\/?$/.test(pathname))return {kind:'settings'};
   if(/^\/search\/?$/.test(pathname))return {kind:'search'};
@@ -11,5 +11,7 @@ export function clientRoute(pathname:string,search=''):ClientRoute {
     if(profile)return {kind:'profile',fid};
     if(cast){const tab=new URLSearchParams(search).get('tab');return {kind:'cast',fid,hash:cast[2],tab:tab==='likes'||tab==='recasts'?tab:'replies'};}
   }
-  return {kind:(pathname==='/notifications'||pathname==='/notifications/')?'notifications':pathname==='/following'?'following':'home'};
+  const selected=new URLSearchParams(search).get('fid');
+  const feedFid=selected&&/^\d+$/.test(selected)&&Number.isSafeInteger(Number(selected))&&Number(selected)>0?Number(selected):undefined;
+  return {...(feedFid?{feedFid}:{}),kind:(pathname==='/notifications'||pathname==='/notifications/')?'notifications':pathname==='/following'?'following':'home'};
 }

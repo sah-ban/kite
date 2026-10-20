@@ -65,6 +65,9 @@ test('visible casts share cached counts and keep request concurrency bounded', {
 });
 test('client routes support home, public profiles, and shareable cast activity tabs',()=>{
   assert.deepEqual(clientRoute('/'),{kind:'home'});assert.deepEqual(clientRoute('/profile/37'),{kind:'profile',fid:37});assert.deepEqual(clientRoute('/following'),{kind:'following'});
+  assert.deepEqual(clientRoute('/following','?fid=268438'),{kind:'following',feedFid:268438});
+  assert.deepEqual(clientRoute('/','?fid=268438'),{kind:'home',feedFid:268438});
+  for(const fid of ['0','-1','bad','1.5','9007199254740992'])assert.deepEqual(clientRoute('/following','?fid='+fid),{kind:'following'});
   assert.deepEqual(clientRoute('/search'),{kind:'search'});
   assert.deepEqual(clientRoute('/search/'),{kind:'search'});
   assert.deepEqual(clientRoute(`/cast/37/${hash}`,'?tab=likes'),{kind:'cast',fid:37,hash,tab:'likes'});
