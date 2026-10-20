@@ -20,6 +20,19 @@ test('reply paging uses the documented parent identifier and excludes tombstones
     assert.deepEqual(result.items,[reply]);assert.equal(result.next,'next+/=');assert.equal(countLabel(result),'1+');
   }finally{globalThis.fetch=original;}
 });
+test('finished multi-shard reply cursors produce exact counts while real cursors remain usable',async()=>{
+  const original=globalThis.fetch;
+  const reply={...cast,hash:'0x'+'cd'.repeat(20),data:{...cast.data,castAddBody:{...cast.data.castAddBody,parentCastId:{fid:37,hash}}}};
+  let messages:Cast[]=[reply],cursor=btoa(JSON.stringify([null,null]));
+  globalThis.fetch=async()=>Response.json({messages,nextPageToken:cursor});
+  try{
+    const finished=await readReplies(config,cast);assert.equal(finished.next,'');assert.equal(countLabel(finished),'1');
+    messages=[];const empty=await readReplies(config,cast);assert.equal(empty.next,'');assert.equal(countLabel(empty),'0');
+    messages=[reply];cursor=btoa(JSON.stringify([null,'real-shard-cursor']));
+    const partial=await readReplies(config,cast);assert.equal(partial.next,cursor);assert.equal(countLabel(partial),'1+');
+    cursor=btoa(JSON.stringify(['another-shard',null]));assert.equal((await readReplies(config,cast)).next,cursor);
+  }finally{globalThis.fetch=original;}
+});
 test('reaction counts use distinct active accounts for the exact cast and requested reaction',async()=>{
   const original=globalThis.fetch;let request='';
   globalThis.fetch=async input=>{request=String(input);return Response.json({messages:[reaction(1),reaction(1),reaction(2,3,1),reaction(3,'MESSAGE_TYPE_REACTION_REMOVE'),reaction(4,3,2),reaction(5,3,1,'0x'+'ee'.repeat(20))],nextPageToken:''});};

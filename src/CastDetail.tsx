@@ -26,7 +26,7 @@ export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionF
   async function more() {
     if(!cast||!activity||loading)return;
     const current=activity[tab];if(!current)return;
-    if(limit<current.items.length){setLimit(v=>v+50);return;}
+    if(tab!=='replies'&&limit<current.items.length){setLimit(v=>v+50);return;}
     if(!current.next)return;
     const id=generation.current,selected=tab;setLoading(true);setError('');
     try {
@@ -56,9 +56,9 @@ export function CastDetail({config,fid,hash,tab,onTab,handlers,revision,sessionF
       </div>
       <div id="activity-panel" role="tabpanel" aria-labelledby={`activity-${tab}`}>
         {!activity?<FeedSkeleton count={2} label="Loading cast activity…"/>:activity.errors[tab]?<div className="feed-message error" role="alert">Could not read {tab}. <button className="text-button" onClick={()=>setRetry(v=>v+1)}>Retry</button></div>:page?.items.length?
-          tab==='replies'?(page.items as Cast[]).slice(0,limit).map(c=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={revision} sessionFid={sessionFid} busy={busy}/>):(page.items as Reaction[]).slice(0,limit).map(m=><ReactionRow key={m.hash} config={config} reaction={m} onProfile={handlers.onProfile}/>)
+          tab==='replies'?(page.items as Cast[]).map(c=><CastCard key={c.hash} config={config} cast={c} handlers={handlers} revision={revision} sessionFid={sessionFid} busy={busy}/>):(page.items as Reaction[]).slice(0,limit).map(m=><ReactionRow key={m.hash} config={config} reaction={m} onProfile={handlers.onProfile}/>)
           :<div className="empty"><h3>No {tab} yet</h3><p>{tab==='replies'?'Start the conversation with a reply.':'Accounts will appear here when they react.'}</p></div>}
-        {page&&(page.items.length>limit||page.next)&&<button className="load-more" disabled={loading} onClick={more}>{loading?'Reading…':`Load more ${tab}`}</button>}
+        {page&&((tab!=='replies'&&page.items.length>limit)||page.next)&&<button className="load-more" disabled={loading} onClick={more}>{loading?'Reading…':`Load more ${tab}`}</button>}
         {page?.next&&<p className="feed-limit">{countLabel(page)} {tab} loaded. More results are available.</p>}
       </div>
     </>:!error&&<FeedSkeleton count={2} label="Opening cast…"/>}

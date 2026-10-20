@@ -16,7 +16,10 @@ export async function readReplies(config: Config, cast: Cast, token = ''): Promi
     fid:cast.data.fid,hash:cast.hash,pageSize:1000,reverse:'false',...(token?{pageToken:token}:{}),
   });
   const items = data.messages.filter(c => c.data.castAddBody.parentCastId?.fid===cast.data.fid && c.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase());
-  return {items:[...new Map(items.map(c=>[c.hash.toLowerCase(),c])).values()],next:data.nextPageToken||''};
+  let next=data.nextPageToken||'';
+  // A multi-shard cursor containing only nulls means every shard is exhausted.
+  if(next)try{const shards:unknown=JSON.parse(atob(next));if(Array.isArray(shards)&&shards.length>0&&shards.every(cursor=>cursor===null))next='';}catch{/* Other cursors remain opaque. */}
+  return {items:[...new Map(items.map(c=>[c.hash.toLowerCase(),c])).values()],next};
 }
 export async function readReactions(config: Config, cast: Cast, kind: 'likes'|'recasts', token = ''): Promise<Page<Reaction>> {
   const data = await hub<{messages:Reaction[];nextPageToken?:string}>(config,'reactionsByCast',{
