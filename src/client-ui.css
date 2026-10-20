@@ -20,3 +20,5 @@
  .toast-stack{bottom:calc(150px + env(safe-area-inset-bottom));left:16px;right:16px;width:auto}.client-toast{padding:12px;font-size:13px}.skeleton-card{padding:20px 16px}
 }
 .client-layout .cast-actions button[aria-pressed=true] .lucide-heart{fill:currentColor}.client-layout .cast-actions button[aria-label="Undo recast"]{color:var(--link)}
+
+.client-layout .cast-expanded .cast-header .cast-menu{margin-left:auto}.cast-meta{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:16px;margin:8px 0;line-height:1.6;font-size:12px;color:var(--muted)}.cast-meta time{overflow-wrap:anywhere}.client-layout .cast-meta .signer{margin:0;max-width:none;white-space:normal;overflow:visible;overflow-wrap:anywhere;text-align:right;font-size:inherit}
