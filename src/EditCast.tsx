@@ -10,20 +10,18 @@ import { CastTime } from './CastTime';
 import { type Cast, type Config } from './lib/hub';
 import type { Session } from './lib/signing';
 import { countLabel, readActivity, castPath, type Activity } from './lib/social';
-import { getProStatus } from './lib/pro';
 import { encodedEditDraft, prepareReplacement, publishReplacement, readCastDraft, type EditCastDraft, type ReplacementAttempt } from './lib/cast-edit';
 export function EditCast({config,session,cast,open,onClose,onPublished,onDeleted}:{config:Config;session:Session;cast:Cast;open:boolean;onClose:(pending:boolean)=>void;onPublished:(hash:string)=>void;onDeleted:()=>void}) {
-  const [draft,setDraft]=useState<EditCastDraft>(),[initialText,setInitialText]=useState(''),[activity,setActivity]=useState<Activity>(),[retry,setRetry]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(false),[progress,setProgress]=useState(''),[pro,setPro]=useState(false);
+  const [draft,setDraft]=useState<EditCastDraft>(),[initialText,setInitialText]=useState(''),[activity,setActivity]=useState<Activity>(),[retry,setRetry]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(false),[progress,setProgress]=useState('');
   const attempt=useRef<ReplacementAttempt|null>(null),input=useRef<HTMLTextAreaElement>(null),mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(()=>{
     let active=true;
     readCastDraft(config,cast).then(value=>{if(active){setDraft(value);setInitialText(value.text);setTimeout(()=>input.current?.focus(),0);}}).catch(e=>{if(active)setError((e as Error).message);});
-    getProStatus(config,session.fid).then(value=>{if(active)setPro(value);}).catch(()=>{});
     return()=>{active=false;};
   },[config,cast,session.fid]);
   useEffect(()=>{let active=true;readActivity(config,cast,`edit:${retry}`).then(value=>{if(active)setActivity(value);});return()=>{active=false;};},[config,cast,retry]);
-  const maximum=pro?4:2;
+  const maximum=4;
   const links=useComposerLinks(draft?.text||'',draft?.embeds.flatMap(embed=>embed.url?[embed.url]:[])||[],maximum-(draft?.embeds.length||0));
   const effectiveDraft=draft?{...draft,embeds:[...draft.embeds,...links.urls.map(url=>({url}))]}:undefined;
   if(!open)return null;

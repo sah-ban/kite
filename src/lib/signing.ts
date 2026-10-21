@@ -123,7 +123,7 @@ export async function submit(config: Config, message: Message): Promise<string> 
 export async function postCast(config: Config, session: Session, text: string, parent?: Cast, quote?: Cast, mentions:DraftMention[]=[], images:string[]=[], links:string[]=[]): Promise<string> {
   const action={kind:'cast',images,links,...encodeMentionText(text,mentions),...(parent?{parent:{fid:parent.data.fid,hash:parent.hash}}:{}),...(quote?{quote:{fid:quote.data.fid,hash:quote.hash}}:{})};
   const body=newCastBody(action);
-  if(requiresCastPro(body)&&!await getProStatus(config,session.fid))throw new Error('Active Farcaster Pro is required for more than two embeds or text over 1,024 UTF-8 bytes.');
+  if(requiresCastPro(body)&&!await getProStatus(config,session.fid))throw new Error('Active Farcaster Pro is required for text over 1,024 UTF-8 bytes.');
   let hash:string;
   if(session.remote)hash=await serverAction(action);
   else{

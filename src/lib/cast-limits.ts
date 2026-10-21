@@ -16,7 +16,7 @@ export function useCastLimits(config:Config,fid?:number,revision=0):CastLimits {
     if(!expiry||expiry*1000<=clock)return;
     const timer=setTimeout(()=>setClock(Date.now()),Math.min(expiry*1000-Date.now()+1,2_147_483_647));return()=>clearTimeout(timer);
   },[expiry,clock]);
-  return {maxEmbeds:pro?4:2,maxBytes:pro?10000:1024,pro,checking:Boolean(fid&&record?.fid!==fid)};
+  return {maxEmbeds:4,maxBytes:pro?10000:1024,pro,checking:Boolean(fid&&record?.fid!==fid)};
 }
 export function composerUsage(text:string,mentions:DraftMention[],embeds:number,limits:Pick<CastLimits,'maxEmbeds'|'maxBytes'>):{bytes:number;error:string} {
   let bytes=0;

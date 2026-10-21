@@ -317,8 +317,8 @@ test('approved signer publishes image-only casts and quote images with valid sig
   const quote={fid:37,hash:'0x'+'ab'.repeat(20)};
   assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image],quote}})).status,200);
   assert.equal(MessageData.decode(h.submitted[1].dataBytes!).castAddBody?.embeds.length,2);
-  for(const images of [[image,image,image],['https://evil.example/image.png']])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images}})).status,400);
-  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image,image],quote}})).status,400);
+  for(const images of [[image,image,image,image,image],['https://evil.example/image.png']])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images}})).status,400);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'',images:[image,image,image,image],quote}})).status,400);
   assert.equal(h.submitted.length,2);
 });
 
@@ -365,7 +365,7 @@ test('approved casts sign link embeds alongside images or quotes and reject inva
     if('images' in body)assert.equal(data.castAddBody?.embeds[0].url,image);
     if('quote' in body)assert.equal(data.castAddBody?.embeds[1].castId?.fid,37);
   }
-  for(const body of [{links:['javascript:alert(1)']},{links:['https://user:pass@example.com']},{links:[link,'https://example.com/second','https://example.com/third']},{images:[image,image],links:[link]},{quote,links:[link,'https://example.com/second']},{links:'https://example.com'},{links:['https://example.com/'+ 'x'.repeat(300)]}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Test',...body}})).status,400);
+  for(const body of [{links:['javascript:alert(1)']},{links:['https://user:pass@example.com']},{links:Array(5).fill(link)},{images:[image,image,image,image],links:[link]},{quote,links:Array(4).fill(link)},{links:'https://example.com'},{links:['https://example.com/'+ 'x'.repeat(300)]}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Test',...body}})).status,400);
   assert.equal(h.submitted.length,3);
 });
 
@@ -382,7 +382,7 @@ test('approved Pro accounts publish four embeds and 10k-byte casts, replies and 
     if('quote' in body)assert.equal(data.castAddBody?.embeds.at(-1)?.castId?.fid,37);
     if(!body.text.startsWith('Escaped'))assert.equal(data.castAddBody?.embeds.length,4);
   }
-  const checks=h.calls.filter(value=>new URL(value.url).pathname==='/v1/storageLimitsByFid');assert.equal(checks.length,6);assert.ok(checks.every(value=>value.url==='https://read.example/v1/storageLimitsByFid?fid=123'));
+  const checks=h.calls.filter(value=>new URL(value.url).pathname==='/v1/storageLimitsByFid');assert.equal(checks.length,3);assert.ok(checks.every(value=>value.url==='https://read.example/v1/storageLimitsByFid?fid=123'));
   const submissions=h.calls.filter(value=>new URL(value.url).pathname==='/v1/submitMessage');assert.equal(submissions.length,6);assert.ok(submissions.every(value=>value.url==='https://read.example/v1/submitMessage'));
   const before=h.submitted.length;
   for(const body of [{text:'😀'.repeat(2500)+'x'},{text:'Too many',links:[...links,...links,'https://example.com/five']},{text:'Too many quoted',quote,images,links}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body}})).status,400);
@@ -393,7 +393,7 @@ test('server rechecks Pro for new and replacement casts and rejects absent, expi
   const h=harness(),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
   for(const status of [{tier_subscriptions:[]},{tierSubscriptions:[{tierType:1,expiresAt:1}]},{}]){
     h.setPro(status);
-    for(const payload of [{text:'x'.repeat(1025)},{text:'',links:['https://a.example','https://b.example','https://c.example']}]){
+    for(const payload of [{text:'x'.repeat(1025)}]){
       const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...payload,pro:true}});assert.equal(result.status,'tier_subscriptions' in status||'tierSubscriptions' in status?400:503);
     }
     const prepared=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source:{fid:123,hash:'0x'+'ab'.repeat(20),timestamp:Math.floor(Date.now()/1000)-1609459200},body:{text:'x'.repeat(1025),embeds:[]}}});assert.equal(prepared.status,'tier_subscriptions' in status||'tierSubscriptions' in status?400:503);
@@ -424,4 +424,14 @@ test('feed enrollment uses only the verified session FID and performs no protoco
   const result=await call(h.middleware,'/api/auth/feed',{cookie,body:{fid:999}});
   assert.equal(result.status,200);assert.deepEqual(result.body,{enrolled:true,fid:456});assert.deepEqual(h.enrolled,[456]);assert.equal(h.submitted.length,0);
   await call(h.middleware,'/api/auth/logout',{cookie});assert.equal((await call(h.middleware,'/api/auth/feed',{cookie})).status,401);
+});
+
+test('non-Pro approved accounts can publish four embeds and prepare four-embed replacements',async()=>{
+  const h=harness(),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const links=['https://a.example','https://b.example','https://c.example','https://d.example'],quote={fid:37,hash:'0x'+'ab'.repeat(20)};
+  for(const body of [{text:'Four',links},{text:'Reply',links,parent:quote},{text:'Quote',links:links.slice(0,3),quote}])assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',...body}})).status,200);
+  assert.equal(h.submitted.length,3);
+  for(const message of h.submitted)assert.equal(MessageData.decode(message.dataBytes!).castAddBody?.embeds.length,4);
+  const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'prepareCastReplacement',source:{fid:123,hash:'0x'+'cd'.repeat(20),timestamp:Math.floor(Date.now()/1000)-1609459200},body:{text:'Replacement',embeds:links.map(url=>({url}))}}});assert.equal(result.status,200);assert.equal(h.submitted.length,3);
+  assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'cast',text:'Five',links:[...links,'https://e.example']}})).status,400);
 });

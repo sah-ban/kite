@@ -23,10 +23,10 @@ test('editing restores Unicode mentions and preserves all URL/quote embeds and r
 test('preparation signs modern embeds without writing and creates a new hash for unchanged content',async()=>{
   const fetch=globalThis.fetch;let writes=0;globalThis.fetch=async()=>{writes++;return Response.json({});};
   try{
-    const cast=source(),draft=restoreCastDraft(cast,{37:'alice.eth'});
+    const cast=source();cast.data.castAddBody.embeds.push({url:'https://example.com/three'},{url:'https://example.com/four'});const draft=restoreCastDraft(cast,{37:'alice.eth'});
     const prepared=await prepareReplacement(config,{...session,remote:false,signer:localSigner},cast,draft);assert.equal(writes,0);
     const message=sdk.Message.decode(prepared.bytes),data=sdk.MessageData.decode(message.dataBytes!);
-    assert.deepEqual(data.castAddBody?.mentions,[37]);assert.equal(data.castAddBody?.embeds[0].url,'https://example.com/photo.png');assert.equal(data.castAddBody?.embeds[1].castId?.fid,77);assert.equal(data.castAddBody?.parentUrl,'chain://channel');assert.ok(data.timestamp>cast.data.timestamp);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
+    assert.equal(data.castAddBody?.embeds.length,4);assert.deepEqual(data.castAddBody?.mentions,[37]);assert.equal(data.castAddBody?.embeds[0].url,'https://example.com/photo.png');assert.equal(data.castAddBody?.embeds[1].castId?.fid,77);assert.equal(data.castAddBody?.parentUrl,'chain://channel');assert.ok(data.timestamp>cast.data.timestamp);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
     const same={...cast,hash:prepared.hash,data:{...cast.data,timestamp:data.timestamp}};const again=await prepareReplacement(config,{...session,remote:false,signer:localSigner},same,draft);assert.notEqual(again.hash,prepared.hash);
   }finally{globalThis.fetch=fetch;}
 });
@@ -36,7 +36,7 @@ test('ownership, mention, URL and Pro validation prevent preparation or deletion
     const cast=source(),draft=restoreCastDraft(cast);
     await assert.rejects(prepareReplacement(config,{...session,fid:999},cast,draft),/own casts/);
     assert.throws(()=>encodedEditDraft({...draft,embeds:[{url:''}]}),/URLs/);
-    await assert.rejects(prepareReplacement(config,session,cast,{...draft,embeds:[...draft.embeds,{url:'https://example.com/third'}]}),/active Farcaster Pro/);assert.equal(writes,0);
+    await assert.rejects(prepareReplacement(config,session,cast,{...draft,text:'x'.repeat(1025),mentions:[]}),/active Farcaster Pro/);assert.equal(writes,0);
   }finally{globalThis.fetch=fetch;}
 });
 test('delete-and-post returns on acceptance without reads and reuses the same signed replacement after failure',async()=>{

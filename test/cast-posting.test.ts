@@ -57,7 +57,6 @@ test('posting checks current Pro status and never submits over-limit or expired 
   try{
     for(pro of [{tier_subscriptions:[]},{tierSubscriptions:[{tierType:1,expiresAt:1}]},{}]){
       await assert.rejects(postCast(config,session,'x'.repeat(1025)),/Pro/);
-      await assert.rejects(postCast(config,session,'Links',undefined,undefined,[],[],['https://a.example','https://b.example','https://c.example']),/Pro/);
     }
     pro={tierSubscriptions:[{tierType:1,expiresAt:Date.now()/1000+86400}]};
     await assert.rejects(postCast(config,session,'😀'.repeat(2500)+'x'),/10,000/);
@@ -66,9 +65,22 @@ test('posting checks current Pro status and never submits over-limit or expired 
   }finally{globalThis.fetch=original;}
 });
 test('composer byte counts exclude mention labels and enforce UTF-8 and total embed limits without truncation',()=>{
-  const regular={maxBytes:1024,maxEmbeds:2},pro={maxBytes:10000,maxEmbeds:4};
-  assert.deepEqual(composerUsage('😀'.repeat(256),[],2,regular),{bytes:1024,error:''});assert.match(composerUsage('😀'.repeat(257),[],0,regular).error,/1,024/);
+  const regular={maxBytes:1024,maxEmbeds:4},pro={maxBytes:10000,maxEmbeds:4};
+  assert.deepEqual(composerUsage('😀'.repeat(256),[],4,regular),{bytes:1024,error:''});assert.match(composerUsage('😀'.repeat(257),[],0,regular).error,/1,024/);
   assert.deepEqual(composerUsage('😀'.repeat(2500),[],4,pro),{bytes:10000,error:''});assert.match(composerUsage('😀'.repeat(2500)+'x',[],0,pro).error,/10,000/);
   assert.match(composerUsage('Valid',[],5,pro).error,/Remove 1 embed/);
   const text='x'.repeat(1020)+' @alice',mentions=[{fid:37,label:'@alice',start:1021,end:1027}];assert.deepEqual(composerUsage(text,mentions,0,regular),{bytes:1021,error:''});
+});
+
+test('non-Pro local accounts sign and submit four embeds in casts, replies and quotes',async()=>{
+  const sdk=await loadGaslessSdk(),original=globalThis.fetch,messages:import('@farcaster/core-gasless').Message[]=[];
+  globalThis.fetch=async(input,init)=>{assert.ok(String(input).includes('submitMessage'),'Four embeds must not require a Pro lookup');messages.push(sdk.Message.decode(init!.body as Uint8Array));return Response.json({});};
+  try{
+    const links=['https://a.example','https://b.example','https://c.example','https://d.example'];
+    await postCast(config,session,'Four',undefined,undefined,[],[],links);
+    await postCast(config,session,'Reply',target,undefined,[],[],links);
+    await postCast(config,session,'Quote',undefined,target,[],[],links.slice(0,3));
+    assert.equal(messages.length,3);
+    for(const message of messages){const data=sdk.MessageData.decode(message.dataBytes!);assert.equal(data.castAddBody?.embeds.length,4);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());}
+  }finally{globalThis.fetch=original;}
 });

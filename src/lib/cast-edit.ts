@@ -26,7 +26,7 @@ export async function prepareReplacement(config:Config,session:Session,cast:Cast
   if(cast.data.fid!==session.fid)throw new Error('You can only edit your own casts.');
   if(!config.readUrl)throw new Error('Configure your node before publishing.');
   const body=encodedEditDraft(draft);
-  if((body.type===2||body.embeds.length>2)&&!await getProStatus(config,session.fid))throw new Error('This replacement needs active Farcaster Pro for more than two embeds or text over 1,024 bytes.');
+  if(body.type===2&&!await getProStatus(config,session.fid))throw new Error('This replacement needs active Farcaster Pro for text over 1,024 bytes.');
   const {prepareCastReplacement}=await import('./signing');
   const prepared=await prepareCastReplacement(config,session,cast,body);
   return {...prepared,originalDeleted:false,deletionSubmitted:false,publicationStarted:false};

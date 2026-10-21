@@ -15,4 +15,4 @@ export function newCastBody(action) {
   if(action.quote)embeds.push({castId:action.quote});
   return replacementBody({text:action.text,mentions:action.mentions??[],mentionsPositions:action.mentionsPositions??[],embeds,...(action.parent?{parentCastId:action.parent}:{})});
 }
-export const requiresCastPro=body=>body.type===2||body.embeds.length>2;
+export const requiresCastPro=body=>body.type===2;

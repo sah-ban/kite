@@ -270,7 +270,7 @@ export function approval(config, dependencies = {}) {
           const response=await request(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});
           if(!response.ok)throw new Error('Unavailable');pro=activeProSubscription(await response.json(),now()/1000);
         }catch{throw new Failure(503,'Could not verify Farcaster Pro status. Your draft is kept; retry when the read node is available.');}
-        if(!pro)throw new Failure(400,'Active Farcaster Pro is required for more than two embeds or text over 1,024 UTF-8 bytes.');
+        if(!pro)throw new Failure(400,'Active Farcaster Pro is required for text over 1,024 UTF-8 bytes.');
       },async name=>{
         const host=new URL(`http://${req.headers.host}`).hostname,peer=req.socket?.remoteAddress;
         if(!['localhost','127.0.0.1','[::1]'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer))throw new Failure(403,'Fname changes are available only on localhost.');
