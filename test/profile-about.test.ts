@@ -10,7 +10,7 @@ const verification=(address:string,protocol:unknown=0)=>({data:{fid,type:7,verif
 
 test('About URLs retain profile FID, accept trailing slashes, and reject invalid IDs',()=>{
   for(const path of ['/profile/268438/about','/profile/268438/about/'])assert.deepEqual(clientRoute(path),{kind:'about',fid});
-  for(const path of ['/profile/0/about','/profile/-1/about','/profile/9007199254740992/about'])assert.deepEqual(clientRoute(path),{kind:'home'});
+  for(const path of ['/profile/0/about','/profile/-1/about','/profile/9007199254740992/about'])assert.deepEqual(clientRoute(path),{kind:'not-found'});
 });
 
 test('profile metadata reads social and account details from numeric and named fields',async()=>{

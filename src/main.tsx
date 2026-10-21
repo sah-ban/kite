@@ -5,8 +5,9 @@ import { Guide } from './Guide';
 import './style.css';
 import './client-ui.css';
 import { AppHeader } from './AppHeader';
+import {isGuidePath} from './lib/routes';
 const Client = lazy(()=>import('./Client').then(m=>({default:m.Client})));
-const currentPage = () => location.pathname==='/guide'||location.pathname.startsWith('/guide/') ? 'guide' : 'client';
+const currentPage = () => isGuidePath(location.pathname) ? 'guide' : 'client';
 function App(){
   const [page,setPage]=useState(currentPage),[config,setConfig]=useState<Config|null>(null),[error,setError]=useState('');
   useEffect(()=>{

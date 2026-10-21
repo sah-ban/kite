@@ -12,6 +12,8 @@ Home opens the chronological Following feed. Desktop navigation and the mobile b
 
 The composer expands on demand, with one image/GIF/link toolbar and the connected username. Collapsing it, closing the compose dialog, or navigating inside the client retains the current draft. Filter controls show a selection count and removable chips; removing the final filter restores all clients. On mobile, filters open as a bottom sheet capped at 70% of the viewport, with a scrolling body and fixed Reset/Apply controls. Client chips and All/Include/Exclude controls stay compact; custom FIDs and public keys expand on demand. Chronological ordering stays visible beside the filter button.
 
+Unknown URLs show a **Page not found** screen with Home and Search links. Direct visits return HTTP 404, while missing assets and unknown API endpoints keep plain error responses. Invalid profile IDs and incomplete cast routes no longer fall back to Home.
+
 Returning from a cast or profile restores scroll position and loaded feed pages from a bounded in-memory cache. Explicit refresh bypasses that cache; a failed refresh keeps existing posts visible with an inline retry. Success messages appear as dismissible toasts, while likes, recasts, and follows update immediately and roll back on submission failure. These UI updates do not add post-submission confirmation polling. Drafts and navigation memory described here last for the current client session, rather than surviving a browser reload.
 
 From your repository checkout:

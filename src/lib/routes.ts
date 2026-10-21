@@ -1,19 +1,8 @@
 import type { ActivityTab } from './social';
-export type ClientRoute = {kind:'home';feedFid?:number} | {kind:'following';feedFid?:number} | {kind:'notifications'} | {kind:'settings'} | {kind:'search'} | {kind:'profile';fid:number} | {kind:'about';fid:number} | {kind:'connections';fid:number;tab:'followers'|'following'} | {kind:'cast';fid:number;hash:string;tab:ActivityTab};
+// @ts-expect-error Shared JavaScript route matching also runs in the Node server.
+import {parseClientRoute,isGuidePath} from '../../routing.mjs';
+export {isGuidePath};
+export type ClientRoute = {kind:'home';feedFid?:number} | {kind:'following';feedFid?:number} | {kind:'notifications'} | {kind:'settings'} | {kind:'search'} | {kind:'not-found'} | {kind:'profile';fid:number} | {kind:'about';fid:number} | {kind:'connections';fid:number;tab:'followers'|'following'} | {kind:'cast';fid:number;hash:string;tab:ActivityTab};
 export function clientRoute(pathname:string,search=''):ClientRoute {
-  if(/^\/settings\/?$/.test(pathname))return {kind:'settings'};
-  if(/^\/search\/?$/.test(pathname))return {kind:'search'};
-  const connections=pathname.match(/^\/profile\/(\d+)\/(followers|following)\/?$/);
-  const about=pathname.match(/^\/profile\/(\d+)\/about\/?$/);
-  const profile=pathname.match(/^\/profile\/(\d+)\/?$/),cast=pathname.match(/^\/cast\/(\d+)\/(0x[0-9a-fA-F]{40})\/?$/);
-  const fid=Number(connections?.[1]||about?.[1]||profile?.[1]||cast?.[1]);
-  if(Number.isSafeInteger(fid)&&fid>0){
-    if(about)return {kind:'about',fid};
-    if(connections)return {kind:'connections',fid,tab:connections[2] as 'followers'|'following'};
-    if(profile)return {kind:'profile',fid};
-    if(cast){const tab=new URLSearchParams(search).get('tab');return {kind:'cast',fid,hash:cast[2],tab:tab==='likes'||tab==='recasts'?tab:'replies'};}
-  }
-  const selected=new URLSearchParams(search).get('fid');
-  const feedFid=selected&&/^\d+$/.test(selected)&&Number.isSafeInteger(Number(selected))&&Number(selected)>0?Number(selected):undefined;
-  return {...(feedFid?{feedFid}:{}),kind:(pathname==='/notifications'||pathname==='/notifications/')?'notifications':pathname==='/following'?'following':'home'};
+  return parseClientRoute(pathname,search);
 }
