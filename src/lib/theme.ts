@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 export type ThemePreference='system'|'light'|'dark';
 type Theme='light'|'dark';
-const storageKey='freecast-theme';
+const storageKey='kite-theme';
 const system=window.matchMedia('(prefers-color-scheme: dark)');
 function savedPreference():ThemePreference {try{const value=localStorage.getItem(storageKey);return value==='light'||value==='dark'?value:'system';}catch{return 'system';}}
 let preference=savedPreference();

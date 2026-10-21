@@ -28,7 +28,7 @@ test('streamed casts normalize dataBytes, mentions, images, quotes and channel p
   assert.equal(result.hash,hash(1));assert.equal(result.signer,key(10));assert.equal(result.data.castAddBody.embeds[1].castId.hash,hash(2));assert.deepEqual(result.data.castAddBody.mentions,[37]);assert.equal(result.data.castAddBody.parentUrl,'https://example.com/channel');
 });
 test('feed API rejects unsupported FIDs/methods and hides database details',async()=>{
-  const middleware=indexedFeed({DATABASE_URL:'configured',FREECAST_FEED_FIDS:'268438'},{pool:{query:async(sql:string)=>{if(sql==='SELECT fid FROM freecast_feed_users WHERE fid=$1')return {rows:[]};throw new Error('private database URL');}}});
+  const middleware=indexedFeed({DATABASE_URL:'configured',KITE_FEED_FIDS:'268438'},{pool:{query:async(sql:string)=>{if(sql==='SELECT fid FROM kite_feed_users WHERE fid=$1')return {rows:[]};throw new Error('private database URL');}}});
   async function call(path:string,method='GET'){let status=200;let body:any;await middleware({url:path,method},{setHeader(){},set statusCode(value:number){status=value;},end(value:string){body=JSON.parse(value);}},()=>{throw Error('Unexpected next');});return {status,body};}
   assert.equal((await call('/api/feed/following?fid=37')).status,404);
   assert.equal((await call('/api/feed/following?fid=268438','POST')).status,405);
@@ -36,14 +36,14 @@ test('feed API rejects unsupported FIDs/methods and hides database details',asyn
   const error=await call('/api/feed/following?fid=268438');assert.equal(error.status,503);assert.ok(!JSON.stringify(error).includes('private database'));
 });
 
-test('PostgreSQL feed: stable pages, filters before pagination, deletion races, channels, follow changes', {skip:!process.env.FREECAST_TEST_DATABASE_URL},async()=>{
+test('PostgreSQL feed: stable pages, filters before pagination, deletion races, channels, follow changes', {skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
   const schema='feed_test_'+randomBytes(6).toString('hex');
-  const admin=createPool(process.env.FREECAST_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
-  const db=createPool(process.env.FREECAST_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+  const admin=createPool(process.env.KITE_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
+  const db=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
   try{
     await migrate(db);await replaceFollows(db,268438,[10,20]);
     for(let n=1;n<=70;n++)await saveCast(db,cast(n,n%2?10:20));
-    await db.query('INSERT INTO freecast_feed_signers(author_fid,signer,requester_fid) VALUES(10,$1,9152),(20,$2,20)',[key(10),key(20)]);
+    await db.query('INSERT INTO kite_feed_signers(author_fid,signer,requester_fid) VALUES(10,$1,9152),(20,$2,20)',[key(10),key(20)]);
     const first=await queryFeed(db,query());assert.equal(first.messages.length,30);assert.ok(first.nextPageToken);
     const fresh=cast(999,10,1020);await saveCast(db,fresh);
     const second=await queryFeed(db,query(),first.nextPageToken);assert.equal(second.messages.length,30);
@@ -56,7 +56,7 @@ test('PostgreSQL feed: stable pages, filters before pagination, deletion races, 
     assert.equal((await queryFeed(db,query('&order=oldest'))).messages[0].hash,hash(1));
     await assert.rejects(queryFeed(db,query('&mode=include&clients=9152'),first.nextPageToken),/cursor/);
     await deleteCast(db,hash(70),20);await saveCast(db,cast(70,20),{backfill:true});await saveCast(db,cast(70,20));
-    assert.equal((await db.query('SELECT deleted FROM freecast_feed_casts WHERE hash=$1',[hash(70)])).rows[0].deleted,true);
+    assert.equal((await db.query('SELECT deleted FROM kite_feed_casts WHERE hash=$1',[hash(70)])).rows[0].deleted,true);
     const channel:any=cast(1001,10,2000);channel.data.castAddBody.parentUrl='https://example.com/channel';await saveCast(db,channel);
     const reply:any=cast(1002,10,2001);reply.data.castAddBody.parentCastId={fid:37,hash:hash(123)};await saveCast(db,reply);
     assert.equal((await queryFeed(db,query())).messages[0].hash,channel.hash);

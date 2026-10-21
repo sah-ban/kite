@@ -36,7 +36,7 @@ test('cross-origin writes are rejected',async()=>{
 });
 test('browser configuration exposes gateway paths rather than upstream endpoints',async()=>{
   const {req,res}=await request('/api/config');
-  await gateway({HUBURL:'https://private-node.example',DATABASE_URL:'postgres://private-db.example/freecast',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'https://private-stream.example:3383',FREECAST_FEED_HTTP_URL:'https://private-feed.example'})(req,res,()=>{});
+  await gateway({HUBURL:'https://private-node.example',DATABASE_URL:'postgres://private-db.example/kite',KITE_FEED_FIDS:'268438',KITE_FEED_GRPC_URL:'https://private-stream.example:3383',KITE_FEED_HTTP_URL:'https://private-feed.example'})(req,res,()=>{});
   const config=JSON.parse(String(res.body));
   assert.equal(config.readUrl,'/api/read');
   assert.ok(!('validatorUrl' in config));
@@ -53,7 +53,7 @@ test('protobuf submissions and reads use the same configured node',async()=>{
 test('HTTPS writes accept the configured origin and reject forged hosts and origins',async()=>{
   const original=globalThis.fetch;let calls=0;
   globalThis.fetch=async()=>{calls++;return Response.json({hash:'0x123'});};
-  const middleware=gateway({HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  const middleware=gateway({HUBURL:'https://node.example',KITE_PUBLIC_URL:'https://client.example:8443'});
   try {
     for(const [host,origin,status] of [['client.example:8443','https://client.example:8443',200],['client.example:8443','http://client.example:8443',403],['attacker.example','https://client.example:8443',403]] as const){
       const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1]),{host,origin});
@@ -66,7 +66,7 @@ test('HTTPS writes accept the configured origin and reject forged hosts and orig
 test('local writes use their exact loopback origin even when a hosted public URL is configured',async()=>{
   const original=globalThis.fetch;let calls=0;
   globalThis.fetch=async()=>{calls++;return Response.json({ok:true});};
-  const middleware=gateway({HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  const middleware=gateway({HUBURL:'https://node.example',KITE_PUBLIC_URL:'https://client.example:8443'});
   try{
     for(const [host,origin,peer,status] of [
       ['localhost:5173','http://localhost:5173','127.0.0.1',200],

@@ -18,12 +18,12 @@ const accountMiddleware = approval(process.env,{enrollFeed:feedMiddleware.enroll
 const previewMiddleware = embedPreviews();
 const uploadMiddleware = imageUploads(process.env);
 const gifMiddleware = gifSearch();
-const certPath=process.env.FREECAST_TLS_CERT,keyPath=process.env.FREECAST_TLS_KEY;
-if(Boolean(certPath)!==Boolean(keyPath))throw new Error('Configure both FREECAST_TLS_CERT and FREECAST_TLS_KEY for HTTPS.');
+const certPath=process.env.KITE_TLS_CERT,keyPath=process.env.KITE_TLS_KEY;
+if(Boolean(certPath)!==Boolean(keyPath))throw new Error('Configure both KITE_TLS_CERT and KITE_TLS_KEY for HTTPS.');
 const tls=certPath?{cert:await readFile(certPath),key:await readFile(keyPath)}:undefined;
 const createListener=tls?handler=>createHttpsServer(tls,handler):createServer;
 const server = createListener((req, res) => feedMiddleware(req,res,() => gifMiddleware(req,res,() => uploadMiddleware(req,res,() => accountMiddleware(req,res,() => previewMiddleware(req,res,() => middleware(req, res, async () => {
   await serve(req,res);
 })))))));
-const host=process.env.FREECAST_HOST||'127.0.0.1',port=Number(process.env.PORT||5173);
+const host=process.env.KITE_HOST||'127.0.0.1',port=Number(process.env.PORT||5173);
 server.listen(port,host,()=>console.log(`Kite ${tls?'HTTPS':'HTTP'} listener ready on port ${port}`));

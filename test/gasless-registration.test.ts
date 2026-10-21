@@ -62,7 +62,7 @@ test('custody phrase registration builds verified gasless authorization and unlo
     const metadata=sdk.decodeGaslessSignedKeyRequestMetadata(body.metadata)._unsafeUnwrap();assert.equal(metadata.requestFid,BigInt(fid));
     assert.equal((await sdk.verifyGaslessKeyRequest({requestFid:metadata.requestFid,key:body.key,deadline:metadata.deadline},metadata.signature,hexToBytes(address)))._unsafeUnwrap(),true);
     assert.deepEqual(sdk.Message.decode(encodeForSnapchain(message as any)).dataBytes,message.dataBytes);
-    const vault=localStorage.getItem('freecast.app-key.v1')!;assert.ok(!vault.includes(password));assert.ok(!vault.includes(phrase));assert.equal(storedAccount()?.registration,'gasless');
+    const vault=localStorage.getItem('kite.app-key.v1')!;assert.ok(!vault.includes(password));assert.ok(!vault.includes(phrase));assert.equal(storedAccount()?.registration,'gasless');
     const unlocked=await unlockSession(config,password);assert.equal(unlocked.key,session.key);
     await react(config,unlocked,{hash:'0x'+'ab'.repeat(20),data:{fid:37}} as any,'like');
     assert.equal(writes[1].data!.type,sdk.MessageType.REACTION_ADD);
@@ -103,7 +103,7 @@ test('gasless unlock rejects revoked, expired, wrong-FID or insufficient-scope k
       setSigner(signer);await assert.rejects(unlockSession(config,password),/missing, expired, revoked/);
     }
     setSigner(active);assert.equal(await checkGaslessSigner(config,fid,prepared.key),true);
-    const raw=JSON.parse(localStorage.getItem('freecast.app-key.v1')!);delete raw.registration;localStorage.setItem('freecast.app-key.v1',JSON.stringify(raw));
+    const raw=JSON.parse(localStorage.getItem('kite.app-key.v1')!);delete raw.registration;localStorage.setItem('kite.app-key.v1',JSON.stringify(raw));
     await assert.rejects(unlockAppKey(password),/Could not unlock/);
   });
 });

@@ -1,7 +1,7 @@
 import { bytesToHex, hexToBytes, type Hex } from 'viem';
 import { localOrigin } from './hub';
 
-export const STORAGE_KEY = 'freecast.app-key.v1';
+export const STORAGE_KEY = 'kite.app-key.v1';
 export const REMEMBER_KEY = 'kite.remembered-app-key.v1';
 export const LOCK_KEY = 'kite.local-account-lock.v1';
 export const ACCESS_CLEARED_EVENT = 'kite:local-access-cleared';

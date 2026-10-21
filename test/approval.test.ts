@@ -32,7 +32,7 @@ function harness(extra:Record<string,string>={}) {
   const submitted:Message[]=[];
   const enrolled:number[]=[];
   const dependencies={
-    ...(extra.FREECAST_SESSION_DIR?{}:{store:memoryStore()}),
+    ...(extra.KITE_SESSION_DIR?{}:{store:memoryStore()}),
     now:()=>time,
     enrollFeed:async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},
     verify:async(fid:number,key:string)=>{if(verifyError)throw verifyError;verified.push({fid,key});return custody;},
@@ -66,7 +66,7 @@ test('public app identity supports HTTPS and identity files without exposing cre
   const directory=await mkdtemp(join(tmpdir(),'kite-public-app-'));
   try{
     const file=join(directory,'.env');await writeFile(file,`DEVELOPER_FID=5678\nDEVELOPER_MNEMONIC="${mnemonic}"\nDATABASE_URL=private-fixture-value\n`);
-    const middleware=approval({FARCASTER_APP_ENV_FILE:file,FREECAST_PUBLIC_URL:'https://client.example'},{store:memoryStore()});
+    const middleware=approval({FARCASTER_APP_ENV_FILE:file,KITE_PUBLIC_URL:'https://client.example'},{store:memoryStore()});
     const result=await call(middleware,'/api/auth/app',{host:'client.example',origin:'https://client.example',ip:'192.0.2.20'});
     assert.equal(result.status,200);assert.deepEqual(result.body,{fid:5678});assert.ok(!JSON.stringify(result.body).includes(mnemonic));
     assert.equal((await call(middleware,'/api/auth/app',{host:'192.0.2.10:5173',origin:'http://192.0.2.10:5173',ip:'192.0.2.20'})).status,403);
@@ -146,7 +146,7 @@ test('approval rejects cross-origin, public HTTP, and forged loopback requests',
 });
 
 test('HTTPS approval cookies are secure and still require the configured origin',async()=>{
-  const h=harness({FREECAST_PUBLIC_URL:'https://client.example'});
+  const h=harness({KITE_PUBLIC_URL:'https://client.example'});
   const started=await call(h.middleware,'/api/auth/start',{host:'client.example',origin:'https://client.example',ip:'192.0.2.20'});
   assert.equal(started.status,200);assert.ok(started.headers['Set-Cookie'].includes('; Secure'));
   assert.equal((await call(h.middleware,'/api/auth/start',{host:'client.example',origin:'https://attacker.example'})).status,403);
@@ -171,7 +171,7 @@ test('unapproved requests and invalid actions cannot submit messages',async()=>{
 });
 
 test('developer identity file reads only the requested identity fields',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-identity-test-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-identity-test-'));
   try {
     const path=join(dir,'.env');
     await writeFile(path,`DEVELOPER_FID=1234\nDEVELOPER_MNEMONIC="${mnemonic}"\nHUBURL=https://unrelated.example\nDATABASE_URL=unrelated-test-value\n`);
@@ -231,9 +231,9 @@ test('mentions are signed as FIDs and UTF-8 positions for casts, replies, and qu
 });
 
 test('pending and approved signer connections survive restarts with the same key and cookie',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-persistent-'));
   try{
-    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    const h=harness({KITE_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
     h.restart();const pending=await call(h.middleware,'/api/auth/start',{cookie});
     assert.equal(pending.body.key,start.body.key);assert.equal(pending.body.deepLinkUrl,start.body.deepLinkUrl);
     assert.equal(h.calls.filter(call=>call.url.endsWith('/signed-key-requests')).length,1);
@@ -252,9 +252,9 @@ test('pending and approved signer connections survive restarts with the same key
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('saved sessions remain bound to their origin and transient verification failures do not erase them',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-persistent-'));
   try{
-    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    const h=harness({KITE_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
     h.approve();await call(h.middleware,'/api/auth/session',{cookie});h.restart();
     h.failVerification(new Error('RPC unavailable'));
     assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).status,502);
@@ -270,9 +270,9 @@ test('saved sessions remain bound to their origin and transient verification fai
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('corrupted saved signer storage returns an error without generating a replacement',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-persistent-'));
   try{
-    const h=harness({FREECAST_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
+    const h=harness({KITE_SESSION_DIR:dir}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);
     h.approve();await call(h.middleware,'/api/auth/session',{cookie});
     const path=join(dir,(await readdir(dir)).find(name=>name.endsWith('.json'))!);
     await writeFile(path,'invalid encrypted record',{mode:0o600});h.restart();
@@ -283,7 +283,7 @@ test('corrupted saved signer storage returns an error without generating a repla
 });
 
 test('approval is not active until its saved key is durable, and logout during saving cannot restore it',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-persistent-'));
   try{
     const disk=sessionStore(dir);let release!:()=>void,started!:()=>void;
     const saving=new Promise<void>(resolve=>{started=resolve;}),gate=new Promise<void>(resolve=>{release=resolve;});
@@ -297,7 +297,7 @@ test('approval is not active until its saved key is durable, and logout during s
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('a failed active-session save can be retried without generating another signer',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-persistent-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-persistent-'));
   try{
     const disk=sessionStore(dir);let fail=true,time=Date.now(),starts=0;
     const middleware=approval(config,{now:()=>time,store:{...disk,save:async(id:string,session:{state:string})=>{if(session.state==='active'&&fail){fail=false;throw new SessionStorageError();}await disk.save(id,session);}},verify:async()=>custody,fetch:async(input:string|URL)=>{const start=String(input).endsWith('/signed-key-requests');if(start)starts++;return Response.json({result:{signedKeyRequest:start?{token:'fixture-token',deeplinkUrl:'farcaster://signed-key-request?token=fixture-token'}:{state:'completed',userFid:123}}});}});
@@ -403,7 +403,7 @@ test('server rechecks Pro for new and replacement casts and rejects absent, expi
 });
 
 test('localhost preferred fname updates require an owning node proof and sign only for the approved FID',async()=>{
-  const h=harness({FREECAST_PUBLIC_URL:'https://hosted.example',HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active');
+  const h=harness({KITE_PUBLIC_URL:'https://hosted.example',HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active');
   for(const proof of [undefined,{fid:999,type:1,name:'newfname'},{fid:123,type:2,name:'newfname'},{fid:123,type:1,name:'different'}]){h.setFnameProof(proof);assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,400);}
   assert.equal(h.submitted.length,0);h.setFnameProof({fid:123,type:'USERNAME_TYPE_FNAME',name:'newfname'});
   const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname',fid:999}});assert.equal(result.status,200);
@@ -411,7 +411,7 @@ test('localhost preferred fname updates require an owning node proof and sign on
   assert.ok(h.calls.some(value=>value.url==='https://read.example/v1/userNameProofByName?name=newfname'));
 });
 test('hosted accounts cannot call the localhost-only fname action; fake loopback hosts and foreign origins stay rejected',async()=>{
-  const h=harness({FREECAST_PUBLIC_URL:'https://client.example'}),options={host:'client.example',origin:'https://client.example',ip:'192.0.2.20'},start=await call(h.middleware,'/api/auth/start',options),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{...options,cookie});h.setFnameProof({fid:123,type:1,name:'newfname'});
+  const h=harness({KITE_PUBLIC_URL:'https://client.example'}),options={host:'client.example',origin:'https://client.example',ip:'192.0.2.20'},start=await call(h.middleware,'/api/auth/start',options),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{...options,cookie});h.setFnameProof({fid:123,type:1,name:'newfname'});
   assert.equal((await call(h.middleware,'/api/auth/action',{...options,cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,403);
   assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173',ip:'192.0.2.20'})).status,403);
   assert.equal((await call(h.middleware,'/api/auth/start',{host:'127.0.0.1:5173',origin:'https://attacker.example',ip:'127.0.0.1'})).status,403);assert.equal(h.submitted.length,0);

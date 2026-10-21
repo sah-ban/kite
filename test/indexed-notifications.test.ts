@@ -29,15 +29,15 @@ test('notification API requires existing enrollment and refuses writes',async()=
  assert.equal((await call('/api/feed/notifications?fid=37','POST')).status,405);
 });
 
-test('PostgreSQL live notifications: no history, all kinds, deduplication, removals, unread, pagination and rollback',{skip:!process.env.FREECAST_TEST_DATABASE_URL},async()=>{
+test('PostgreSQL live notifications: no history, all kinds, deduplication, removals, unread, pagination and rollback',{skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
  const schema='notifications_test_'+randomBytes(6).toString('hex');
- const admin=createPool(process.env.FREECAST_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
- const db=createPool(process.env.FREECAST_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+ const admin=createPool(process.env.KITE_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
+ const db=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
  const viewers=new Map([[37,150],[38,150]]);
  try{
   await migrate(db);await enrollViewer(db,37);await enrollViewer(db,38);
-  await db.query("UPDATE freecast_feed_users SET notifications_started_at=to_timestamp(1609459350)");
-  await db.query('INSERT INTO freecast_feed_health(id,connected_shards) VALUES(1,ARRAY[1,2])');
+  await db.query("UPDATE kite_feed_users SET notifications_started_at=to_timestamp(1609459350)");
+  await db.query('INSERT INTO kite_feed_health(id,connected_shards) VALUES(1,ARRAY[1,2])');
   await indexNotification(db,cast(1,10,{mentions:[37]},149),viewers);
   assert.equal((await queryNotifications(db,37,params())).items.length,0);
   // Actors need not be followed. Mention + reply produces one reply for 37 and a mention for 38.

@@ -65,7 +65,7 @@ test('registered signer import encrypts the key, remains usable, and unlocks wit
     assert.ok(livePublicKey.isOk());
     assert.equal(bytesToHex(livePublicKey.value),session.key);
     assert.equal(storedAccount()?.key,session.key);
-    const encrypted = localStorage.getItem('freecast.app-key.v1')!;
+    const encrypted = localStorage.getItem('kite.app-key.v1')!;
     assert.ok(!encrypted.includes(privateKey.slice(2)));
     assert.ok(!encrypted.includes(password));
     const unlocked = await unlockSession(config,password);

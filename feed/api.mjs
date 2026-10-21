@@ -1,10 +1,10 @@
 import {createPool,enrollViewer,parseFeedQuery,queryFeed,validFid} from './store.mjs';
 import {localFeedEnrollment} from './enrollment.mjs';
 import {queryNotifications} from './notifications.mjs';
-export const feedFids=config=>(config.FREECAST_FEED_FIDS||'').split(',').filter(validFid).map(Number);
+export const feedFids=config=>(config.KITE_FEED_FIDS||'').split(',').filter(validFid).map(Number);
 export function indexedFeed(config,{pool,...dependencies}={}) {
   if(!config.DATABASE_URL)return (req,res,next)=>next();
-  const seeds=new Set(feedFids(config)),maxUsers=Number(config.FREECAST_FEED_MAX_USERS||1000);
+  const seeds=new Set(feedFids(config)),maxUsers=Number(config.KITE_FEED_MAX_USERS||1000);
   if(!Number.isInteger(maxUsers)||maxUsers<1||maxUsers>10000)throw new Error('Invalid feed enrollment capacity');
   pool ||= createPool(config.DATABASE_URL);
   const enroll=fid=>enrollViewer(pool,fid,{maxUsers});
@@ -19,11 +19,11 @@ export function indexedFeed(config,{pool,...dependencies}={}) {
       if(req.method!=='GET')return send(405,{error:'Method not allowed'});
       const fid=Number(url.searchParams.get('fid'));if(!validFid(fid))return send(400,{error:'Use a positive FID'});
       let query;if(url.pathname==='/api/feed/following')try{query=parseFeedQuery(url.searchParams);}catch(error){return send(400,{error:error.message});}
-      const enrolled=seeds.has(fid)||(await pool.query('SELECT fid FROM freecast_feed_users WHERE fid=$1',[fid])).rows.length>0;
+      const enrolled=seeds.has(fid)||(await pool.query('SELECT fid FROM kite_feed_users WHERE fid=$1',[fid])).rows.length>0;
       if(url.pathname==='/api/feed/enrollment')return send(200,{enrolled,fid});
       if(!enrolled)return send(404,{error:'Connect this account to enable its indexed feed'});
-      if(url.pathname==='/api/feed/notifications')return send(200,{...await queryNotifications(pool,fid,url.searchParams),historyDays:Number(config.FREECAST_FEED_HISTORY_DAYS||30)});
-      const page=await queryFeed(pool,query,url.searchParams.get('cursor')||'');return send(200,{...page,status:{...page.status,historyDays:Number(config.FREECAST_FEED_HISTORY_DAYS||30)}});
+      if(url.pathname==='/api/feed/notifications')return send(200,{...await queryNotifications(pool,fid,url.searchParams),historyDays:Number(config.KITE_FEED_HISTORY_DAYS||30)});
+      const page=await queryFeed(pool,query,url.searchParams.get('cursor')||'');return send(200,{...page,status:{...page.status,historyDays:Number(config.KITE_FEED_HISTORY_DAYS||30)}});
     }catch(error){
       if(error.status)return send(error.status,{error:error.message});
       if(error.message==='Feed changed or cursor is invalid. Refresh the feed.')return send(400,{error:error.message});

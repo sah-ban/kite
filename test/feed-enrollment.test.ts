@@ -11,7 +11,7 @@ import {createPool,migrate,enrollViewer,replaceFollows,saveCast,queryFeed,parseF
 import {indexedFeed} from '../feed/api.mjs';
 const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
 const key='0x'+Buffer.from((await signer.getSignerKey())._unsafeUnwrap()).toString('hex');
-const config={FREECAST_PUBLIC_URL:'https://freecast.example',HUBURL:'https://node.example'};
+const config={KITE_PUBLIC_URL:'https://kite.example',HUBURL:'https://node.example'};
 function request(path:string,body?:unknown,extra:any={}){return {url:path,method:body===undefined?'GET':'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173'},socket:{remoteAddress:'127.0.0.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(body));},...extra};}
 async function proof(now=1000,source:any=1){let time=now,calls=0;const enrolled:number[]=[];
   const handler=localFeedEnrollment(config,async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},{now:()=>time,fetcher:async(url:URL)=>{assert.equal(url.origin,config.HUBURL);calls++;return Response.json({signers:[{fid:123,key,keyType:1,source,expiresAt:100000,scopes:[1]}]});}});
@@ -31,22 +31,22 @@ test('local enrollment rejects forgery, expiry, foreign origins, and hosted call
   challenge=await h.challenge();const body=await h.signed(challenge);h.advance(120001);await assert.rejects(h.submit(body),/expired/);
   challenge=await h.challenge();const valid=await h.signed(challenge);
   await assert.rejects(h.submit(valid,{headers:{host:'127.0.0.1:5173',origin:'https://attacker.example'}}),/Origin mismatch/);
-  await assert.rejects(h.submit(valid,{headers:{host:'freecast.example',origin:'https://freecast.example'},socket:{remoteAddress:'192.0.2.1'}}),/delegated/);
+  await assert.rejects(h.submit(valid,{headers:{host:'kite.example',origin:'https://kite.example'},socket:{remoteAddress:'192.0.2.1'}}),/delegated/);
   assert.equal(h.calls,0);assert.deepEqual(h.enrolled,[]);
 });
 test('local gasless enrollment checks expiry and requested account registration',async()=>{
   const active=await proof(1000,2);const challenge=await active.challenge();await active.submit(await active.signed(challenge));assert.deepEqual(active.enrolled,[123]);
   const expired=await proof(100001000,2);const old=await expired.challenge();await assert.rejects(expired.submit(await expired.signed(old)),/expired/);
 });
-test('database enrollment is idempotent, limits new viewers, reuses authors, and enables public reads', {skip:!process.env.FREECAST_TEST_DATABASE_URL},async()=>{
-  const schema='enroll_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.FREECAST_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
-  const pool=createPool(process.env.FREECAST_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+test('database enrollment is idempotent, limits new viewers, reuses authors, and enables public reads', {skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
+  const schema='enroll_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.KITE_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
   try{await migrate(pool);await enrollViewer(pool,123,{maxUsers:2});await enrollViewer(pool,123,{maxUsers:2});await enrollViewer(pool,456,{maxUsers:2});
     await assert.rejects(enrollViewer(pool,789,{maxUsers:2}),/capacity/);await enrollViewer(pool,123,{maxUsers:1});
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_users')).rows[0].n,2);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_users')).rows[0].n,2);
     await replaceFollows(pool,123,[10]);await replaceFollows(pool,456,[10]);
     await saveCast(pool,{hash:'0x'+'11'.repeat(20),signer:key,data:{fid:10,timestamp:1234,castAddBody:{text:'Shared author',mentions:[],mentionsPositions:[],embeds:[]}}});
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_authors')).rows[0].n,1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_authors')).rows[0].n,1);
     for(const fid of [123,456])assert.equal((await queryFeed(pool,parseFeedQuery(new URLSearchParams({fid:String(fid)})))).messages.length,1);
     const api=indexedFeed({DATABASE_URL:'configured'},{pool});
     async function call(path:string){let status=200,body:any;await api(request(path),{setHeader(){},set statusCode(value:number){status=value;},end(value:string){body=JSON.parse(value);}},()=>{throw Error('Unexpected next');});return {status,body};}
@@ -54,7 +54,7 @@ test('database enrollment is idempotent, limits new viewers, reuses authors, and
     assert.equal((await call('/api/feed/enrollment?fid=789')).body.enrolled,false);
     assert.equal((await call('/api/feed/following?fid=789')).status,404);
     assert.equal((await call('/api/feed/following?fid=456')).body.messages.length,1);
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_users')).rows[0].n,2,'anonymous reads cannot enroll arbitrary FIDs');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_users')).rows[0].n,2,'anonymous reads cannot enroll arbitrary FIDs');
   }finally{await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
 });
 

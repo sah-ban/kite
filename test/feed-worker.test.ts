@@ -12,13 +12,13 @@ const key='0x'+'11'.repeat(32),hash='0x'+'22'.repeat(20);
 const add={hash,signer:key,data:{fid:10,type:1,timestamp:Math.floor(Date.now()/1000)-1609459200,network:1,castAddBody:{text:'Worker fixture',mentions:[],mentionsPositions:[],embeds:[]}}};
 const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 
-test('worker integrates backfill, explicit subscriptions, atomic checkpoints, reconnect and cast removal', {skip:!process.env.FREECAST_TEST_DATABASE_URL},async()=>{
-  const schema='worker_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.FREECAST_TEST_DATABASE_URL);
+test('worker integrates backfill, explicit subscriptions, atomic checkpoints, reconnect and cast removal', {skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
+  const schema='worker_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.KITE_TEST_DATABASE_URL);
   await admin.query(`CREATE SCHEMA ${schema}`);
-  const pool=createPool(process.env.FREECAST_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+  const pool=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
   await migrate(pool);await replaceFollows(pool,268438,[10]);
   const ghost={...add,hash:'0x'+'99'.repeat(20)};await saveCast(pool,ghost);
-  await pool.query("INSERT INTO freecast_feed_checkpoints(shard,event_id,updated_at) VALUES(1,50,now()-interval '3 days')");
+  await pool.query("INSERT INTO kite_feed_checkpoints(shard,event_id,updated_at) VALUES(1,50,now()-interval '3 days')");
   const server=new Server();let connections=0;let stop:(()=>Promise<void>)|undefined;let rpc:any;const timers:ReturnType<typeof setTimeout>[]=[];
   server.addService({subscribe:{path:'/HubService/Subscribe',requestStream:false,responseStream:true,requestDeserialize:(bytes:Buffer)=>bytes,requestSerialize:(bytes:Buffer)=>bytes,responseSerialize:(event:any)=>Buffer.from(HubEvent.encode(HubEvent.create(event)).finish()),responseDeserialize:HubEvent.decode}},
     {subscribe(call:any){connections++;rpc=call;assert.equal(call.request[0],10);assert.ok(call.request[1]>0);call.on('error',()=>{});
@@ -39,26 +39,26 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
     throw Error('Unexpected endpoint '+ep);
   };
   try{
-    stop=await startWorker({DATABASE_URL:'fixture',HUBURL:'https://worker-node.example',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:()=>{}});
-    await until(async()=>Number((await pool.query('SELECT event_id FROM freecast_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===101);
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_casts WHERE hash=$1',[hash])).rows[0].n,1);
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_casts WHERE hash=$1',[ghost.hash])).rows[0].n,0);
+    stop=await startWorker({DATABASE_URL:'fixture',HUBURL:'https://worker-node.example',KITE_FEED_FIDS:'268438',KITE_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:()=>{}});
+    await until(async()=>Number((await pool.query('SELECT event_id FROM kite_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===101);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_casts WHERE hash=$1',[hash])).rows[0].n,1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_casts WHERE hash=$1',[ghost.hash])).rows[0].n,0);
     await until(async()=>connections>=2); // Graceful disconnect must reconnect and replay idempotently.
     const removal=Message.create({hash:Buffer.alloc(20,0x33),signer:Buffer.from(key.slice(2),'hex'),data:{fid:10,type:2,timestamp:add.data.timestamp+1,network:1,castRemoveBody:{targetHash:Buffer.from(hash.slice(2),'hex')}}});
     rpc.write({type:1,id:102,mergeMessageBody:{message:removal,deletedMessages:[]}});
-    await until(async()=>Number((await pool.query('SELECT event_id FROM freecast_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===102);
-    assert.equal((await pool.query('SELECT deleted FROM freecast_feed_casts WHERE hash=$1',[hash])).rows[0].deleted,true);
+    await until(async()=>Number((await pool.query('SELECT event_id FROM kite_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===102);
+    assert.equal((await pool.query('SELECT deleted FROM kite_feed_casts WHERE hash=$1',[hash])).rows[0].deleted,true);
     const second=Message.create({hash:Buffer.alloc(20,0x44),signer:Buffer.from(key.slice(2),'hex'),data:add.data});
     rpc.write({type:1,id:103,mergeMessageBody:{message:second,deletedMessages:[]}});
     rpc.write({type:2,id:104,pruneMessageBody:{message:second}});
-    await until(async()=>Number((await pool.query('SELECT event_id FROM freecast_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===104);
-    assert.equal((await pool.query('SELECT deleted FROM freecast_feed_casts WHERE hash=$1',['0x'+'44'.repeat(20)])).rows[0].deleted,true);
+    await until(async()=>Number((await pool.query('SELECT event_id FROM kite_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===104);
+    assert.equal((await pool.query('SELECT deleted FROM kite_feed_casts WHERE hash=$1',['0x'+'44'.repeat(20)])).rows[0].deleted,true);
     await enrollViewer(pool,888);await enrollViewer(pool,999);
-    await until(async()=>Boolean((await pool.query('SELECT follows_synced_at FROM freecast_feed_users WHERE fid=999')).rows[0]?.follows_synced_at));
-    await until(async()=>Boolean((await pool.query('SELECT backfill_done FROM freecast_feed_authors WHERE fid=20')).rows[0]?.backfill_done));
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_authors WHERE fid=10')).rows[0].n,1);
-    assert.equal((await pool.query('SELECT author_fid FROM freecast_feed_casts WHERE hash=$1',['0x'+'55'.repeat(20)])).rows[0].author_fid,'20');
-    assert.equal((await pool.query('SELECT follows_failed FROM freecast_feed_users WHERE fid=888')).rows[0].follows_failed,true,'one failed user must not block another user import');
-    assert.equal((await pool.query('SELECT requester_fid FROM freecast_feed_signers WHERE author_fid=10 AND signer=$1',[key])).rows[0].requester_fid,'9152');
+    await until(async()=>Boolean((await pool.query('SELECT follows_synced_at FROM kite_feed_users WHERE fid=999')).rows[0]?.follows_synced_at));
+    await until(async()=>Boolean((await pool.query('SELECT backfill_done FROM kite_feed_authors WHERE fid=20')).rows[0]?.backfill_done));
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_authors WHERE fid=10')).rows[0].n,1);
+    assert.equal((await pool.query('SELECT author_fid FROM kite_feed_casts WHERE hash=$1',['0x'+'55'.repeat(20)])).rows[0].author_fid,'20');
+    assert.equal((await pool.query('SELECT follows_failed FROM kite_feed_users WHERE fid=888')).rows[0].follows_failed,true,'one failed user must not block another user import');
+    assert.equal((await pool.query('SELECT requester_fid FROM kite_feed_signers WHERE author_fid=10 AND signer=$1',[key])).rows[0].requester_fid,'9152');
   }finally{for(const timer of timers)clearTimeout(timer);if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
 });

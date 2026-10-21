@@ -9,7 +9,7 @@ const id='ab'.repeat(32);
 const record=()=>({state:'active',origin:'https://client.example',expires:Date.now()+100000,key:'0x'+'11'.repeat(32),privateKey:new Uint8Array(32).fill(17),fid:123,address:'0x'+'22'.repeat(20)});
 
 test('sessions are encrypted, private, and decryptable by a fresh store',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-sessions-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-sessions-'));
   try{
     const value=record();await sessionStore(dir).save(id,value);
     const files=await readdir(dir),name=files.find(name=>name.endsWith('.json'))!;
@@ -23,7 +23,7 @@ test('sessions are encrypted, private, and decryptable by a fresh store',async()
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('queued logout wins over an in-flight save and snapshots do not share live key memory',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-sessions-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-sessions-'));
   try{
     const store=sessionStore(dir),value=record(),saving=store.save(id,value);value.privateKey.fill(0);await saving;
     assert.deepEqual((await sessionStore(dir).load()).get(id).privateKey,new Uint8Array(32).fill(17));
@@ -33,7 +33,7 @@ test('queued logout wins over an in-flight save and snapshots do not share live 
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('tampered ciphertext and a missing master key fail closed',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'freecast-sessions-'));
+  const dir=await mkdtemp(join(tmpdir(),'kite-sessions-'));
   try{
     await sessionStore(dir).save(id,record());const name=(await readdir(dir)).find(name=>name.endsWith('.json'))!;
     const path=join(dir,name),original=await readFile(path,'utf8'),envelope=JSON.parse(original);
@@ -45,7 +45,7 @@ test('tampered ciphertext and a missing master key fail closed',async()=>{
   }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('saved connections can move with their master key but cannot live in the public build',async()=>{
-  const base=await mkdtemp(join(tmpdir(),'freecast-sessions-')),first=join(base,'first'),second=join(base,'second');
+  const base=await mkdtemp(join(tmpdir(),'kite-sessions-')),first=join(base,'first'),second=join(base,'second');
   try{await sessionStore(first).save(id,record());await rename(first,second);assert.equal((await sessionStore(second).load()).get(id).fid,123);assert.throws(()=>sessionStore('dist/sessions'),SessionStorageError);assert.throws(()=>sessionStore('public/sessions'),SessionStorageError);}
   finally{await rm(base,{recursive:true,force:true});}
 });

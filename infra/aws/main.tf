@@ -31,7 +31,7 @@ data "aws_ami" "ubuntu" {
 resource "aws_vpc" "node" {
   cidr_block           = "10.78.0.0/16"
   enable_dns_hostnames = true
-  tags                = { Name = "freecast" }
+  tags                = { Name = "kite" }
 }
 resource "aws_subnet" "node" {
   vpc_id                  = aws_vpc.node.id
@@ -51,7 +51,7 @@ resource "aws_route_table_association" "node" {
   route_table_id = aws_route_table.node.id
 }
 resource "aws_security_group" "node" {
-  name   = "freecast-node"
+  name   = "kite-node"
   vpc_id = aws_vpc.node.id
   ingress {
     from_port   = 22
@@ -73,7 +73,7 @@ resource "aws_security_group" "node" {
   }
 }
 resource "aws_key_pair" "node" {
-  key_name_prefix = "freecast-"
+  key_name_prefix = "kite-"
   public_key      = var.ssh_public_key
 }
 resource "aws_instance" "node" {
@@ -90,7 +90,7 @@ resource "aws_instance" "node" {
     encrypted             = true
     delete_on_termination = true
   }
-  tags = { Name = "freecast-read-node" }
+  tags = { Name = "kite-read-node" }
 }
 output "public_ip" { value = aws_instance.node.public_ip }
 output "ssh" { value = "ssh ubuntu@${aws_instance.node.public_ip}" }

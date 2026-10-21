@@ -3,8 +3,8 @@ set -euo pipefail
 python3 scripts/resources.py
 docker info >/dev/null
 docker compose version >/dev/null
-mkdir -p .freecast/node
-cd .freecast/node
+mkdir -p .kite/node
+cd .kite/node
 if [[ -n "${SNAPCHAIN_REF:-}" ]]; then
   RELEASE="$SNAPCHAIN_REF"
 elif [[ -f release ]]; then

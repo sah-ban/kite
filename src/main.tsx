@@ -17,7 +17,7 @@ function App(){
     return()=>window.removeEventListener('popstate',pop);
   },[]);
   function navigate(p:'client'|'guide'){
-    history.pushState({freecast:true},'',p==='client'?'/':'/guide');setPage(p);
+    history.pushState({kite:true},'',p==='client'?'/':'/guide');setPage(p);
     window.dispatchEvent(new PopStateEvent('popstate'));window.scrollTo(0,0);
   }
   const loading=<><AppHeader onHome={()=>navigate('client')} desktopHidden/><main className="loading"><p>{error||'Opening Kite…'}</p></main></>;

@@ -6,7 +6,7 @@ const identifier=/^[a-f0-9]{64}$/;
 export class SessionStorageError extends Error {
   constructor(){super('Saved signer storage is unavailable. Check the server and try again.');}
 }
-export function sessionStore(directory=resolve('.freecast/sessions')){
+export function sessionStore(directory=resolve('.kite/sessions')){
   directory=resolve(directory);
   for(const publicRoot of [resolve('dist'),resolve('public')])if(directory===publicRoot||directory.startsWith(publicRoot+sep))throw new SessionStorageError();
   let key,initializing,initialized=false,queue=Promise.resolve();

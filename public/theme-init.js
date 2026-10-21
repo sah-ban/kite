@@ -1,7 +1,7 @@
 // Apply the saved/system theme before the application renders.
 (() => {
   let saved;
-  try { saved = localStorage.getItem('freecast-theme'); } catch {}
+  try { saved = localStorage.getItem('kite-theme'); } catch {}
   const theme = saved === 'dark' || saved === 'light'
     ? saved
     : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

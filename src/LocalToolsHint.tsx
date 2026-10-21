@@ -7,6 +7,6 @@ export function LocalToolsHint({kind}:{kind:keyof typeof copy}){
   const {title,text}=copy[kind];
   return <section className="local-tools-hint" aria-label={title}>
     <h3>{title}</h3><p>{text}</p>
-    <a href="https://github.com/sah-ban/freecast#readme" target="_blank" rel="noopener noreferrer">Local setup instructions <ArrowUpRight size={13}/></a>
+    <a href="https://github.com/sah-ban/kite#readme" target="_blank" rel="noopener noreferrer">Local setup instructions <ArrowUpRight size={13}/></a>
   </section>;
 }

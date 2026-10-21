@@ -9,24 +9,24 @@ x-app: &app
 x-feed-environment: &feed-environment
   HUBURL: ${HUBURL:?Set HUBURL to your node HTTP API}
   # pg reads PGPASSWORD separately, so passwords need no URL encoding.
-  DATABASE_URL: postgresql://freecast@db:5432/freecast
-  PGPASSWORD: ${FREECAST_POSTGRES_PASSWORD:?Set FREECAST_POSTGRES_PASSWORD}
-  FREECAST_FEED_HTTP_URL: ${FREECAST_FEED_HTTP_URL:-${HUBURL}}
-  FREECAST_FEED_FIDS: ${FREECAST_FEED_FIDS:-37}
-  FREECAST_FEED_HISTORY_DAYS: ${FREECAST_FEED_HISTORY_DAYS:-30}
+  DATABASE_URL: postgresql://kite@db:5432/kite
+  PGPASSWORD: ${KITE_POSTGRES_PASSWORD:?Set KITE_POSTGRES_PASSWORD}
+  KITE_FEED_HTTP_URL: ${KITE_FEED_HTTP_URL:-${HUBURL}}
+  KITE_FEED_FIDS: ${KITE_FEED_FIDS:-37}
+  KITE_FEED_HISTORY_DAYS: ${KITE_FEED_HISTORY_DAYS:-30}
 
 services:
   web:
     <<: *app
     environment:
       <<: *feed-environment
-      FREECAST_PUBLIC_URL: ${FREECAST_PUBLIC_URL:?Set FREECAST_PUBLIC_URL to the exact public origin}
-      FREECAST_SESSION_DIR: /data/sessions
+      KITE_PUBLIC_URL: ${KITE_PUBLIC_URL:?Set KITE_PUBLIC_URL to the exact public origin}
+      KITE_SESSION_DIR: /data/sessions
       OPTIMISM_RPC_URL: ${OPTIMISM_RPC_URL:-https://mainnet.optimism.io}
       FARCASTER_APP_FID: ${FARCASTER_APP_FID:-}
       FARCASTER_APP_MNEMONIC: ${FARCASTER_APP_MNEMONIC:-}
       IMGBB_API_KEY: ${IMGBB_API_KEY:-}
-      FREECAST_FEED_MAX_USERS: ${FREECAST_FEED_MAX_USERS:-1000}
+      KITE_FEED_MAX_USERS: ${KITE_FEED_MAX_USERS:-1000}
     expose:
       - '3000'
     ports:
@@ -45,22 +45,22 @@ services:
     command: ['node', 'feed/worker.mjs']
     environment:
       <<: *feed-environment
-      FREECAST_FEED_GRPC_URL: ${FREECAST_FEED_GRPC_URL:?Set FREECAST_FEED_GRPC_URL to your node gRPC API}
+      KITE_FEED_GRPC_URL: ${KITE_FEED_GRPC_URL:?Set KITE_FEED_GRPC_URL to your node gRPC API}
     stop_grace_period: 45s
 
   db:
     image: postgres:17
     restart: unless-stopped
     environment:
-      POSTGRES_DB: freecast
-      POSTGRES_USER: freecast
-      POSTGRES_PASSWORD: ${FREECAST_POSTGRES_PASSWORD:?Set FREECAST_POSTGRES_PASSWORD}
+      POSTGRES_DB: kite
+      POSTGRES_USER: kite
+      POSTGRES_PASSWORD: ${KITE_POSTGRES_PASSWORD:?Set KITE_POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     shm_size: 128mb
     command: ['postgres', '-c', 'shared_buffers=128MB', '-c', 'max_connections=30']
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U freecast -d freecast']
+      test: ['CMD-SHELL', 'pg_isready -U kite -d kite']
       interval: 5s
       timeout: 5s
       start_period: 15s

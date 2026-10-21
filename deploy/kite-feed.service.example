@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/kiteapp
-ExecStart=/path/to/node /path/to/kiteapp/feed/worker.mjs
+WorkingDirectory=/path/to/kite
+ExecStart=/path/to/node /path/to/kite/feed/worker.mjs
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

@@ -19,9 +19,9 @@ import { indexedFeed } from './feed/api.mjs';
 
 export default defineConfig(({mode})=>{
   const config={...loadEnv(mode,process.cwd(),''),...process.env};
-  const savedSigners=normalizePath(resolve(config.FREECAST_SESSION_DIR||'.freecast/sessions'));
+  const savedSigners=normalizePath(resolve(config.KITE_SESSION_DIR||'.kite/sessions'));
   return {
-    plugins:[react(),{name:'freecast-gateway',configureServer(server){
+    plugins:[react(),{name:'kite-gateway',configureServer(server){
       const feedMiddleware=indexedFeed(config);
       server.middlewares.use(feedMiddleware);
       server.middlewares.use(gifSearch());
@@ -30,6 +30,6 @@ export default defineConfig(({mode})=>{
       server.middlewares.use(embedPreviews());
       server.middlewares.use(gateway(config));
     }}],
-    server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/.freecast/**',`${savedSigners}/**`]}},
+    server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/.kite/**',`${savedSigners}/**`]}},
   };
 });

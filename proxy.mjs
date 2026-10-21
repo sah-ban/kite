@@ -26,7 +26,7 @@ export function gateway(config) {
     if (write) {
       let expected;
       try { expected=writeOrigin(req,config); } catch { res.statusCode=403;res.end('Invalid request origin');return; }
-      if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch. Open the app at its configured origin, or set FREECAST_PUBLIC_URL to the exact browser origin and restart.'); return; }
+      if (expected.host!==req.headers.host || (req.headers.origin && req.headers.origin!==expected.origin)) { res.statusCode = 403; res.end('Origin mismatch. Open the app at its configured origin, or set KITE_PUBLIC_URL to the exact browser origin and restart.'); return; }
     }
     try {
       const target = new URL(url.pathname.replace(/^\/api\/(read|write)/, '') + url.search, nodeUrl);

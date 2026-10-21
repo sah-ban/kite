@@ -20,7 +20,7 @@ test('connected clients exclude expired, revoked, malformed and unrelated keys w
 });
 test('connected client reads paginate all active signer pages and deduplicate keys across pages',async()=>{
   const original=globalThis.fetch,calls:URL[]=[];
-  globalThis.fetch=async(input,init)=>{assert.ok(init?.signal);const url=new URL(String(input),'https://freecast.example');calls.push(url);return Response.json(url.searchParams.has('pageToken')?{signers:[signer(1),signer(2,901)]}:{signers:[signer(1)],nextPageToken:'opaque+/='});};
+  globalThis.fetch=async(input,init)=>{assert.ok(init?.signal);const url=new URL(String(input),'https://kite.example');calls.push(url);return Response.json(url.searchParams.has('pageToken')?{signers:[signer(1),signer(2,901)]}:{signers:[signer(1)],nextPageToken:'opaque+/='});};
   try{assert.deepEqual(await readConnectedClients(config,37),{clients:[{fid:900,keyCount:1},{fid:901,keyCount:1}],unknownKeys:0});assert.equal(calls.length,2);assert.equal(calls[0].pathname,'/api/read/v1/signersByFid');assert.equal(calls[0].searchParams.get('fid'),'37');assert.equal(calls[0].searchParams.get('pageSize'),'100');assert.equal(calls[1].searchParams.get('pageToken'),'opaque+/=');}
   finally{globalThis.fetch=original;}
 });

@@ -22,7 +22,7 @@ function transport(route:(url:URL)=>Route) {
   };return {request,calls};
 }
 async function call(middleware:any,url:string,method='GET') {
-  const req={url:'/api/embed?'+new URLSearchParams({url}),method,socket:{remoteAddress:'127.0.0.1'},headers:{cookie:'freecast_session=do-not-forward',authorization:'do-not-forward'}};
+  const req={url:'/api/embed?'+new URLSearchParams({url}),method,socket:{remoteAddress:'127.0.0.1'},headers:{cookie:'kite_session=do-not-forward',authorization:'do-not-forward'}};
   const res={statusCode:200,headers:{} as Record<string,string>,body:'',setHeader(key:string,value:string){this.headers[key]=value;},end(value:string){this.body=value;}};
   await middleware(req,res,()=>assert.fail('Unexpected middleware fallthrough'));
   return {status:res.statusCode,body:JSON.parse(res.body)};

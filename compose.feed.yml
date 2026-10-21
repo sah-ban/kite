@@ -3,18 +3,18 @@ services:
     image: postgres:17
     restart: unless-stopped
     environment:
-      POSTGRES_DB: freecast
-      POSTGRES_USER: freecast
-      POSTGRES_PASSWORD: ${FREECAST_POSTGRES_PASSWORD:?Set FREECAST_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: kite
+      POSTGRES_USER: kite
+      POSTGRES_PASSWORD: ${KITE_POSTGRES_PASSWORD:?Set KITE_POSTGRES_PASSWORD in .env}
     ports:
       - '127.0.0.1:55432:5432'
     volumes:
-      - ./.freecast/postgres:/var/lib/postgresql/data
+      - ./.kite/postgres:/var/lib/postgresql/data
     shm_size: 128mb
     mem_limit: 768m
     command: ['postgres', '-c', 'shared_buffers=128MB', '-c', 'max_connections=30']
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U freecast -d freecast']
+      test: ['CMD-SHELL', 'pg_isready -U kite -d kite']
       interval: 10s
       timeout: 5s
       retries: 5

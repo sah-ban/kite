@@ -8,7 +8,7 @@ export function localFeedEnrollment(config,enroll,{fetcher=fetch,now=Date.now}={
   async function registered(fid,key){
     let token='';const seen=new Set();
     do{
-      const url=new URL('/v1/signersByFid',config.FREECAST_FEED_HTTP_URL||hubUrl(config));
+      const url=new URL('/v1/signersByFid',config.KITE_FEED_HTTP_URL||hubUrl(config));
       url.search=new URLSearchParams({fid:String(fid),pageSize:'100',...(token?{pageToken:token}:{})}).toString();
       const response=await fetcher(url,{signal:AbortSignal.timeout(20000),redirect:'error'});if(!response.ok)fail(502,'Could not verify the app key. Please retry.');
       const page=await response.json();if(!Array.isArray(page.signers))fail(502,'Could not verify the app key. Please retry.');

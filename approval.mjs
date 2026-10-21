@@ -21,7 +21,7 @@ import { validateProfileField } from './profile-fields.mjs';
 import { fnameName, ownsFnameProof } from './fname-utils.mjs';
 import { writeOrigin } from './proxy.mjs';
 
-const COOKIE = 'freecast_session';
+const COOKIE = 'kite_session';
 const PENDING_TTL = 10 * 60_000;
 const SESSION_TTL = 30 * 24 * 60 * 60_000;
 class Failure extends Error {
@@ -138,7 +138,7 @@ export function approval(config, dependencies = {}) {
   const now = dependencies.now || Date.now;
   const verify = dependencies.verify || ((fid,key) => verifyRegistration(config,fid,key,request));
   const sessions = new Map();
-  const store=dependencies.store||sessionStore(config.FREECAST_SESSION_DIR||undefined);
+  const store=dependencies.store||sessionStore(config.KITE_SESSION_DIR||undefined);
   let ready;
   const starts = new Map();
   let identity;
