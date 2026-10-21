@@ -8,7 +8,7 @@ The client is the homepage at `/`; the tutorial lives at `/guide`. Public profil
 
 ## Try the client
 
-Home opens the chronological Following feed. Desktop navigation and the mobile bottom bar provide Home, Search, Notifications, and Profile; the account menu opens Settings and account actions. The guide remains available at `/guide`, linked from Settings alongside node diagnostics and protocol references. Existing `/following` and public FID links continue to work. The feed picker is hidden while indexed feed coverage is limited.
+Home opens the chronological Following feed. Desktop navigation and the mobile bottom bar provide Home, Search, Notifications, and Profile; the account menu opens Settings and account actions. Mobile navigation uses icons, with a centered New cast button between Search and Notifications. The guide remains available at `/guide`, linked from Settings alongside node diagnostics and protocol references. Existing `/following` and public FID links continue to work. The feed picker is hidden while indexed feed coverage is limited.
 
 The composer expands on demand, with one image/GIF/link toolbar and the connected username. Collapsing it, closing the compose dialog, or navigating inside the client retains the current draft. Filter controls show a selection count and removable chips; removing the final filter restores all clients. On mobile, filters open as a bottom sheet capped at 70% of the viewport, with a scrolling body and fixed Reset/Apply controls. Client chips and All/Include/Exclude controls stay compact; custom FIDs and public keys expand on demand. Chronological ordering stays visible beside the filter button.
 

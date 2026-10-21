@@ -52,6 +52,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   const [images,setImages]=useState<string[]>([]),[replyImages,setReplyImages]=useState<string[]>([]),[uploading,setUploading]=useState(false),[replyUploading,setReplyUploading]=useState(false);
   const [editingCast,setEditingCast]=useState<Cast|null>(null),[editCastOpen,setEditCastOpen]=useState(false);
   const [editProfileOpen,setEditProfileOpen]=useState(false),[composeOpen,setComposeOpen]=useState(false);
+  const composeTrigger=useRef<HTMLElement|null>(null);
   const [toastError,setToastError]=useState(''),[reactionOverrides,setReactionOverrides]=useState<Record<string,ReactionOverride>>({});
   const reactionRequests=useRef(new Set<string>());
   const [deletePending,setDeletePending]=useState<Cast|null>(null),[deleting,setDeleting]=useState(false);
@@ -221,7 +222,8 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
     {label:'Notifications',Icon:Bell,active:view.kind==='notifications',action:()=>navigate('/notifications')},
     {label:'Profile',Icon:UserRound,active:(view.kind==='profile'||view.kind==='about')&&view.fid===session?.fid,action:()=>session?openProfile(session.fid):setAccountOpen(true)},
   ];
-  function startCompose(){if(!session){setAccountOpen(true);return;}setComposeOpen(true);}
+  function startCompose(){if(!session){setAccountOpen(true);return;}composeTrigger.current=document.activeElement as HTMLElement|null;setComposeOpen(true);}
+  const mobileNavigation=[...navigation.slice(0,2),{label:'New cast',Icon:PenLine,active:composeOpen,action:startCompose},...navigation.slice(2)];
   async function publishDraft():Promise<boolean>{
     if(!session){setAccountOpen(true);return false;}
     setPublishing(true);setError('');
@@ -263,7 +265,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {(view.kind==='cast'||view.kind==='settings')&&error&&<div className="feed-message error" role="alert">{error}</div>}
   {editingCast&&!editCastOpen&&session?.fid===editingCast.data.fid&&<div className="feed-message notice" role="status"><span>Your cast edit is still pending.</span><button type="button" className="text-button" onClick={()=>setEditCastOpen(true)}>Resume cast edit</button></div>}
   </section>
-  {composeOpen&&<Modal title="New cast" className="compose-modal" onClose={()=>{if(!publishing&&!uploading)setComposeOpen(false);}}><CastComposer {...composerProps} modal/>{error&&<p className="danger" role="alert">{error}</p>}</Modal>}
+  {composeOpen&&<Modal title="New cast" className="compose-modal" onClose={()=>{if(!publishing&&!uploading){setComposeOpen(false);requestAnimationFrame(()=>{if(composeTrigger.current?.isConnected)composeTrigger.current.focus();});}}}><CastComposer {...composerProps} modal/>{error&&<p className="danger" role="alert">{error}</p>}</Modal>}
   {deletePending&&<Modal title="Delete this cast?" onClose={()=>{if(!deleting)setDeletePending(null);}}><p>This permanently removes your cast from Farcaster. This action cannot be undone.</p><div className="delete-confirm-actions"><button className="button" disabled={deleting} onClick={()=>setDeletePending(null)}>Cancel</button><button className="button delete-confirm" disabled={deleting} onClick={async()=>{
     if(!session||session.fid!==deletePending.data.fid){setError('Connect the account that owns this cast.');return;}
     const target=deletePending;setDeleting(true);setError('');
@@ -285,5 +287,5 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {editProfileOpen&&session&&<EditProfile key={session.key} config={config} session={session} onClose={()=>setEditProfileOpen(false)} onConnect={()=>{setEditProfileOpen(false);setAccountOpen(true);}} onSaved={()=>{setNotice('Profile updated');profile(config,session.fid).then(person=>setProfiles(value=>({...value,[person.fid]:person}))).catch(()=>{});setRefresh(value=>value+1);}}/>}
   {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys,selfRegistered}} onClose={()=>setControls(false)} onApply={filters=>{applyFilters(filters);setControls(false);}}/>}
-  </main><div className="toast-stack">{toastError&&<Toast error onDismiss={()=>setToastError('')}>{toastError}</Toast>}{notice&&<Toast onDismiss={()=>setNotice('')}>{notice}</Toast>}</div><button className="compose-fab" aria-label="New cast" title="New cast" disabled={publishing||uploading} onClick={startCompose}><PenLine size={23}/></button><nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map(({label,Icon,active,action})=><button key={label} className={active?'active':''} aria-current={active?'page':undefined} onClick={action}>{label==='Profile'&&session?<Avatar person={profiles[session.fid]}/>:<Icon size={22}/>}<span className="sr-only">{label}</span>{label==='Notifications'&&notificationUnread>0&&<b className="notification-unread" aria-label={`${notificationUnread} unread notifications`}>{notificationUnread>99?'99+':notificationUnread}</b>}</button>)}</nav></>;
+  </main><div className="toast-stack">{toastError&&<Toast error onDismiss={()=>setToastError('')}>{toastError}</Toast>}{notice&&<Toast onDismiss={()=>setNotice('')}>{notice}</Toast>}</div><nav className="mobile-nav" aria-label="Mobile navigation">{mobileNavigation.map(({label,Icon,active,action})=><button key={label} className={`${label==='New cast'?'mobile-compose ':''}${active?'active':''}`} aria-label={label} aria-current={active&&label!=='New cast'?'page':undefined} aria-haspopup={label==='New cast'?'dialog':undefined} disabled={label==='New cast'&&(publishing||uploading)} onClick={action}>{label==='Profile'&&session?<Avatar person={profiles[session.fid]}/>:<Icon size={22}/>}<span className="sr-only">{label}</span>{label==='Notifications'&&notificationUnread>0&&<b className="notification-unread" aria-label={`${notificationUnread} unread notifications`}>{notificationUnread>99?'99+':notificationUnread}</b>}</button>)}</nav></>;
 }
