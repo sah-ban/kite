@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { Home, PenLine, Bell, Radio, UserRound, ArrowUpRight, RefreshCw, Search, ArrowRight, AlertCircle } from 'lucide-react';
-import { hub, profile, following, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
+import { hub, profile, following, localOrigin, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
+import { clearRememberedAppKey, rememberedAccessCurrent, ACCESS_CLEARED_EVENT, REMEMBER_KEY, STORAGE_KEY, LOCK_KEY } from './lib/vault';
 import { attribute } from './lib/attribution';
 import type { Session } from './lib/signing';
 const Account=lazy(()=>import('./Account').then(m=>({default:m.Account})));
@@ -125,16 +126,62 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   },[feedView,feedKey,casts,pageToken,hasMore,followPage,followFids,feedStatus,newPosts,refresh,busy,error]);
   const profileOrder=feed==='profile'?order:'newest';
   const requestId=useRef(0), reading=useRef(false), replyComposer=useRef<HTMLTextAreaElement>(null);
+  const sessionRevision=useRef(0);
   useEffect(()=>{
-    if(!config.approvalConfigured||(!['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&location.protocol!=='https:'))return;
-    let active=true;
-    fetch('/api/auth/session').then(r=>r.ok?r.json():null).then(result=>{if(active&&result?.state==='active'&&result.session)setSession({...result.session,remote:true});}).catch(()=>{});
+    let active=true;const revision=sessionRevision.current;
+    const current=()=>active&&revision===sessionRevision.current;
+    void (async()=>{
+      if(localOrigin()){
+        try{
+          if(localStorage.getItem(REMEMBER_KEY)){
+            const restored=await (await import('./lib/signing')).restoreRememberedSession(config);
+            if(restored){if(current())setSession(restored);return;}
+          }
+        }catch{if(current())setNotice('Could not restore your local account. Connect again to unlock the saved app key.');}
+      }
+      if(!current()||!config.approvalConfigured||(!localOrigin()&&location.protocol!=='https:'))return;
+      try{
+        const response=await fetch('/api/auth/session',{signal:AbortSignal.timeout(25_000)});
+        const result=response.ok?await response.json():null;
+        if(current()&&result?.state==='active'&&result.session)setSession({...result.session,remote:true});
+      }catch{/* The account can still be connected manually. */}
+    })();
     return()=>{active=false;};
   },[config]);
+  useEffect(()=>{
+    const cleared=()=>{sessionRevision.current++;setSession(current=>current&&!current.remote?null:current);};
+    const storageChanged=(event:StorageEvent)=>{
+      if(event.storageArea===localStorage&&(event.key===null||event.key===REMEMBER_KEY||event.key===STORAGE_KEY||event.key===LOCK_KEY))cleared();
+    };
+    window.addEventListener(ACCESS_CLEARED_EVENT,cleared);
+    window.addEventListener('storage',storageChanged);
+    return()=>{window.removeEventListener(ACCESS_CLEARED_EVENT,cleared);window.removeEventListener('storage',storageChanged);};
+  },[]);
+  useEffect(()=>{
+    if(!session||session.remote||!session.remembered)return;
+    const access=session.remembered;
+    let timer:ReturnType<typeof setTimeout>;
+    const check=()=>{
+      if(!rememberedAccessCurrent(access)){
+        sessionRevision.current++;setSession(null);
+        void clearRememberedAppKey().catch(()=>{});
+        setNotice('Remembered access ended. Unlock your saved app key to reconnect.');
+      }else timer=setTimeout(check,Math.min(access.expiresAt-Date.now(),2_147_483_647));
+    };
+    const visible=()=>{clearTimeout(timer);check();};
+    check();window.addEventListener('focus',visible);document.addEventListener('visibilitychange',visible);
+    return()=>{clearTimeout(timer);window.removeEventListener('focus',visible);document.removeEventListener('visibilitychange',visible);};
+  },[session]);
+  function connectSession(connected:Session){
+    sessionRevision.current++;setSession(connected);
+    profile(config,connected.fid).then(p=>setProfiles(v=>({...v,[connected.fid]:p}))).catch(()=>{});
+  }
   async function lockSession(){
+    sessionRevision.current++;
     setError('');
     if(session?.remote){try{const r=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(25_000)});if(!r.ok)throw new Error('Could not end the approval session. Try again.');}catch(e){setError((e as Error).message);return;}}
     setSession(null);
+    try{await clearRememberedAppKey();}catch{setNotice('Account locked. Browser key storage could not be cleared; clear this site’s browser data to remove it completely.');}
     if(view.kind==='home'||view.kind==='following'){navigate('/');}
   }
 
@@ -290,7 +337,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
 
   {editingCast&&session?.fid===editingCast.data.fid&&<EditCast key={`${session.key}:${editingCast.hash}`} config={config} session={session} cast={editingCast} open={editCastOpen} onClose={pending=>{setEditCastOpen(false);if(!pending)setEditingCast(null);}} onDeleted={()=>setCasts(value=>value.filter(cast=>cast.hash!==editingCast.hash))} onPublished={hash=>{setEditingCast(null);setEditCastOpen(false);published(session.fid,hash);setRefresh(value=>value+1);if(view.kind==='cast'&&view.hash===editingCast.hash)openProfile(session.fid);}}/>}
   {editProfileOpen&&session&&<EditProfile key={session.key} config={config} session={session} onClose={()=>setEditProfileOpen(false)} onConnect={()=>{setEditProfileOpen(false);setAccountOpen(true);}} onSaved={()=>{setNotice('Profile updated');profile(config,session.fid).then(person=>setProfiles(value=>({...value,[person.fid]:person}))).catch(()=>{});setRefresh(value=>value+1);}}/>}
-  {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={s=>{setSession(s);profile(config,s.fid).then(p=>setProfiles(v=>({...v,[s.fid]:p}))).catch(()=>{});}} onClose={()=>setAccountOpen(false)}/></Suspense>}
+  {accountOpen&&<Suspense fallback={<div className="feed-message notice" role="status">Opening local account tools…</div>}><Account config={config} onSession={connectSession} onNotice={setNotice} onClose={()=>setAccountOpen(false)}/></Suspense>}
   {controls&&<FeedControls initial={{mode,clientFids,signerKeys,selfRegistered}} onClose={()=>setControls(false)} onApply={filters=>{applyFilters(filters);setControls(false);}}/>}
   </main><div className="toast-stack">{toastError&&<Toast error onDismiss={()=>setToastError('')}>{toastError}</Toast>}{notice&&<Toast onDismiss={()=>setNotice('')}>{notice}</Toast>}</div><nav className="mobile-nav" aria-label="Mobile navigation">{mobileNavigation.map(({label,Icon,active,action})=><button key={label} className={`${label==='New cast'?'mobile-compose ':''}${active?'active':''}`} aria-label={label} aria-current={active&&label!=='New cast'?'page':undefined} aria-haspopup={label==='New cast'?'dialog':undefined} disabled={label==='New cast'&&(publishing||uploading)} onClick={action}>{label==='Profile'&&session?<Avatar person={profiles[session.fid]}/>:<Icon size={22}/>}<span className="sr-only">{label}</span>{label==='Notifications'&&notificationUnread>0&&<b className="notification-unread" aria-label={`${notificationUnread} unread notifications`}>{notificationUnread>99?'99+':notificationUnread}</b>}</button>)}</nav></>;
 }

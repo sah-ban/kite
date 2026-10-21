@@ -70,7 +70,7 @@ test('registered signer import encrypts the key, remains usable, and unlocks wit
     assert.ok(!encrypted.includes(password));
     const unlocked = await unlockSession(config,password);
     assert.equal(unlocked.key,session.key);
-    assert.equal(requests.length,4);
+    assert.equal(requests.length,5);
   });
 });
 

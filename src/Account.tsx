@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { KeyRound, Lock, ArrowRight, ExternalLink } from 'lucide-react';
 import { type Config, localOrigin } from './lib/hub';
 import { importExistingSigner, prepareKey, unlockSession, type PreparedKey, type Session } from './lib/signing';
-import { storedAccount, forgetAppKey } from './lib/vault';
+import { storedAccount, forgetAppKey, rememberAppKey, clearRememberedAppKey, AccountAccessChangedError, REMEMBER_DAYS } from './lib/vault';
 import { Modal } from './components';
 import { Approval } from './Approval';
 import {LocalToolsHint} from './LocalToolsHint';
 
 type Mode = 'approve' | 'signer' | 'seed' | 'unlock';
 
-export function Account({ config, onSession, onClose }: {
-  config: Config; onSession: (s: Session) => void; onClose: () => void;
+export function Account({ config, onSession, onClose, onNotice }: {
+  config: Config; onSession: (s: Session) => void; onClose: () => void; onNotice: (message: string) => void;
 }) {
   const [saved, setSaved] = useState(storedAccount);
   const [mode, setMode] = useState<Mode>(saved ? 'unlock' : config.approvalConfigured ? 'approve' : 'signer');
@@ -22,6 +22,7 @@ export function Account({ config, onSession, onClose }: {
   const [pending, setPending] = useState<PreparedKey | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(false);
 
   useEffect(() => () => { pending?.discard(); }, [pending]);
 
@@ -41,10 +42,33 @@ export function Account({ config, onSession, onClose }: {
     setPassword('');
   }
 
+  async function finish(session: Session) {
+    try {
+      if(!session.remote&&remember)session.remembered=await rememberAppKey(password,session);
+      else await clearRememberedAppKey();
+    } catch (error) {
+      if(error instanceof AccountAccessChangedError){
+        setPrivateKey('');setPassword('');
+        onNotice('Account access changed in another tab. Unlock the saved app key again to reconnect.');
+        onClose();return;
+      }
+      onNotice('Account connected for this tab. This browser could not save remembered access; use your passphrase after refreshing.');
+    }
+    setPrivateKey('');
+    setPassword('');
+    onSession(session);
+    onClose();
+  }
+
+  const rememberOption=<label className="remember-device">
+    <input type="checkbox" checked={remember} disabled={busy} onChange={event=>setRemember(event.target.checked)} aria-describedby="remember-device-hint"/>
+    <span>Remember this device<small id="remember-device-hint">Stay connected after refreshing for {REMEMBER_DAYS} days. Anyone using this browser can post while connected. Your passphrase is never saved.</small></span>
+  </label>;
+
   if (!localOrigin()) return (
     <Modal title="Connect with Farcaster" onClose={onClose}>
       <div className="account-icon"><Lock size={26} /></div>
-      <Approval config={config} onSession={onSession} onClose={onClose}/>
+      <Approval config={config} onSession={session=>{void finish(session);}} onClose={()=>{}}/>
       <LocalToolsHint kind="account"/>
     </Modal>
   );
@@ -67,11 +91,10 @@ export function Account({ config, onSession, onClose }: {
           <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow, unfollow and edit your profile</dd>
         </dl>
         <p className="small muted">The encrypted app key is saved before submission so you can unlock it if the request is interrupted. Active use refreshes its expiry.</p>
+        {rememberOption}
         <button className="button primary full" disabled={busy} onClick={() => run(async () => {
           const session = await pending.register();
-          setPassword('');
-          onSession(session);
-          onClose();
+          await finish(session);
         })}>
           {busy ? 'Registering app key…' : 'Register app key (gasless)'} <ArrowRight size={16} />
         </button>
@@ -82,7 +105,7 @@ export function Account({ config, onSession, onClose }: {
           <option value="seed">Register a new key with a custody phrase</option>
           {saved && <option value="unlock">Unlock saved app key</option>}
         </select>
-      </label>{mode==='approve'?<Approval config={config} onSession={onSession} onClose={onClose}/>:<form onSubmit={e => {
+      </label>{mode==='approve'?<Approval config={config} onSession={session=>{void finish(session);}} onClose={()=>{}}/>:<form onSubmit={e => {
         e.preventDefault();
         run(async () => {
           if (mode === 'seed') {
@@ -94,10 +117,7 @@ export function Account({ config, onSession, onClose }: {
           const session = mode === 'signer'
             ? await importExistingSigner(config, Number(fid), privateKey, password)
             : await unlockSession(config, password);
-          setPrivateKey('');
-          setPassword('');
-          onSession(session);
-          onClose();
+          await finish(session);
         });
       }}>
         {mode === 'signer' && <>
@@ -124,17 +144,18 @@ export function Account({ config, onSession, onClose }: {
         <label>{mode === 'unlock' ? 'Encryption passphrase' : 'App key encryption passphrase'}
           <input disabled={busy} type="password" autoComplete={mode === 'unlock' ? 'current-password' : 'new-password'} minLength={mode === 'unlock' ? undefined : 12} value={password} onChange={e => setPassword(e.target.value)} required placeholder={mode === 'unlock' ? 'Your local passphrase' : 'At least 12 characters'} />
         </label>
+        {rememberOption}
         <button className="button primary full" disabled={busy}>
           {busy ? 'Checking account…' : mode === 'seed' ? 'Prepare registration' : mode === 'signer' ? 'Verify and import signer' : 'Unlock app key'} <ArrowRight size={16} />
         </button>
       </form>}</>}
       {error && <div className="error" role="alert">{error}</div>}
       {saved && !pending && <div className="account-alternatives">
-        <button disabled={busy} className="text-button danger" onClick={() => {
-          forgetAppKey();
+        <button disabled={busy} className="text-button danger" onClick={() => run(async () => {
+          await forgetAppKey();
           setSaved(null);
           changeMode('signer');
-        }}>Forget local app key</button>
+        })}>Forget local app key</button>
         <p className="small muted">Forgetting removes only the encrypted browser copy.{saved.registration==='gasless'?' It does not revoke the gasless key.':' To revoke access, remove the key onchain.'}</p>
         <a className="small" href={saved.registration==='gasless'?'https://snapchain.farcaster.xyz/guides/writing-messages':'https://optimistic.etherscan.io/address/0x00000000fc1237824fb747abde0ff18990e59b7e#writeContract'} target="_blank" rel="noreferrer">{saved.registration==='gasless'?'Gasless signer documentation':'Key Registry on Optimism'} <ExternalLink size={12} /></a>
       </div>}

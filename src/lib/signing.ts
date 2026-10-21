@@ -7,10 +7,10 @@ import { mnemonicToAccount } from 'viem/accounts';
 import { optimism } from 'viem/chains';
 import { hub, localOrigin, type Config, type Cast } from './hub';
 import { encodeMentionText, type DraftMention } from './mentions';
-import { saveAppKey, unlockAppKey } from './vault';
+import { saveAppKey, unlockAppKey, unlockRememberedAppKey, rememberedAccessCurrent, clearRememberedAppKey, type UnlockedAppKey, type RememberedAccess } from './vault';
 import { buildGaslessKey, checkGaslessSigner, gaslessState, GASLESS_TTL } from './gasless';
 
-export type LocalSession = { fid: number; address: Hex; key: Hex; signer: NobleEd25519Signer; remote?: false };
+export type LocalSession = { fid: number; address: Hex; key: Hex; signer: NobleEd25519Signer; remote?: false; remembered?: RememberedAccess };
 export type RemoteSession = { fid: number; address: Hex; key: Hex; remote: true };
 export type Session = LocalSession | RemoteSession;
 export type PreparedKey = { fid: number; address: Hex; key: Hex; ttlSeconds: number; register: () => Promise<LocalSession>; discard: () => void };
@@ -94,16 +94,33 @@ export async function prepareKey(config: Config, phrase: string, password: strin
 export async function unlockSession(config: Config, password: string): Promise<LocalSession> {
   requireLocal();
   const saved = await unlockAppKey(password);
+  return validatedLocalSession(config,saved);
+}
+async function validatedLocalSession(config: Config, saved: UnlockedAppKey): Promise<LocalSession> {
   try {
     const signer = new NobleEd25519Signer(saved.privateKey.slice());
     if (bytesToHex(result(await signer.getSignerKey())).toLowerCase() !== saved.key.toLowerCase()) throw new Error('Saved key does not match its public key.');
     if (saved.registration === 'gasless') {
       if (!(await checkGaslessSigner(config,saved.fid,saved.key))) throw new Error('This gasless app key is missing, expired, revoked, or lacks the required permissions. Wait for registration to sync or register a replacement.');
-      const storage=await hub<{units?:number}>(config,'storageLimitsByFid',{fid:saved.fid});
-      if (!(Number(storage.units)>0)) throw new Error('This account has no active storage.');
     } else await checkRegisteredSigner(config, saved.fid, saved.key);
+    const storage=await hub<{units?:number}>(config,'storageLimitsByFid',{fid:saved.fid});
+    if (!(Number(storage.units)>0)) throw new Error('This account has no active storage.');
     return {fid:saved.fid,address:saved.address,key:saved.key,signer};
   }finally{saved.privateKey.fill(0);}
+}
+export async function restoreRememberedSession(config: Config): Promise<LocalSession | null> {
+  requireLocal();
+  const saved=await unlockRememberedAppKey();
+  if(!saved)return null;
+  try{
+    // Restoring is read-only and checks the same registration and storage as unlock.
+    const session=await validatedLocalSession(config,saved);
+    return rememberedAccessCurrent(saved.remembered)?{...session,remembered:saved.remembered}:null;
+  }catch(error){
+    if(!rememberedAccessCurrent(saved.remembered))return null;
+    await clearRememberedAppKey().catch(()=>{});
+    throw error;
+  }
 }
 export function encodeForSnapchain(message: Message): Uint8Array {
   if (!message.dataBytes?.length) {
