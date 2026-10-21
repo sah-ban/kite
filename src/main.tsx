@@ -19,7 +19,7 @@ function App(){
     history.pushState({freecast:true},'',p==='client'?'/':'/guide');setPage(p);
     window.dispatchEvent(new PopStateEvent('popstate'));window.scrollTo(0,0);
   }
-  const loading=<><AppHeader onHome={()=>navigate('client')}/><main className="loading"><p>{error||'Opening Kite…'}</p></main></>;
+  const loading=<><AppHeader onHome={()=>navigate('client')} desktopHidden/><main className="loading"><p>{error||'Opening Kite…'}</p></main></>;
   return page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
