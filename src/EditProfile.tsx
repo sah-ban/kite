@@ -6,6 +6,7 @@ import type { Session } from './lib/signing';
 import { getProStatus } from './lib/pro';
 import { uploadImage } from './lib/images';
 import { canEditProfile, profileDraft, profileChanges, saveProfile, type ProfileDraft } from './lib/profile-edit';
+import {LocalToolsHint} from './LocalToolsHint';
 const empty:ProfileDraft={name:'',bio:'',avatar:'',banner:'',website:''};
 const ChangeFname=lazy(()=>import('./ChangeFname').then(module=>({default:module.ChangeFname})));
 export function EditProfile({config,session,onClose,onSaved,onConnect}:{config:Config;session:Session;onClose:()=>void;onSaved:()=>void;onConnect:()=>void}) {
@@ -30,6 +31,7 @@ export function EditProfile({config,session,onClose,onSaved,onConnect}:{config:C
   return <Modal title="Edit profile" className="edit-profile-modal" onClose={()=>{if(!busy&&!uploading&&!fnameBusy)onClose();}}>
     {loading?<p role="status">Loading your profile…</p>:<>
       <p className="small muted">{username?`@${username}`:`FID ${session.fid}`}</p>
+      {!localOrigin()&&<LocalToolsHint kind="fname"/>}
       {!allowed&&!error&&<div className="profile-permission-note" role="status"><p>This signer does not have profile editing permission. Your existing posting access still works. Connect an approved signer or register a new app key that includes profile editing.</p><button type="button" className="button small-button" onClick={onConnect}>Connect another signer</button></div>}
       <form onSubmit={async event=>{
         event.preventDefault();if(locked||!allowed||validation||!changed)return;setBusy(true);setError('');

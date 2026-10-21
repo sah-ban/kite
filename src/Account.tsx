@@ -5,6 +5,7 @@ import { importExistingSigner, prepareKey, unlockSession, type PreparedKey, type
 import { storedAccount, forgetAppKey } from './lib/vault';
 import { Modal } from './components';
 import { Approval } from './Approval';
+import {LocalToolsHint} from './LocalToolsHint';
 
 type Mode = 'approve' | 'signer' | 'seed' | 'unlock';
 
@@ -43,8 +44,8 @@ export function Account({ config, onSession, onClose }: {
   if (!localOrigin()) return (
     <Modal title="Connect with Farcaster" onClose={onClose}>
       <div className="account-icon"><Lock size={26} /></div>
-      <Approval configured={Boolean(config.approvalConfigured)} onSession={onSession} onClose={onClose}/>
-      <p className="small muted">Private-key and custody-phrase import remain available only on localhost.</p>
+      <Approval config={config} onSession={onSession} onClose={onClose}/>
+      <LocalToolsHint kind="account"/>
     </Modal>
   );
 
@@ -60,6 +61,7 @@ export function Account({ config, onSession, onClose }: {
           <dt>FID</dt><dd>{pending.fid}</dd>
           <dt>Custody address</dt><dd className="mono">{pending.address}</dd>
           <dt>App public key</dt><dd className="mono">{pending.key}</dd>
+          <dt>Client account</dt><dd>Your account · FID {pending.fid}</dd>
           <dt>Registration fee</dt><dd>No gas required</dd>
           <dt>Key expiry</dt><dd>{pending.ttlSeconds / 86400} days of inactivity</dd>
           <dt>Permissions</dt><dd>Publish and delete casts, like, recast, follow, unfollow and edit your profile</dd>
@@ -80,7 +82,7 @@ export function Account({ config, onSession, onClose }: {
           <option value="seed">Register a new key with a custody phrase</option>
           {saved && <option value="unlock">Unlock saved app key</option>}
         </select>
-      </label>{mode==='approve'?<Approval configured={Boolean(config.approvalConfigured)} onSession={onSession} onClose={onClose}/>:<form onSubmit={e => {
+      </label>{mode==='approve'?<Approval config={config} onSession={onSession} onClose={onClose}/>:<form onSubmit={e => {
         e.preventDefault();
         run(async () => {
           if (mode === 'seed') {
@@ -110,6 +112,7 @@ export function Account({ config, onSession, onClose }: {
         </>}
         {mode === 'seed' && <>
           <p>Use the seed phrase that controls an existing Farcaster FID with active storage. It stays in this browser's memory during setup.</p>
+          <p className="signer-attribution-note">Casts made with this key will show your own account as the client.</p>
           <label>Custody seed phrase
             <textarea disabled={busy} autoComplete="off" spellCheck={false} value={phrase} onChange={e => setPhrase(e.target.value)} required rows={3} placeholder="Enter your 12 or 24 words" />
           </label>

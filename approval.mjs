@@ -173,10 +173,14 @@ export function approval(config, dependencies = {}) {
       const origin = originFor(req,config);
       if (!canConnect(origin)) throw new Failure(403, 'Open Kite through localhost or HTTPS to connect an account.');
       if (origin.protocol !== 'https:' && !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress)) throw new Failure(403, 'Localhost account connections must originate on this server.');
-      const expectedMethod = path === '/api/auth/session' ? 'GET' : 'POST';
+      const expectedMethod = ['/api/auth/session','/api/auth/app'].includes(path) ? 'GET' : 'POST';
       if (req.method !== expectedMethod) throw new Failure(405, 'Method not allowed.');
       if (req.method === 'POST' && req.headers.origin !== origin.origin) throw new Failure(403, 'Origin mismatch.');
-      if (!['/api/auth/start','/api/auth/session','/api/auth/action','/api/auth/logout','/api/auth/feed'].includes(path)) throw new Failure(404, 'Unknown account endpoint.');
+      if (!['/api/auth/start','/api/auth/session','/api/auth/app','/api/auth/action','/api/auth/logout','/api/auth/feed'].includes(path)) throw new Failure(404, 'Unknown account endpoint.');
+      if(path==='/api/auth/app'){
+        try{identity ||= loadApprovalIdentity(config);return send(res,200,{fid:(await identity).fid});}
+        catch(error){identity=undefined;throw error;}
+      }
       try{await (ready ||= restore());}catch(error){ready=undefined;throw error;}await prune();
       let id = cookieValue(req);
       let session = id && sessions.get(id);

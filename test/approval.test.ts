@@ -18,7 +18,7 @@ const config={FARCASTER_APP_FID:'1234',FARCASTER_APP_MNEMONIC:mnemonic,NEXT_PUBL
 type ResponseState={statusCode:number;headers:Record<string,string>;body:unknown;setHeader:(k:string,v:string)=>void;end:(value:unknown)=>void};
 
 async function call(middleware:ReturnType<typeof approval>,path:string,options:{cookie?:string;body?:unknown;origin?:string;host?:string;ip?:string;method?:string}={}) {
-  const req={url:path,method:options.method||(path==='/api/auth/session'?'GET':'POST'),headers:{host:options.host||'127.0.0.1:5173',origin:options.origin||'http://127.0.0.1:5173',cookie:options.cookie||''},socket:{remoteAddress:options.ip||'127.0.0.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(options.body||{}));}};
+  const req={url:path,method:options.method||(['/api/auth/session','/api/auth/app'].includes(path)?'GET':'POST'),headers:{host:options.host||'127.0.0.1:5173',origin:options.origin||'http://127.0.0.1:5173',cookie:options.cookie||''},socket:{remoteAddress:options.ip||'127.0.0.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(options.body||{}));}};
   const res:ResponseState={statusCode:200,headers:{},body:null,setHeader(k,v){this.headers[k]=v;},end(v){this.body=v;}};
   await middleware(req,res,()=>{throw new Error('Unexpected next middleware');});
   return {status:res.statusCode,headers:res.headers,body:JSON.parse(String(res.body))};
@@ -52,6 +52,26 @@ function harness(extra:Record<string,string>={}) {
   return {get middleware(){return middleware;},restart:()=>{middleware=approval({...config,...extra},dependencies);},failVerification:(error?:Error)=>{verifyError=error;},calls,verified,submitted,enrolled,setPro:(value:unknown)=>{proStatus=value;},setFnameProof:(value:unknown)=>{fnameProof=value;},approve:(fid=123)=>{state='completed';approvedFid=fid;time+=2000;},advance:(ms:number)=>{time+=ms;}};
 }
 const cookieFrom=(result:Awaited<ReturnType<typeof call>>)=>result.headers['Set-Cookie'].split(';')[0];
+
+test('public app identity exposes only the requester FID without creating a signer',async()=>{
+  const h=harness();
+  const info=await call(h.middleware,'/api/auth/app');
+  assert.equal(info.status,200);assert.deepEqual(info.body,{fid:1234});assert.equal(info.headers['Set-Cookie'],undefined);assert.equal(h.calls.length,0);assert.equal(h.submitted.length,0);
+  assert.equal((await call(h.middleware,'/api/auth/app',{method:'POST'})).status,405);
+  const start=await call(h.middleware,'/api/auth/start');assert.equal(start.status,200);
+  assert.equal(JSON.parse(String(h.calls[0].body)).requestFid,info.body.fid);
+});
+
+test('public app identity supports HTTPS and identity files without exposing credentials',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'kite-public-app-'));
+  try{
+    const file=join(directory,'.env');await writeFile(file,`DEVELOPER_FID=5678\nDEVELOPER_MNEMONIC="${mnemonic}"\nDATABASE_URL=private-fixture-value\n`);
+    const middleware=approval({FARCASTER_APP_ENV_FILE:file,FREECAST_PUBLIC_URL:'https://client.example'},{store:memoryStore()});
+    const result=await call(middleware,'/api/auth/app',{host:'client.example',origin:'https://client.example',ip:'192.0.2.20'});
+    assert.equal(result.status,200);assert.deepEqual(result.body,{fid:5678});assert.ok(!JSON.stringify(result.body).includes(mnemonic));
+    assert.equal((await call(middleware,'/api/auth/app',{host:'192.0.2.10:5173',origin:'http://192.0.2.10:5173',ip:'192.0.2.20'})).status,403);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
 
 test('approval creation signs public metadata and reuses a pending browser request',async()=>{
   const h=harness();

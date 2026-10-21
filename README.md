@@ -78,6 +78,8 @@ To stop charges when finished, review a Terraform destroy plan before applying i
 
 ## Account import and app keys
 
+On hosted origins, account connection explains the signer tools available locally, and Edit profile includes a hint for localhost fname changes. Signer approval identifies the configured requester account by username or FID before creation; that account is shown as the client on casts published using the key. Local custody-phrase registration uses the connected account’s own FID for client attribution.
+
 For a fresh delegated signer without entering the user's custody phrase, choose **Approve a fresh signer in Farcaster**. Configure the server-only `FARCASTER_APP_FID` and `FARCASTER_APP_MNEMONIC`, or set `FARCASTER_APP_ENV_FILE` to an explicitly selected app configuration containing `DEVELOPER_FID` and `DEVELOPER_MNEMONIC`. Only those identity fields are read from that file; its database and hub settings are not imported. Never use a `NEXT_PUBLIC_` or `VITE_` prefix for developer credentials.
 
 Kite generates a fresh Ed25519 key, signs a request with the developer identity, and displays the Farcaster approval link and a locally rendered QR code. The account owner approves in Farcaster. The server checks onchain registration and active storage, then binds the connection to that browser with an HttpOnly, SameSite cookie. The delegated private key is encrypted on disk and is never returned to the browser. No cast, reaction, or follow is sent during approval. Later actions require explicit client interaction.

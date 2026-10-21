@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import qrcode from 'qrcode-generator';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
 import type { RemoteSession } from './lib/signing';
+import type {Config} from './lib/hub';
+import {useProfile} from './social-ui';
 
 type Status = {state:'none'|'pending'|'active';deepLinkUrl?:string;key?:string;message?:string;session?:RemoteSession};
 async function accountRequest(path: 'start'|'session'|'logout'): Promise<Status> {
@@ -10,9 +12,21 @@ async function accountRequest(path: 'start'|'session'|'logout'): Promise<Status>
   if (!response.ok) throw new Error(result.error || 'Could not connect your account.');
   return result;
 }
-export function Approval({configured,onSession,onClose}:{configured:boolean;onSession:(s:RemoteSession)=>void;onClose:()=>void}) {
+export function Approval({config,onSession,onClose}:{config:Config;onSession:(s:RemoteSession)=>void;onClose:()=>void}) {
+  const configured=Boolean(config.approvalConfigured);
+  const [appFid,setAppFid]=useState<number>();
+  const app=useProfile(config,appFid||0);
   const [link,setLink]=useState(''),[key,setKey]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
   const secure = window.location.protocol==='https:' || ['localhost','127.0.0.1','[::1]'].includes(window.location.hostname);
+  useEffect(()=>{
+    if(!configured||!secure)return;
+    const controller=new AbortController();
+    fetch('/api/auth/app',{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])}).then(async response=>{
+      if(!response.ok)return;const value=await response.json();
+      if(!controller.signal.aborted&&Number.isSafeInteger(value.fid)&&value.fid>0)setAppFid(value.fid);
+    }).catch(()=>{});
+    return()=>controller.abort();
+  },[configured,secure]);
   const image = useMemo(()=>{
     if (!link) return '';
     const code=qrcode(0,'M');code.addData(link);code.make();return code.createDataURL(5,12);
@@ -37,6 +51,7 @@ export function Approval({configured,onSession,onClose}:{configured:boolean;onSe
   },[link,onSession,onClose]);
   return <div className="approval">
     <p>Create a fresh signer and approve it in Farcaster. Your account's seed phrase is not requested. The delegated private key is stored encrypted on this server.</p>
+    {configured&&<p className="signer-attribution-note">Your casts will be published by your account, with {appFid?<a href={`/profile/${appFid}`} target="_blank" rel="noopener noreferrer">{app?.username?`@${app.username}`:`FID ${appFid}`}</a>:'the configured app account'} shown as the client.</p>}
     {!secure&&<div className="note">Open this client through localhost or HTTPS to approve an account. This public HTTP view supports reading.</div>}
     {!configured&&<div className="note">The operator needs to configure a server-only developer app identity before approval requests can be created.</div>}
     {link?<>
