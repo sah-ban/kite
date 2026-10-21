@@ -24,6 +24,17 @@ From your repository checkout:
 
 Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
 
+On Windows, `./kite client` requires Bash. With Node.js 22.13+ and npm installed, start the client directly from the repository folder in PowerShell:
+
+```powershell
+npm.cmd ci
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
+npm.cmd run dev
+```
+
+Set `HUBURL` in `.env` to your Snapchain HTTP endpoint before starting. Keep the terminal open and visit http://127.0.0.1:5173/. The provision/node scripts target Ubuntu; the client can run separately on Windows.
+
 ## Three-command quickstart on suitable existing compute
 
 To access the guide and read-only client through this server's IP address, run `npm run dev:network` and open `http://SERVER_IP:5173/`. This listens on all interfaces; the normal `npm run dev` remains localhost-only. Account import and signing still require a localhost browser origin. The browser uses the server's read gateway, and the upstream read-node URL stays in the server's local configuration.
