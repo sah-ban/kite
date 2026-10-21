@@ -5,7 +5,6 @@ export function AboutKite({onGuide}:{onGuide:()=>void}){
   return <aside className="client-about-sidebar" aria-labelledby="about-kite-heading">
     <section className="about-kite-card">
       <div className="about-kite-brand"><KiteMark/><h2 id="about-kite-heading">About Kite</h2></div>
-      <p className="about-kite-tagline">Your people. Your feed.</p>
       <p className="about-kite-description">An open source Farcaster client with chronological feeds, client filters, and richer conversations.</p>
       <div className="about-kite-links">
         <a href="https://github.com/sah-ban/freecast" target="_blank" rel="noopener noreferrer"><Github size={17}/><span>Source code</span><ArrowUpRight size={15}/></a>
