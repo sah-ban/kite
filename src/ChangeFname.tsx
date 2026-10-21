@@ -47,7 +47,10 @@ export function ChangeFname({config,session,username,disabled,onBusy,onChanged}:
       {checking?<p className="small muted" role="status">Checking availability and 28-day cooldown…</p>:problem?<p className="small danger" role="status">{problem}</p>:check&&<p className="small muted" role="status">{check.alreadyOwned?'Already owned by this FID; ready to update the preferred username.':`@${check.name} is available and cooldown checks passed.`}</p>}
       {name.trim()&&<button type="button" className="text-button" disabled={busy||checking} onClick={()=>setRefresh(value=>value+1)}>Check again</button>}
       <label>Custody recovery phrase<textarea rows={3} autoComplete="off" spellCheck={false} disabled={busy||disabled} value={phrase} onChange={event=>setPhrase(event.target.value)} required/></label>
-      <label>Address derivation index<input type="number" min="0" max="100" step="1" value={index} disabled={busy||disabled} onChange={event=>setIndex(event.target.value)} required/></label>
+      <details className="custody-advanced">
+        <summary>Advanced options</summary>
+        <label>Address derivation index<input type="number" min="0" max="100" step="1" value={index} disabled={busy||disabled} onChange={event=>setIndex(event.target.value)} required/></label>
+      </details>
       {error&&<p className="danger" role="alert">{error}</p>}
       <div className="fname-actions"><button type="button" className="button" disabled={busy} onClick={()=>{reset();setOpen(false);}}>Cancel</button><button type="submit" className="button primary" disabled={busy||disabled||checking||!check||Boolean(problem)||!phrase.trim()}>{busy?'Checking custody…':'Review username change'}</button></div>
     </form>)}

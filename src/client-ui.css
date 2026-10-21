@@ -57,3 +57,6 @@
 .modal label.remember-device{display:flex;align-items:flex-start;gap:10px;color:var(--ink);font-size:13px;line-height:1.5;font-weight:500}
 .modal label.remember-device input{flex:0 0 18px;width:18px;height:18px;margin:2px 0 0;padding:0;accent-color:var(--accent)}
 .remember-device small{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.6;font-weight:400}
+.custody-advanced{margin:12px 0;color:var(--muted);font-size:13px}
+.custody-advanced>summary{cursor:pointer;min-height:44px;line-height:44px}
+.custody-advanced>summary:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:5px}

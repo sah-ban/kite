@@ -136,9 +136,12 @@ export function Account({ config, onSession, onClose, onNotice }: {
           <label>Custody seed phrase
             <textarea disabled={busy} autoComplete="off" spellCheck={false} value={phrase} onChange={e => setPhrase(e.target.value)} required rows={3} placeholder="Enter your 12 or 24 words" />
           </label>
-          <label>Address derivation index
-            <input disabled={busy} type="number" min={0} max={100} value={index} onChange={e => setIndex(e.target.value)} required />
-          </label>
+          <details className="custody-advanced">
+            <summary>Advanced options</summary>
+            <label>Address derivation index
+              <input disabled={busy} type="number" min={0} max={100} value={index} onChange={e => setIndex(e.target.value)} required />
+            </label>
+          </details>
         </>}
         {mode === 'unlock' && <p>Unlock the encrypted app key for <strong>FID {saved?.fid}</strong>. Your custody phrase is not needed.</p>}
         <label>{mode === 'unlock' ? 'Encryption passphrase' : 'App key encryption passphrase'}

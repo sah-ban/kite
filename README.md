@@ -101,7 +101,7 @@ If you already have a registered delegated Farcaster signer, choose **Import exi
 
 The **Register a new key with a custody phrase** option remains available for the contest's complete onboarding flow:
 
-An existing FID must have active storage. The imported phrase must derive its current custody address; a verified wallet or recovery address may be different. Default derivation is `m/44'/60'/0'/0/0`, with an adjustable final address index.
+An existing FID must have active storage. The imported phrase must derive its current custody address; a verified wallet or recovery address may be different. Default derivation is `m/44'/60'/0'/0/0` (address index `0`). A custom index is available under **Advanced options**.
 
 1. Choose **Connect account** on localhost.
 2. Enter the custody seed phrase and an app-key encryption passphrase of at least 12 characters.
@@ -237,7 +237,7 @@ Banner editing requires an active Farcaster Pro subscription. The editor checks 
 
 ### Change fname on localhost
 
-Open Kite at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then choose **Edit profile → Change username**. Enter the new fname, custody recovery phrase and derivation index. The phrase stays in browser memory and is cleared from the field before review; it is never stored or sent to Kite, the registry or the RPC. Only signed public username proofs go directly to `fnames.farcaster.xyz`. The phrase must derive the connected FID's current custody address, and the connected app signer must allow profile updates. ENS names use a separate registration process.
+Open Kite at `localhost`, `127.0.0.1` or `[::1]`, connect your account, then choose **Edit profile → Change username**. Enter the new fname and custody recovery phrase. Address index `0` is used by default; a custom index is available under **Advanced options**. The phrase stays in browser memory and is cleared from the field before review; it is never stored or sent to Kite, the registry or the RPC. Only signed public username proofs go directly to `fnames.farcaster.xyz`. The phrase must derive the connected FID's current custody address, and the connected app signer must allow profile updates. ENS names use a separate registration process.
 
 Availability, known reserved names, and the registry's [28-day cooldown](https://github.com/farcasterxyz/fname-registry/blob/main/src/transfers.ts) are checked before review and again before submission. The new name's complete transfer history is checked too: a released name can still be cooling down. Review the current and new fnames and custody address, then explicitly confirm the release. Releasing the old name and claiming the new one are separate registry writes; the new name is not reserved by an availability check, and the old name may not be reclaimable for 28 days. Both custody proofs are prepared before releasing anything, with the claim timestamp later than the release.
 
