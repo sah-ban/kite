@@ -2,13 +2,13 @@ import {castDate} from './hub';
 
 export function relativeCastTime(timestamp:number,now=Date.now()):string {
   const seconds=Math.max(0,Math.floor((now-castDate(timestamp).getTime())/1000));
-  if(seconds<60)return 'just now';
-  const units=[[365*86400,'year'],[30*86400,'month'],[86400,'day'],[3600,'hr'],[60,'min']] as const;
+  if(seconds<60)return 'now';
+  const units=[[365*86400,'y'],[30*86400,'mo'],[86400,'d'],[3600,'h'],[60,'m']] as const;
   for(const [size,unit] of units)if(seconds>=size){
     const count=Math.floor(seconds/size);
-    return `${count} ${unit}${count>1&&unit!=='min'&&unit!=='hr'?'s':''} ago`;
+    return `${count}${unit}`;
   }
-  return 'just now';
+  return 'now';
 }
 
 export function fullCastTime(timestamp:number):string {
