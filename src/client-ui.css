@@ -60,3 +60,4 @@
 .custody-advanced{margin:12px 0;color:var(--muted);font-size:13px}
 .custody-advanced>summary{cursor:pointer;min-height:44px;line-height:44px}
 .custody-advanced>summary:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:5px}
+.kite-account-link{text-decoration:underline;text-underline-offset:3px}.kite-account-link:hover{color:var(--ink)}
