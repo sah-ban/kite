@@ -42,3 +42,5 @@
 .client-layout .cast-expanded{row-gap:0}.client-layout .cast-expanded>.cast-main>.cast-text,.client-layout .cast-expanded>.cast-main>.cast-embeds,.client-layout .cast-expanded>.cast-main>.quote-preview{margin-bottom:2px}.client-layout .cast-expanded .cast-meta{margin-top:0}
 
 .mobile-nav button.mobile-compose{width:44px;height:44px;min-height:44px;align-self:center;justify-self:center;border-radius:14px;background:var(--primary);color:var(--on-primary)}
+
+.feed-toolbar .feed-refresh{display:none}@media(max-width:700px){.app-header.mobile-hidden,.client-layout .home-feed-title{display:none}.app-header.mobile-hidden+.client-layout{min-height:100dvh}.feed-toolbar .feed-refresh{display:inline-flex;flex-shrink:0;width:40px;height:40px;border:0;border-radius:50%}.feed-toolbar .feed-order{min-width:0}}
