@@ -148,6 +148,38 @@ npm start
 
 `@farcaster/core` remains pinned to 0.15.3 for existing onchain signer operations and reactions. Cast publishing, edit replacements, modern profile fields and custody-phrase registration use the isolated official `@farcaster/core-gasless` alias pinned to core 0.20.0. Both local and approved-account cast signing use its modern builder, including `TEN_K_CAST`, with explicit Snapchain `dataBytes` encoding. The SDK bundles legacy Faker fixture initialization, so a small loader bridges those removed APIs to patched Faker 10.6.0. The tutorial and client are separate chunks.
 
+## Docker deployment
+
+`Dockerfile` builds the client with Node.js 22, installs the locked dependencies, and produces a non-root production image containing the built client and Node APIs. Its default command is `node server.mjs` (equivalent to `npm start`), listening on `0.0.0.0:3000`. Override the command with `node feed/worker.mjs` (equivalent to `npm run feed:worker`) to run the indexer from the same image. `.dockerignore` excludes local environment files, certificates, runtime databases, signer files, and local dependencies from the build context. The build installs development tools for compilation, then prunes development-only dependencies before copying runtime files into the final image.
+
+For one deployment containing the web server, feed/notification worker, and PostgreSQL, use `compose.deploy.yml`. The existing `compose.feed.yml` remains the database-only option for development. The deployment stack creates its own database with persistent named volumes; it does not reuse an existing database or automatically migrate its data. On an empty database, the worker creates tables, enrolls seed FIDs, and imports the configured feed history. New connected accounts enroll automatically. Notifications collect new activity after activation without importing earlier notification history.
+
+With Docker Engine and Docker Compose installed, prepare the deployment settings:
+
+```bash
+cp .env.deploy.example .env.deploy
+```
+
+Edit `.env.deploy`: set `HUBURL` to your Snapchain HTTP API, `FREECAST_FEED_GRPC_URL` to its gRPC API, `FREECAST_PUBLIC_URL` to the exact public HTTPS origin, and a strong `FREECAST_POSTGRES_PASSWORD`. Set `FARCASTER_APP_FID` and `FARCASTER_APP_MNEMONIC` for approval links/QR and `IMGBB_API_KEY` for image uploads. `FREECAST_FEED_HTTP_URL` defaults to `HUBURL`. Use addresses reachable from inside the containers: `127.0.0.1` refers to the container, not the Docker host. The node's HTTP and gRPC APIs must allow access from this deployment. `.env.deploy` is ignored by Git and Docker; keep its credentials private.
+
+Start all three services and inspect their status:
+
+```bash
+docker compose --env-file .env.deploy -f compose.deploy.yml up --build -d
+docker compose --env-file .env.deploy -f compose.deploy.yml ps
+docker compose --env-file .env.deploy -f compose.deploy.yml logs -f worker
+```
+
+Compose waits for PostgreSQL to become healthy before starting the web server and worker. The stack supplies `DATABASE_URL=postgresql://freecast@db:5432/freecast` and the matching `PGPASSWORD` to both processes automatically. Passwords are passed separately so reserved URL characters work without encoding. No manually entered `DATABASE_URL` is needed for this bundled database. A hosting platform that accepts Compose can use the same file and environment values; no platform-specific configuration is required.
+
+The web server is available to a reverse proxy on the host at `http://127.0.0.1:3000`. Change `PORT` in `.env.deploy` if that host port is already occupied; the container always listens on port `3000`. Point your domain's DNS to the server and configure your HTTPS reverse proxy to forward to this address while preserving the original `Host` header. A proxy on the Compose network can instead target `web:3000` directly. Set `FREECAST_PUBLIC_URL` to the exact browser origin, and leave `FREECAST_TLS_CERT` and `FREECAST_TLS_KEY` unset when the proxy handles TLS. PostgreSQL has no published host port.
+
+Inspect worker logs for `Feed worker started` and check the feed's import progress. Keep one worker instance per database. The worker must remain running for feeds and notifications to update. Feed backfill can take time; the web container's health check confirms the HTTP server is responding, not that indexing has caught up.
+
+The `postgres-data` volume retains indexed data and enrollments. The `signer-sessions` volume mounts at `/data` and retains encrypted sessions plus their master key under `/data/sessions`. Regular redeployments preserve both volumes. Back them up before deleting volumes or changing volume/project names. Moving from an IP origin to a subdomain requires account reconnection because approval sessions are bound to the origin. Secrets stay in runtime environment settings and are not passed to Docker build commands.
+
+The Dockerfile also works without Compose: build it with `docker build -t kite .`, run the web image with your runtime environment and persistent storage at `/data`, and run a separate container with command `node feed/worker.mjs` for indexing. Supply your own `DATABASE_URL` to both containers when using an existing PostgreSQL database. The original non-container `npm start` default remains loopback port `5173`.
+
 ## Before entering the contest
 
 This is an implementation to test, not a claim of contest qualification. Complete these external steps:

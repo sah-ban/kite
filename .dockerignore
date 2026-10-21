@@ -1,0 +1,26 @@
+# Only send application source and build inputs to Docker.
+**
+!package.json
+!package-lock.json
+!index.html
+!tsconfig.json
+!vite.config.ts
+!*.mjs
+!src/
+!src/**
+!public/
+!public/**
+!feed/
+!feed/**
+!test/
+!test/**
+
+# Keep credentials, certificates and generated files out, including in subfolders.
+**/.env*
+**/*.pem
+**/*.key
+**/*.crt
+**/*.tsbuildinfo
+**/node_modules
+**/.git
+**/.freecast
