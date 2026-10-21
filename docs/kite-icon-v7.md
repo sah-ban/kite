@@ -1,6 +1,6 @@
 # Kite icon — tilted sail panels
 
-Asset: `public/kite-icon-v7.png`. Approved app logo, used by the header, guide footer, favicon, and Apple touch icon. Edited from v6 with the built-in imagegen tool to tilt the design clockwise toward the upper right. Original PNG preserved.
+Asset: `public/kite-icon-v7.png`. Approved app logo tile, used by avatar fallbacks, the About panel, guide footer, and Apple touch icon. The header and favicon use the [transparent variant](kite-icon-transparent.md). Edited from v6 with the built-in imagegen tool to tilt the design clockwise toward the upper right. Original PNG preserved.
 
 ## Edit prompt
 
