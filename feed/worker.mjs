@@ -1,3 +1,4 @@
+import {hubUrl} from '../node-config.mjs';
 import {Client,credentials} from '@grpc/grpc-js';
 import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid} from './store.mjs';
 import {castOf,dataOf,hex,requesterOf,subscriptionRequest,decodeEvent} from './protocol.mjs';
@@ -12,7 +13,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   if(!Number.isInteger(days)||days<1||days>365)throw new Error('Invalid feed history days');
   const grpcUrl=new URL(config.FREECAST_FEED_GRPC_URL);
   if(!['http:','https:'].includes(grpcUrl.protocol)||grpcUrl.username||grpcUrl.password)throw new Error('Invalid feed gRPC URL');
-  const httpUrl=config.FREECAST_FEED_HTTP_URL||config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381';
+  const httpUrl=config.FREECAST_FEED_HTTP_URL||hubUrl(config);
   const cutoff=()=>Math.floor(Date.now()/1000)-1609459200-days*86400;
   const stopController=new AbortController();let stopped=false,tracked=new Set(),dirtyViewers=new Map(),lastGraph=0,lastCleanup=0,lastRecovery=0;
   const connected=new Set(),clients=new Set(),streams=new Set();

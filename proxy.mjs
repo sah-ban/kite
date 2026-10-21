@@ -1,3 +1,4 @@
+import {hubUrl} from './node-config.mjs';
 import { feedFids } from './feed/api.mjs';
 import { joinedDates } from './joined.mjs';
 import { profileCounts } from './profile-counts.mjs';
@@ -9,7 +10,7 @@ export {writeOrigin} from './origin.mjs';
 export function gateway(config) {
   const joinedMiddleware=joinedDates();
   const countsMiddleware=profileCounts();
-  const nodeUrl = config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381';
+  const nodeUrl = hubUrl(config);
   return async (req, res, next) => {
     const url = new URL(req.url || '/', 'http://localhost');
     if(url.pathname==='/api/profile/joined')return joinedMiddleware(req,res,next);

@@ -1,3 +1,4 @@
+import {hubUrl} from './node-config.mjs';
 import { newCastBody, requiresCastPro } from './cast.mjs';
 import { activeProSubscription } from './pro-subscription.mjs';
 import { randomBytes } from 'node:crypto';
@@ -85,7 +86,7 @@ async function verifyRegistration(config, fid, key, request) {
   if (Number(state[0]) === 0) throw new RegistrationPending();
   if (Number(state[0]) !== 1 || Number(state[1]) !== 1) throw new SignerInactive();
   const address = await client.readContract({address:ID_REGISTRY_ADDRESS,abi:idRegistryABI,functionName:'custodyOf',args:[BigInt(fid)]});
-  const response = await request(new URL(`/v1/storageLimitsByFid?fid=${fid}`,config.NEXT_PUBLIC_HUBURL || 'http://127.0.0.1:3381'),{signal:AbortSignal.timeout(20_000)});
+  const response = await request(new URL(`/v1/storageLimitsByFid?fid=${fid}`,hubUrl(config)),{signal:AbortSignal.timeout(20_000)});
   if (!response.ok) throw new Failure(502, 'Could not check account storage.');
   if (!(Number((await response.json()).units) > 0)) throw new Failure(403, 'The approved account needs active Farcaster storage.');
   return address;
@@ -265,7 +266,7 @@ export function approval(config, dependencies = {}) {
         if(!requiresCastPro(body))return;
         let pro;
         try{
-          const target=new URL('/v1/storageLimitsByFid',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381');target.searchParams.set('fid',String(session.fid));
+          const target=new URL('/v1/storageLimitsByFid',hubUrl(config));target.searchParams.set('fid',String(session.fid));
           const response=await request(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});
           if(!response.ok)throw new Error('Unavailable');pro=activeProSubscription(await response.json(),now()/1000);
         }catch{throw new Failure(503,'Could not verify Farcaster Pro status. Your draft is kept; retry when the read node is available.');}
@@ -273,14 +274,14 @@ export function approval(config, dependencies = {}) {
       },async name=>{
         const host=new URL(`http://${req.headers.host}`).hostname,peer=req.socket?.remoteAddress;
         if(!['localhost','127.0.0.1','[::1]'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer))throw new Failure(403,'Fname changes are available only on localhost.');
-        const target=new URL('/v1/userNameProofByName',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381');target.searchParams.set('name',name);
+        const target=new URL('/v1/userNameProofByName',hubUrl(config));target.searchParams.set('name',name);
         const response=await request(target,{signal:AbortSignal.timeout(12_000),redirect:'error'});
         if(!response.ok||!ownsFnameProof(await response.json(),name,session.fid))throw new Failure(400,'The read node does not confirm this fname belongs to your FID.');
       });
       if (sessions.get(id) !== session || session.state!=='active' || session.expires <= now()) throw new Failure(401, 'This account session has ended.');
       const bytes = Message.encode({...message,dataBytes:MessageData.encode(message.data).finish(),data:undefined}).finish();
       if(action.kind==='prepareCastReplacement')return send(res,200,{hash:bytesToHex(message.hash),message:Buffer.from(bytes).toString('base64')});
-      const response = await request(new URL('/v1/submitMessage',config.NEXT_PUBLIC_HUBURL||'http://127.0.0.1:3381'),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
+      const response = await request(new URL('/v1/submitMessage',hubUrl(config)),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(25_000),redirect:'error'});
       if (!response.ok) throw new Failure(502, `Submission endpoint rejected the message (${response.status}).`);
       return send(res,200,{hash:bytesToHex(message.hash),accepted:true});
     } catch (error) {

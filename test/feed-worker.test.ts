@@ -28,6 +28,7 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
   const port=await new Promise<number>((resolve,reject)=>server.bindAsync('127.0.0.1:0',ServerCredentials.createInsecure(),(error,port)=>error?reject(error):resolve(port)));
   async function until(check:()=>Promise<boolean>){for(let i=0;i<100;i++){if(await check())return;await sleep(100);}throw Error('Worker fixture timed out');}
   const fetcher=async(url:URL)=>{
+    assert.equal(url.origin,'https://worker-node.example');
     const ep=url.pathname.split('/').pop();
     if(ep==='info')return Response.json({shardInfos:[{shardId:1}]});
     if(ep==='events')return Response.json({events:[{id:100}]});
@@ -38,7 +39,7 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
     throw Error('Unexpected endpoint '+ep);
   };
   try{
-    stop=await startWorker({DATABASE_URL:'fixture',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:()=>{}});
+    stop=await startWorker({DATABASE_URL:'fixture',HUBURL:'https://worker-node.example',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:()=>{}});
     await until(async()=>Number((await pool.query('SELECT event_id FROM freecast_feed_checkpoints WHERE shard=1')).rows[0]?.event_id)===101);
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_casts WHERE hash=$1',[hash])).rows[0].n,1);
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM freecast_feed_casts WHERE hash=$1',[ghost.hash])).rows[0].n,0);

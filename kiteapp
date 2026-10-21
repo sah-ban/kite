@@ -24,7 +24,7 @@ case "${1:-help}" in
       cp .env.example .env
     fi
     if [[ ! -d node_modules ]]; then npm ci; fi
-    echo 'Reads and signed submissions use NEXT_PUBLIC_HUBURL in .env.'
+    echo 'Reads and signed submissions use HUBURL in .env.'
     exec npm run dev ;;
   *) cat <<'HELP'
 Kite — your node, your feed

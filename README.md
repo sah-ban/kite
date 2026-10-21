@@ -22,7 +22,7 @@ From your repository checkout:
 ./kite client
 ```
 
-Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `NEXT_PUBLIC_HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
+Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
 
 ## Three-command quickstart on suitable existing compute
 
@@ -55,7 +55,7 @@ ssh -N -L 3381:127.0.0.1:3381 ubuntu@YOUR-NODE-IP
 In another terminal, configure `.env` from `.env.example`:
 
 ```dotenv
-NEXT_PUBLIC_HUBURL=http://127.0.0.1:3381
+HUBURL=http://127.0.0.1:3381
 OPTIMISM_RPC_URL=https://mainnet.optimism.io
 ```
 
@@ -114,7 +114,7 @@ No analytics are added. The optional QR approval flow uses Farcaster's signed-ke
 - A short hash like `0x50184b62` is resolved by paging FID 37's casts and then calling `castById` with `0x50184b62b4c52fd76628713562e1eda3dccaf63d`.
 - Casts, replies, likes, recasts, follows, and unfollows are signed with the Ed25519 app key. `dataBytes` is explicitly encoded for Snapchain compatibility.
 - Casts, deletions, profile updates, gasless signer registration, follows, and reactions finish when Snapchain accepts their signed message. No post-submission inclusion queries or delays block success. Cast success includes the hash and a view link; rejected submissions retain the draft.
-- `NEXT_PUBLIC_HUBURL` is the single Snapchain HTTP endpoint for reads and `/v1/submitMessage`. The gateway keeps read requests and signed submissions on separate same-origin routes to enforce method, endpoint, payload-size, and origin checks; both routes target the same configured node.
+- `HUBURL` is the server-only Snapchain HTTP endpoint for reads and `/v1/submitMessage`. The gateway keeps read requests and signed submissions on separate same-origin routes to enforce method, endpoint, payload-size, and origin checks; both routes target the same configured node.
 
 ## Filtering by client
 

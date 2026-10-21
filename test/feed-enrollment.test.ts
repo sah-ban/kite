@@ -11,10 +11,10 @@ import {createPool,migrate,enrollViewer,replaceFollows,saveCast,queryFeed,parseF
 import {indexedFeed} from '../feed/api.mjs';
 const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
 const key='0x'+Buffer.from((await signer.getSignerKey())._unsafeUnwrap()).toString('hex');
-const config={FREECAST_PUBLIC_URL:'https://freecast.example',FREECAST_FEED_HTTP_URL:'https://node.example'};
+const config={FREECAST_PUBLIC_URL:'https://freecast.example',HUBURL:'https://node.example'};
 function request(path:string,body?:unknown,extra:any={}){return {url:path,method:body===undefined?'GET':'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173'},socket:{remoteAddress:'127.0.0.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(body));},...extra};}
 async function proof(now=1000,source:any=1){let time=now,calls=0;const enrolled:number[]=[];
-  const handler=localFeedEnrollment(config,async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},{now:()=>time,fetcher:async()=>{calls++;return Response.json({signers:[{fid:123,key,keyType:1,source,expiresAt:100000,scopes:[1]}]});}});
+  const handler=localFeedEnrollment(config,async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},{now:()=>time,fetcher:async(url:URL)=>{assert.equal(url.origin,config.HUBURL);calls++;return Response.json({signers:[{fid:123,key,keyType:1,source,expiresAt:100000,scopes:[1]}]});}});
   async function challenge(fid=123){const url=new URL('/api/feed/challenge?'+new URLSearchParams({fid:String(fid),key}),'http://127.0.0.1:5173');return handler(request(url.pathname+url.search),{},url);}
   async function signed(challenge:any){return {nonce:challenge.nonce,signature:'0x'+Buffer.from((await signer.signMessageHash(createHash('sha256').update(challenge.message).digest()))._unsafeUnwrap()).toString('hex')};}
   async function submit(body:any,extra:any={}){return handler(request('/api/feed/enroll',body,extra),{},new URL('http://127.0.0.1:5173/api/feed/enroll'));}

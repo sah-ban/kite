@@ -10,7 +10,7 @@ async function request(url:string,method='GET',body=new Uint8Array(),headers:Rec
 test('gateway fixes read destination and preserves opaque query parameters',async()=>{
   const original=globalThis.fetch;let seen='';
   globalThis.fetch=async input=>{seen=String(input);return Response.json({messages:[]});};
-  try{const {req,res}=await request('/api/read/v1/castsByFid?fid=37&pageToken=x%2B%2F%3D');await gateway({NEXT_PUBLIC_HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);assert.equal(seen,'https://mine.example/v1/castsByFid?fid=37&pageToken=x%2B%2F%3D');}
+  try{const {req,res}=await request('/api/read/v1/castsByFid?fid=37&pageToken=x%2B%2F%3D');await gateway({HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);assert.equal(seen,'https://mine.example/v1/castsByFid?fid=37&pageToken=x%2B%2F%3D');}
   finally{globalThis.fetch=original;}
 });
 test('gateway blocks unsupported read endpoints and writes on read path',async()=>{
@@ -21,7 +21,7 @@ test('conversation and follower reads are allowed only on the configured read no
   globalThis.fetch=async input=>{calls.push(String(input));return Response.json({messages:[]});};
   try{for(const endpoint of ['castsByParent','castsByMention','reactionsByCast','linksByTargetFid','userNameProofByName','verificationsByFid']){
     const {req,res}=await request(`/api/read/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);
-    await gateway({NEXT_PUBLIC_HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);
+    await gateway({HUBURL:'https://mine.example'})(req,res,()=>{});assert.equal(res.statusCode,200);
     assert.equal(calls.at(-1),`https://mine.example/v1/${endpoint}?fid=37&pageToken=opaque%2B%2F%3D`);
   }}finally{globalThis.fetch=original;}
 });
@@ -32,11 +32,11 @@ test('default node supports submissions without a separate endpoint setting',asy
   finally{globalThis.fetch=original;}
 });
 test('cross-origin writes are rejected',async()=>{
-  const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array(),{origin:'https://attacker.example'});await gateway({NEXT_PUBLIC_HUBURL:'https://node.example'})(req,res,()=>{});assert.equal(res.statusCode,403);
+  const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array(),{origin:'https://attacker.example'});await gateway({HUBURL:'https://node.example'})(req,res,()=>{});assert.equal(res.statusCode,403);
 });
 test('browser configuration exposes gateway paths rather than upstream endpoints',async()=>{
   const {req,res}=await request('/api/config');
-  await gateway({NEXT_PUBLIC_HUBURL:'https://private-node.example',DATABASE_URL:'postgres://private-db.example/freecast',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'https://private-stream.example:3383',FREECAST_FEED_HTTP_URL:'https://private-feed.example'})(req,res,()=>{});
+  await gateway({HUBURL:'https://private-node.example',DATABASE_URL:'postgres://private-db.example/freecast',FREECAST_FEED_FIDS:'268438',FREECAST_FEED_GRPC_URL:'https://private-stream.example:3383',FREECAST_FEED_HTTP_URL:'https://private-feed.example'})(req,res,()=>{});
   const config=JSON.parse(String(res.body));
   assert.equal(config.readUrl,'/api/read');
   assert.ok(!('validatorUrl' in config));
@@ -47,13 +47,13 @@ test('browser configuration exposes gateway paths rather than upstream endpoints
 test('protobuf submissions and reads use the same configured node',async()=>{
   const original=globalThis.fetch;let seen='',payload:unknown;
   globalThis.fetch=async(input,init)=>{seen=String(input);payload=init?.body;assert.equal((init?.headers as Record<string,string>)['Content-Type'],'application/octet-stream');return Response.json({hash:'0x123'});};
-  try{const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1,2,3]),{origin:'http://127.0.0.1:5173'});await gateway({NEXT_PUBLIC_HUBURL:'https://node.example'})(req,res,()=>{});assert.equal(seen,'https://node.example/v1/submitMessage');assert.deepEqual([...payload as Uint8Array],[1,2,3]);assert.equal(res.statusCode,200);}
+  try{const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1,2,3]),{origin:'http://127.0.0.1:5173'});await gateway({HUBURL:'https://node.example'})(req,res,()=>{});assert.equal(seen,'https://node.example/v1/submitMessage');assert.deepEqual([...payload as Uint8Array],[1,2,3]);assert.equal(res.statusCode,200);}
   finally{globalThis.fetch=original;}
 });
 test('HTTPS writes accept the configured origin and reject forged hosts and origins',async()=>{
   const original=globalThis.fetch;let calls=0;
   globalThis.fetch=async()=>{calls++;return Response.json({hash:'0x123'});};
-  const middleware=gateway({NEXT_PUBLIC_HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  const middleware=gateway({HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
   try {
     for(const [host,origin,status] of [['client.example:8443','https://client.example:8443',200],['client.example:8443','http://client.example:8443',403],['attacker.example','https://client.example:8443',403]] as const){
       const {req,res}=await request('/api/write/v1/submitMessage','POST',new Uint8Array([1]),{host,origin});
@@ -66,7 +66,7 @@ test('HTTPS writes accept the configured origin and reject forged hosts and orig
 test('local writes use their exact loopback origin even when a hosted public URL is configured',async()=>{
   const original=globalThis.fetch;let calls=0;
   globalThis.fetch=async()=>{calls++;return Response.json({ok:true});};
-  const middleware=gateway({NEXT_PUBLIC_HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
+  const middleware=gateway({HUBURL:'https://node.example',FREECAST_PUBLIC_URL:'https://client.example:8443'});
   try{
     for(const [host,origin,peer,status] of [
       ['localhost:5173','http://localhost:5173','127.0.0.1',200],

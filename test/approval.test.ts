@@ -14,7 +14,7 @@ import {sessionStore,SessionStorageError} from '../session-store.mjs';
 // Public deterministic development fixture. Never used for a live approval.
 const mnemonic='test test test test test test test test test test test junk';
 const custody='0x0000000000000000000000000000000000000001';
-const config={FARCASTER_APP_FID:'1234',FARCASTER_APP_MNEMONIC:mnemonic,NEXT_PUBLIC_HUBURL:'https://node.example'};
+const config={FARCASTER_APP_FID:'1234',FARCASTER_APP_MNEMONIC:mnemonic,HUBURL:'https://node.example'};
 type ResponseState={statusCode:number;headers:Record<string,string>;body:unknown;setHeader:(k:string,v:string)=>void;end:(value:unknown)=>void};
 
 async function call(middleware:ReturnType<typeof approval>,path:string,options:{cookie?:string;body?:unknown;origin?:string;host?:string;ip?:string;method?:string}={}) {
@@ -42,7 +42,7 @@ function harness(extra:Record<string,string>={}) {
       if(new URL(url).pathname==='/v1/storageLimitsByFid')return Response.json(proStatus);
       if(url.endsWith('/signed-key-requests'))return Response.json({result:{signedKeyRequest:{token:'0xdeadbeef',deeplinkUrl:'farcaster://signed-key-request?token=0xdeadbeef'}}});
       if(url.includes('/signed-key-request?'))return Response.json({result:{signedKeyRequest:{state,userFid:approvedFid}}});
-      if(url===new URL('/v1/submitMessage',extra.NEXT_PUBLIC_HUBURL||config.NEXT_PUBLIC_HUBURL).href){
+      if(url===new URL('/v1/submitMessage',extra.HUBURL||config.HUBURL).href){
         submitted.push(Message.decode(init!.body as Uint8Array));return Response.json({accepted:true});
       }
       throw new Error('Unexpected network request: '+url);
@@ -174,11 +174,11 @@ test('developer identity file reads only the requested identity fields',async()=
   const dir=await mkdtemp(join(tmpdir(),'freecast-identity-test-'));
   try {
     const path=join(dir,'.env');
-    await writeFile(path,`DEVELOPER_FID=1234\nDEVELOPER_MNEMONIC="${mnemonic}"\nNEXT_PUBLIC_HUBURL=https://unrelated.example\nDATABASE_URL=unrelated-test-value\n`);
-    const settings={FARCASTER_APP_ENV_FILE:path,NEXT_PUBLIC_HUBURL:'https://own-node.example'};
+    await writeFile(path,`DEVELOPER_FID=1234\nDEVELOPER_MNEMONIC="${mnemonic}"\nHUBURL=https://unrelated.example\nDATABASE_URL=unrelated-test-value\n`);
+    const settings={FARCASTER_APP_ENV_FILE:path,HUBURL:'https://own-node.example'};
     const identity=await loadApprovalIdentity(settings);
     assert.equal(identity.fid,1234);assert.equal(identity.account.address,mnemonicToAccount(mnemonic).address);
-    assert.equal(settings.NEXT_PUBLIC_HUBURL,'https://own-node.example');
+    assert.equal(settings.HUBURL,'https://own-node.example');
     assert.ok(!('DATABASE_URL' in settings));
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
@@ -371,7 +371,7 @@ test('approved casts sign link embeds alongside images or quotes and reject inva
 
 test('approved Pro accounts publish four embeds and 10k-byte casts, replies and quotes using modern signatures',async()=>{
   const {loadGaslessSdk}=await import('../src/lib/gasless-sdk');const sdk=await loadGaslessSdk();
-  const h=harness({NEXT_PUBLIC_HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
+  const h=harness({HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();await call(h.middleware,'/api/auth/session',{cookie});
   h.setPro({tier_subscriptions:[{tier_type:'Pro',expires_at:Math.floor(Date.now()/1000)+86400}]});
   const quote={fid:37,hash:'0x'+'cd'.repeat(20)},images=['https://i.ibb.co/fixture/photo.png','https://media.tenor.com/fixture/hello.gif'],links=['https://example.com/one','https://example.com/two'];
   for(const body of [{text:'😀'.repeat(2500),images,links},{text:'Reply '+ 'x'.repeat(1024),images,links,parent:quote},{text:'Quote',images,links:links.slice(0,1),quote},{text:'Four images',images:[images[0],images[0],images[0],images[0]]},{text:'Quote images',images:[images[0],images[0],images[0]],quote},{text:'Escaped\n'+ '\\'.repeat(9992)}]){
@@ -403,7 +403,7 @@ test('server rechecks Pro for new and replacement casts and rejects absent, expi
 });
 
 test('localhost preferred fname updates require an owning node proof and sign only for the approved FID',async()=>{
-  const h=harness({FREECAST_PUBLIC_URL:'https://hosted.example',NEXT_PUBLIC_HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active');
+  const h=harness({FREECAST_PUBLIC_URL:'https://hosted.example',HUBURL:'https://read.example'}),start=await call(h.middleware,'/api/auth/start'),cookie=cookieFrom(start);h.approve();assert.equal((await call(h.middleware,'/api/auth/session',{cookie})).body.state,'active');
   for(const proof of [undefined,{fid:999,type:1,name:'newfname'},{fid:123,type:2,name:'newfname'},{fid:123,type:1,name:'different'}]){h.setFnameProof(proof);assert.equal((await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname'}})).status,400);}
   assert.equal(h.submitted.length,0);h.setFnameProof({fid:123,type:'USERNAME_TYPE_FNAME',name:'newfname'});
   const result=await call(h.middleware,'/api/auth/action',{cookie,body:{kind:'setPreferredFname',name:'newfname',fid:999}});assert.equal(result.status,200);
