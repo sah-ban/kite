@@ -44,3 +44,5 @@
 .mobile-nav button.mobile-compose{width:44px;height:44px;min-height:44px;align-self:center;justify-self:center;border-radius:14px;background:var(--primary);color:var(--on-primary)}
 
 .feed-toolbar .feed-refresh{display:none}@media(max-width:700px){.app-header.mobile-hidden,.client-layout .home-feed-title{display:none}.app-header.mobile-hidden+.client-layout{min-height:100dvh}.feed-toolbar .feed-refresh{display:inline-flex;flex-shrink:0;width:40px;height:40px;border:0;border-radius:50%}.feed-toolbar .feed-order{min-width:0}}
+
+.notification-row,.quote-preview .quoted-cast{cursor:pointer}.notification-row:focus-visible,.quote-preview .quoted-cast:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}

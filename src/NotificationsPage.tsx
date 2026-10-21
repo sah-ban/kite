@@ -14,13 +14,17 @@ const labels:Record<NotificationKind,string>={mention:'mentioned you',reply:'rep
 const icons={mention:AtSign,reply:MessageCircle,like:Heart,recast:Repeat2,follow:UserPlus};
 function NotificationRow({config,item,onProfile,onCast}:{config:Config;item:NotificationItem;onProfile:(fid:number)=>void;onCast:(cast:Cast)=>void}){
  const person=useProfile(config,item.actor),Icon=icons[item.kind];
- return <article className={`notification-row notification-${item.kind}`}>
+ const cast=item.cast||(item.target?{hash:item.target.hash,signer:'',data:{fid:item.target.fid,timestamp:0,castAddBody:{text:'',mentions:[],mentionsPositions:[],embeds:[]}}}:undefined);
+ const open=()=>cast?onCast(cast):onProfile(item.actor);
+ return <article className={`notification-row notification-${item.kind}`} role="link" tabIndex={0} aria-label={`${person?.name||`FID ${item.actor}`} ${labels[item.kind]}. Open ${cast?'cast':'profile'}.`} onClick={event=>{
+  if(event.defaultPrevented||event.button!==0||(event.target as HTMLElement).closest('a,button,input,textarea,select,[role="button"],[contenteditable]')||window.getSelection()?.toString())return;
+  open();
+ }} onKeyDown={event=>{if(event.key==='Enter'&&event.target===event.currentTarget){event.preventDefault();open();}}}>
   <div className="notification-symbol"><Icon size={18}/></div>
   <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${item.actor}`} profile`} onClick={()=>onProfile(item.actor)}><Avatar person={person}/></button>
   <div className="notification-main"><div className="notification-title"><button className="author" onClick={()=>onProfile(item.actor)}>{person?.name||`FID ${item.actor}`} <ProBadge config={config} fid={item.actor}/></button> <span>{labels[item.kind]}</span></div>
    <CastTime timestamp={item.timestamp}/>
-   {item.cast&&<CastText config={config} cast={item.cast} visible onProfile={onProfile} onOpen={onCast} limit={240} className="notification-cast-text"/>}
-   {(item.cast||item.target)&&<button className="text-button notification-open" onClick={()=>onCast(item.cast||{hash:item.target!.hash,signer:'',data:{fid:item.target!.fid,timestamp:0,castAddBody:{text:'',mentions:[],mentionsPositions:[],embeds:[]}}})}>View cast →</button>}
+   {item.cast&&<CastText config={config} cast={item.cast} visible onProfile={onProfile} limit={240} className="notification-cast-text"/>}
   </div>
  </article>;
 }
