@@ -39,3 +39,4 @@
 .client-layout .quote-text{line-height:1.45}
 
 .client-layout .cast-actions .signer{line-height:1.3}
+.client-layout .cast-expanded{row-gap:0}.client-layout .cast-expanded>.cast-main>.cast-text,.client-layout .cast-expanded>.cast-main>.cast-embeds,.client-layout .cast-expanded>.cast-main>.quote-preview{margin-bottom:2px}.client-layout .cast-expanded .cast-meta{margin-top:0}
