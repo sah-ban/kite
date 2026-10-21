@@ -10,7 +10,7 @@ def inspect(root=None):
     memory = int(Path('/proc/meminfo').read_text().split('MemTotal:')[1].split()[0]) * 1024
     cpu = os.cpu_count() or 0
     free = shutil.disk_usage(root).free
-    checks = [('CPU cores', cpu, 4, str), ('RAM', memory, 15 * 1024**3, lambda n: f'{n / 1024**3:.1f} GiB'), ('Free disk', free, 1_500_000_000_000, lambda n: f'{n / 10**12:.2f} TB')]
+    checks = [('CPU cores', cpu, 4, str), ('RAM', memory, 15 * 1024**3, lambda n: f'{n / 1024**3:.1f} GiB'), ('Free disk', free, 2_000_000_000_000, lambda n: f'{n / 10**12:.2f} TB')]
     for name, value, minimum, fmt in checks:
         print(f'{"PASS" if value >= minimum else "FAIL"}  {name}: {fmt(value)} (minimum {fmt(minimum)})')
     print('Also required: public IP, inbound UDP 3382, outbound peer/snapshot access.')
