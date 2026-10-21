@@ -19,7 +19,7 @@ Returning from a cast or profile restores scroll position and loaded feed pages 
 From your repository checkout:
 
 ```bash
-./kiteapp client
+./kite client
 ```
 
 Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `NEXT_PUBLIC_HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
@@ -31,16 +31,16 @@ To access the guide and read-only client through this server's IP address, run `
 First clone this repository. The node host needs Ubuntu 22.04/24.04, Python 3, curl, a public IP, four cores, at least 16 GB RAM, and at least 1.5 TB free SSD. The script allows 15 GiB reported physical RAM to accommodate a nominal 16 GB VM. The client machine needs Node.js 22.13+ and npm 10+.
 
 ```bash
-./kiteapp provision --existing
-./kiteapp node
-./kiteapp client
+./kite provision --existing
+./kite node
+./kite client
 ```
 
 1. Provision checks hardware before installing Docker. It supports an existing Ubuntu server and stops if an installed Docker daemon is inaccessible. If it adds your user to the Docker group, reconnect before continuing. It does not provision a new paid VM.
 2. Node resolves the latest stable upstream release on first run, pins that release and image, and starts the canonical mainnet read-node configuration. Later runs retain the same release. Set `SNAPCHAIN_REF=0.x.y` explicitly to change it after reviewing upstream release notes. The full initial sync downloads a very large snapshot and can take hours.
 3. Client installs locked dependencies if missing, creates a local-node `.env` if needed, and starts a localhost-only Vite server. The configured node handles both reads and signed submissions. These three shell invocations do not eliminate prerequisite installation, configuration, browser account registration, or initial sync.
 
-Check progress with `./kiteapp status`. Each shard should have advancing heights and a delay approaching zero. The script exits 2 while catching up and 1 when unavailable. A low-delay sample is not proof of sustained health; check it again later.
+Check progress with `./kite status`. Each shard should have advancing heights and a delay approaching zero. The script exits 2 while catching up and 1 when unavailable. A low-delay sample is not proof of sustained health; check it again later.
 
 The official read-node configuration needs inbound UDP 3382 and outbound access to network peers and snapshot storage. Our script binds HTTP 3381 and gRPC 3383 to loopback. It leaves APIs private; it does not change an existing firewall. Configure the host and provider firewalls accordingly.
 
@@ -59,7 +59,7 @@ NEXT_PUBLIC_HUBURL=http://127.0.0.1:3381
 OPTIMISM_RPC_URL=https://mainnet.optimism.io
 ```
 
-Then run `./kiteapp client`. Set `NODE_STATUS_URL` explicitly if `./kiteapp status` should inspect a different host. Keep the browser and client server on the machine you control; account import is disabled for non-loopback browser origins.
+Then run `./kite client`. Set `NODE_STATUS_URL` explicitly if `./kite status` should inspect a different host. Keep the browser and client server on the machine you control; account import is disabled for non-loopback browser origins.
 
 ## Optional AWS provisioning
 
@@ -68,7 +68,7 @@ Then run `./kiteapp client`. Set `NODE_STATUS_URL` explicitly if `./kiteapp stat
 Install Terraform 1.6+ and configure AWS credentials locally. Copy `infra/aws/terraform.example.tfvars` to `infra/aws/terraform.tfvars` and enter your SSH **public** key and client IPv4 CIDR. Never put private SSH keys in this file.
 
 ```bash
-./kiteapp provision --aws
+./kite provision --aws
 terraform -chdir=infra/aws apply kiteapp.tfplan
 ```
 
@@ -268,4 +268,4 @@ Run the regular suite with `npm test`. Set `FREECAST_TEST_DATABASE_URL` to run P
 
 ## Branding and compatibility
 
-The app is Kite, with `kiteapp` as its project name and handle. Use `./kiteapp` for the command-line entry point; `./freecast` remains a compatibility alias. Existing deployment identifiers, `FREECAST_*` operator settings, `.freecast/` runtime paths, database table names, browser theme/app-key storage, and session cookies are retained so the rebrand preserves saved keys, approved sessions, feed enrollment, and indexed posts. The GitHub repository URL remains the existing repository URL. Changing the app brand does not change any Farcaster account or registered app identity.
+The app is Kite, with `kiteapp` as its project name and handle. Use `./kite` for the command-line entry point; `./kiteapp` and `./freecast` remain available for compatibility. Existing deployment identifiers, `FREECAST_*` operator settings, `.freecast/` runtime paths, database table names, browser theme/app-key storage, and session cookies are retained so the rebrand preserves saved keys, approved sessions, feed enrollment, and indexed posts. The GitHub repository URL remains the existing repository URL. Changing the app brand does not change any Farcaster account or registered app identity.
