@@ -38,6 +38,7 @@ import { ProfileHeader } from './ProfileHeader';
 import { ProfileAbout } from './ProfileAbout';
 import { SettingsPage } from './SettingsPage';
 import { NotificationsPage } from './NotificationsPage';
+import {AboutKite} from './AboutKite';
 import {useNotificationUnread} from './lib/indexed-notifications';
 import { readLikedCasts } from './lib/profile-likes';
 import { clientRoute } from './lib/routes';
@@ -265,6 +266,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   {(view.kind==='cast'||view.kind==='settings')&&error&&<div className="feed-message error" role="alert">{error}</div>}
   {editingCast&&!editCastOpen&&session?.fid===editingCast.data.fid&&<div className="feed-message notice" role="status"><span>Your cast edit is still pending.</span><button type="button" className="text-button" onClick={()=>setEditCastOpen(true)}>Resume cast edit</button></div>}
   </section>
+  <AboutKite onGuide={openGuide}/>
   {composeOpen&&<Modal title="New cast" className="compose-modal" onClose={()=>{if(!publishing&&!uploading){setComposeOpen(false);requestAnimationFrame(()=>{if(composeTrigger.current?.isConnected)composeTrigger.current.focus();});}}}><CastComposer {...composerProps} modal/>{error&&<p className="danger" role="alert">{error}</p>}</Modal>}
   {deletePending&&<Modal title="Delete this cast?" onClose={()=>{if(!deleting)setDeletePending(null);}}><p>This permanently removes your cast from Farcaster. This action cannot be undone.</p><div className="delete-confirm-actions"><button className="button" disabled={deleting} onClick={()=>setDeletePending(null)}>Cancel</button><button className="button delete-confirm" disabled={deleting} onClick={async()=>{
     if(!session||session.fid!==deletePending.data.fid){setError('Connect the account that owns this cast.');return;}
