@@ -47,9 +47,9 @@ test('Twitter draft retains links already in text without duplicating their embe
 });
 test('Twitter mentions prefer linked X handles, use Farcaster usernames otherwise, and keep FID links when profiles are unavailable',()=>{
   const value=cast('🤓  hello ');value.data.castAddBody.mentions=[37,88];value.data.castAddBody.mentionsPositions=[5,12];
-  assert.equal(draft(value,{37:{twitterUsername:'alice_on_x',username:'alice'},88:{username:'bob'}}),'🤓 @alice_on_x hello @bob (on Farcaster)');
-  assert.equal(draft(value,{37:{twitterUsername:'alice.eth',username:'alice.eth'},88:{twitterUsername:'not a handle',username:'bob.base.eth'}}),'🤓 @alice.eth (on Farcaster) hello @bob.base.eth (on Farcaster)');
-  assert.equal(draft(value,{37:{twitterUsername:'@alice_on_x'},88:{username:' @bob '}}),'🤓 @alice_on_x hello @bob (on Farcaster)');
+  assert.equal(draft(value,{37:{twitterUsername:'alice_on_x',username:'alice'},88:{username:'bob'}}),'🤓 @alice_on_x hello @.bob (on Farcaster)');
+  assert.equal(draft(value,{37:{twitterUsername:'alice.eth',username:'alice.eth'},88:{twitterUsername:'not a handle',username:'bob.base.eth'}}),'🤓 @.alice.eth (on Farcaster) hello @.bob.base.eth (on Farcaster)');
+  assert.equal(draft(value,{37:{twitterUsername:'@alice_on_x'},88:{username:' @bob '}}),'🤓 @alice_on_x hello @.bob (on Farcaster)');
   assert.equal(draft(value,{37:{username:''}}),'🤓 https://farcaster.xyz/37 hello https://farcaster.xyz/88');
 });
 test('quoted casts use full-hash conversation URLs and do not duplicate a conversation link already in the text',()=>{
