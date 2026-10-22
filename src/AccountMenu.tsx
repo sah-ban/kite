@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, LogOut, Settings, UserRound, KeyRound, Menu } from 'lucide-react';
+import { BookOpen, ChevronDown, Github, LogOut, Settings, UserRound, KeyRound, Menu } from 'lucide-react';
 import type { Profile } from './lib/hub';
 import type { Session } from './lib/signing';
 import { Avatar } from './social-ui';
 
-export function AccountMenu({session,person,menuIcon=false,onSettings,onConnect,onLock}:{session:Session|null;person?:Profile;menuIcon?:boolean;onSettings:()=>void;onConnect:()=>void;onLock:()=>Promise<void>}) {
+export function AccountMenu({session,person,menuIcon=false,onGuide,onSettings,onConnect,onLock}:{session:Session|null;person?:Profile;menuIcon?:boolean;onGuide?:()=>void;onSettings:()=>void;onConnect:()=>void;onLock:()=>Promise<void>}) {
   const [open,setOpen]=useState(false),[locking,setLocking]=useState(false),root=useRef<HTMLDivElement>(null),toggle=useRef<HTMLButtonElement>(null),id=useId();
   useEffect(()=>{
     if(!open)return;
@@ -30,6 +30,10 @@ export function AccountMenu({session,person,menuIcon=false,onSettings,onConnect,
       {session&&<div className="account-menu-identity"><strong>{person?.name||'Your account'}</strong><small>{person?.username?`@${person.username}`:`FID ${session.fid}`}</small></div>}
       {!session&&<button role="menuitem" onClick={()=>select(onConnect)}><KeyRound size={18}/>Connect account</button>}
       <button role="menuitem" onClick={()=>select(onSettings)}><Settings size={18}/>Settings</button>
+      {onGuide&&<>
+        <a role="menuitem" href="/guide" onClick={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();select(onGuide);}}><BookOpen size={18}/>Guide</a>
+        <a role="menuitem" href="https://github.com/sah-ban/kite" target="_blank" rel="noopener noreferrer" onClick={()=>setOpen(false)}><Github size={18}/>GitHub</a>
+      </>}
       {session&&<button role="menuitem" disabled={locking} onClick={async()=>{setLocking(true);try{await onLock();setOpen(false);}finally{setLocking(false);}}}><LogOut size={18}/>{locking?'Disconnecting…':session.remote?'Sign out':'Lock account'}</button>}
     </div>}
   </div>;
