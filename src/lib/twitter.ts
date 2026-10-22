@@ -1,4 +1,4 @@
-import type { Cast } from './hub';
+import type { Cast, Profile } from './hub';
 import { castTextParts } from './mentions';
 import { classifyEmbed, embedPreview, embedURL } from './embeds';
 import { xHandle } from './x-handle';
@@ -15,15 +15,16 @@ export async function twitterMediaUrls(cast:Cast):Promise<Set<string>> {
   return new Set(media.filter((url):url is string=>Boolean(url)));
 }
 
-export function twitterIntent(cast:Cast,usernames:Record<number,string>={},mediaUrls:ReadonlySet<string>=new Set()):string {
+export function twitterIntent(cast:Cast,people:Record<number,Partial<Pick<Profile,'username'|'twitterUsername'>>>={},mediaUrls:ReadonlySet<string>=new Set()):string {
   const body=cast.data.castAddBody;
   const text=castTextParts(body.text,body.mentions,body.mentionsPositions).parts.map(part=>{
     if(part.fid===undefined)return part.text;
-    const handle=xHandle(usernames[part.fid]);return handle?`@${handle}`:`https://farcaster.xyz/${part.fid}`;
+    const person=people[part.fid],handle=xHandle(person?.twitterUsername),username=person?.username?.trim().replace(/^@/,'');
+    return handle?`@${handle}`:username?`@${username} (on Farcaster)`:`https://farcaster.xyz/${part.fid}`;
   }).join('');
   const seen=new Set<string>(textLinks(text)),urls:string[]=[];
   for(const embed of [...(body.embeds||[]),...(body.embedsDeprecated||[]).map(url=>({url}))]){
-    const raw='castId' in embed&&embed.castId?`https://farcaster.xyz/${embed.castId.fid}/${embed.castId.hash}`:embed.url;
+    const raw='castId' in embed&&embed.castId?`https://farcaster.xyz/~/conversations/${embed.castId.hash}`:embed.url;
     const url=raw?embedURL(raw):undefined;
     if(url&&classifyEmbed(url)?.kind==='link'&&!mediaUrls.has(url)&&!seen.has(url)){seen.add(url);urls.push(url);}
   }

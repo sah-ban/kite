@@ -13,7 +13,7 @@ export function CastMenu({config,cast,username,own,busy,onDelete,onEdit}:{config
     let active=true;
     setTwitter(undefined);
     Promise.all([
-      Promise.all([...new Set(cast.data.castAddBody.mentions)].map(async fid=>{try{return [fid,(await profile(config,fid)).twitterUsername||''] as const;}catch{return [fid,''] as const;}})),
+      Promise.all([...new Set(cast.data.castAddBody.mentions)].map(async fid=>{try{return [fid,await profile(config,fid)] as const;}catch{return [fid,{}] as const;}})),
       twitterMediaUrls(cast),
     ]).then(([entries,media])=>{if(active)setTwitter({cast:castId,url:twitterIntent(cast,Object.fromEntries(entries),media)});});
     return()=>{active=false;};
