@@ -8,23 +8,24 @@ import {pageMetadata,metadataOrigin,renderPageMetadata} from '../page-metadata.m
 // @ts-expect-error Production static handler.
 import {staticFiles} from '../static.mjs';
 
-test('social crawlers receive distinct client and guide cards without executing JavaScript',async()=>{
+test('social crawlers receive distinct client, guide and endorsements cards without executing JavaScript',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'kite-social-'));
   try{
     await writeFile(join(directory,'index.html'),await readFile(new URL('../index.html',import.meta.url)));
     const serve=staticFiles(directory,{KITE_PUBLIC_URL:'https://kite.example'});
-    for(const path of ['/','/guide','/guide/']){
+    for(const path of ['/','/guide','/guide/','/endorsements','/endorsements/']){
       let status=200,body='';const headers:Record<string,string>={};
       await serve({url:path,method:'GET',headers:{host:'internal:3000'}},{setHeader(name:string,value:string){headers[name]=value;},set statusCode(value:number){status=value;},end(value:string){body=value;}});
       assert.equal(status,200);assert.equal(headers['Content-Type'],'text/html');
-      const guide=path.startsWith('/guide'),image=`https://kite.example/og-${guide?'guide':'client'}.png`;
+      const guide=path.startsWith('/guide'),endorsements=path.startsWith('/endorsements'),image=`https://kite.example/og-${endorsements?'endorsements':guide?'guide':'client'}.png`;
       assert.ok(body.includes(`<meta property="og:image" content="${image}">`));
       assert.ok(body.includes(`<meta name="twitter:image" content="${image}">`));
       assert.ok(body.includes('content="summary_large_image"'));
-      assert.ok(body.includes(`<meta property="og:url" content="https://kite.example${guide?'/guide':'/'}">`));
+      assert.ok(body.includes(`<meta property="og:url" content="https://kite.example${endorsements?'/endorsements':guide?'/guide':'/'}">`));
       assert.equal((body.match(/property="og:image"/g)||[]).length,1);
       assert.equal((body.match(/<title>/g)||[]).length,1);
       assert.equal(body.includes('<title>Kite Guide'),guide);
+      assert.equal(body.includes('<title>Endorsements — Kite</title>'),endorsements);
       assert.ok(!body.includes('internal:3000'));
     }
   }finally{await rm(directory,{recursive:true,force:true});}
@@ -43,8 +44,8 @@ test('metadata respects public origins, HTTPS proxies and safe HTML escaping',()
   assert.ok(renderPageMetadata(html,'/"<unsafe>','https://kite.example').includes('%22%3Cunsafe%3E'));
 });
 
-test('both social images are PNGs with 1200 by 630 dimensions',async()=>{
-  for(const name of ['client','guide']){
+test('all social images are PNGs with 1200 by 630 dimensions',async()=>{
+  for(const name of ['client','guide','endorsements']){
     const png=await readFile(new URL(`../public/og-${name}.png`,import.meta.url));
     assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
     assert.equal(png.readUInt32BE(16),1200);assert.equal(png.readUInt32BE(20),630);

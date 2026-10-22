@@ -31,6 +31,11 @@
     document.querySelector('#heading').innerHTML='Your node.<br>Your feed.<br>Your rules.';
     document.querySelector('#description').textContent='Run Snapchain and Kite, one step at a time.';
     document.querySelector('#edition').textContent='The Kite guide';
+  }else if(new URLSearchParams(location.search).get('page')==='endorsements'){
+    document.querySelector('#label').textContent='From the community';
+    document.querySelector('#heading').textContent='Endorsements.';
+    document.querySelector('#description').innerHTML='Public casts from people who have tried Kite.<br>Their feedback, in their own words.';
+    document.querySelector('#edition').textContent='Kite endorsements';
   }
 </script>
 </html>

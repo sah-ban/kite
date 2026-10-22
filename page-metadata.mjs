@@ -7,8 +7,8 @@ export function pageMetadata(pathname,origin=''){
   return {
     title:endorsements?'Endorsements — Kite':guide?'Kite Guide — Your node. Your feed. Your rules.':'Kite — An open source Farcaster client',
     description:endorsements?'Public casts from people who have tried Kite. Read their feedback in their own words.':guide?'Run your own Snapchain node and Farcaster client. A practical, step-by-step guide to building your own feed.':'Explore Farcaster with chronological feeds, client filters, rich profiles, and more.',
-    image:absolute(guide?'/og-guide.png':'/og-client.png'),
-    imageAlt:guide?'Kite guide: Your node. Your feed. Your rules.':'Kite, an open source Farcaster client',
+    image:absolute(endorsements?'/og-endorsements.png':guide?'/og-guide.png':'/og-client.png'),
+    imageAlt:endorsements?'Kite endorsements: Public casts from people who have tried Kite.':guide?'Kite guide: Your node. Your feed. Your rules.':'Kite, an open source Farcaster client',
     url:absolute(endorsements?'/endorsements':guide?'/guide':pathname==='/index.html'||/^\/client\/?$/.test(pathname)?'/':pathname),
   };
 }
