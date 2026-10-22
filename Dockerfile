@@ -20,6 +20,7 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./*.mjs ./
 COPY --chown=node:node feed ./feed
+COPY --chown=node:node data ./data
 
 RUN mkdir -p /data/sessions \
     && chown -R node:node /data \

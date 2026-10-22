@@ -12,6 +12,8 @@
 !public/**
 !feed/
 !feed/**
+!data/
+!data/**
 !test/
 !test/**
 

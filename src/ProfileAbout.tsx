@@ -8,6 +8,7 @@ import { ConnectedClients } from './ConnectedClients';
 import { JoinedDate } from './JoinedDate';
 import { ProBadge } from './ProBadge';
 import { ProfileStorage } from './ProfileStorage';
+import { ProfileLocation } from './ProfileLocation';
 
 function WalletLink({wallet,primary=false}:{wallet:Wallet;primary?:boolean}) {
   const name=wallet.protocol==='ethereum'?'Ethereum':'Solana';
@@ -38,7 +39,7 @@ export function ProfileAbout({config,fid,revision,onProfile}:{config:Config;fid:
     <div className="about-content">
       <div className="about-person"><button className="avatar-link" onClick={()=>onProfile(fid)} aria-label="Open profile"><Avatar person={person}/></button><div><button className="about-name" onClick={()=>onProfile(fid)}>{person?.name||`FID ${fid}`}</button> <ProBadge config={config} fid={fid}/><p>{person?.username?`@${person.username} · `:''}FID {fid}</p></div></div>
       {error?<p className="about-status" role="alert">Couldn’t load profile details. <button className="text-button" onClick={refresh}>Retry</button></p>:!person?<p className="about-status" role="status">Loading profile details…</p>:<>
-        <section className="about-section"><h2>Profile details</h2><dl className="about-fields"><div><dt>FID</dt><dd>{fid}</dd></div>{person.username&&<div><dt>Username</dt><dd>@{person.username}</dd></div>}{website&&<div><dt>Website</dt><dd><a href={website} target="_blank" rel="noreferrer">{person.website}<ArrowUpRight size={14}/></a></dd></div>}{person.location&&<div><dt>Location</dt><dd>{person.location}</dd></div>}{live&&<div><dt>Live activity</dt><dd><a href={live} target="_blank" rel="noreferrer">{person.liveActivityUrl}<ArrowUpRight size={14}/></a></dd></div>}{person.profileToken&&<div><dt>Profile token</dt><dd><code>{person.profileToken}</code></dd></div>}</dl><JoinedDate fid={fid} revision={revision+retry}/></section>
+        <section className="about-section"><h2>Profile details</h2><dl className="about-fields"><div><dt>FID</dt><dd>{fid}</dd></div>{person.username&&<div><dt>Username</dt><dd>@{person.username}</dd></div>}{website&&<div><dt>Website</dt><dd><a href={website} target="_blank" rel="noreferrer">{person.website}<ArrowUpRight size={14}/></a></dd></div>}{person.location&&<div><dt>Location</dt><dd><ProfileLocation value={person.location}/></dd></div>}{live&&<div><dt>Live activity</dt><dd><a href={live} target="_blank" rel="noreferrer">{person.liveActivityUrl}<ArrowUpRight size={14}/></a></dd></div>}{person.profileToken&&<div><dt>Profile token</dt><dd><code>{person.profileToken}</code></dd></div>}</dl><JoinedDate fid={fid} revision={revision+retry}/></section>
         <section className="about-section"><h2>Social accounts</h2>{person.twitterUsername||github?<div className="about-socials">{person.twitterUsername&&<a href={`https://x.com/${person.twitterUsername}`} target="_blank" rel="noreferrer"><span><strong>X</strong><small>@{person.twitterUsername}</small></span><ArrowUpRight size={16}/></a>}{github&&<a href={`https://github.com/${github}`} target="_blank" rel="noreferrer"><span><strong>GitHub</strong><small>{github}</small></span><ArrowUpRight size={16}/></a>}</div>:<p className="about-status">No social accounts shared on this profile.</p>}</section>
       </>}
       <ProfileStorage key={retry} config={config} fid={fid} revision={revision}/>

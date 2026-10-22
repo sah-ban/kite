@@ -1,4 +1,5 @@
 /* Client UI. Guide typography keeps its own layout in style.css. */
+.profile-location{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.profile-location small{font-size:10px;color:var(--muted)}
 .app-header{height:72px;position:sticky;top:0;z-index:30;padding:0 max(24px,calc((100% - 1120px)/2));gap:24px;backdrop-filter:blur(18px)}
 .app-header .brand{font-size:28px}.app-header .header-actions{display:flex;align-items:center;gap:14px;margin-left:auto}
 .account-menu{position:relative}.account-menu-toggle{display:flex;align-items:center;gap:9px;min-height:44px;border-radius:24px;padding:3px 9px 3px 4px}.account-menu-toggle:hover{background:var(--surface-soft)}.account-menu-toggle .avatar{width:32px;height:32px;font-size:13px}.account-menu-toggle>span{font-size:13px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

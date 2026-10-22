@@ -279,6 +279,8 @@ Active Farcaster Pro subscriptions display a **PRO** badge beside names in profi
 
 Profiles show the full joined date from the earliest recorded incoming fname transfer to that FID, read through the fixed `fnames.farcaster.xyz/transfers` provider. This fname acquisition date may differ from FID registration. Outgoing transfers and invalid or future timestamps are ignored. History is paginated and cached for five minutes; empty or unavailable histories omit the joined date. ENS-only accounts may have no fname history.
 
+The About page resolves `geo:latitude,longitude` profile locations to an approximate city and country through `/api/profile/location`, using bundled [GeoNames data](data/README.md). The server finds the nearest listed city within 25 km, with “Near” before names farther than 10 km; municipal boundaries and smaller settlements are not covered. No coordinates are sent to an external service, and no API key or network lookup is required. If no nearby city is found, the page keeps readable coordinates and a map link. Plain-text locations stay as entered. This display does not change profile data on Snapchain.
+
 Open **Settings** in the sidebar or visit `/settings` to choose System, Light, or Dark appearance; connect, manage, or lock/sign out of an account; edit your profile; open feed controls; and inspect or refresh connection status. Theme preferences persist on the device and stay synchronized with the header toggle. System appearance follows the device setting. Connection credentials remain server-configured.
 
 ### Edit a cast by replacing it
