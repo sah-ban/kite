@@ -23,8 +23,8 @@ export function onlyCastAdds(messages: unknown[]): Cast[] {
   });
 }
 export const localOrigin = () => ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
-export async function getConfig(): Promise<Config> {
-  const response = await fetch('/api/config');
+export async function getConfig(signal?:AbortSignal): Promise<Config> {
+  const response = await fetch('/api/config',{signal});
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
     throw new Error('Start the Kite server and configure your node in its local .env.');
   }
