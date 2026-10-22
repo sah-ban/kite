@@ -6,9 +6,10 @@ import './style.css';
 import './client-ui.css';
 import { AppHeader } from './AppHeader';
 import { AppLoading } from './AppLoading';
+import { PageMetadata } from './PageMetadata';
 import {isGuidePath} from './lib/routes';
 const Client = lazy(()=>import('./Client').then(m=>({default:m.Client})));
-const currentPage = () => isGuidePath(location.pathname) ? 'guide' : 'client';
+const currentPage = ():'guide'|'client' => isGuidePath(location.pathname) ? 'guide' : 'client';
 function App(){
   const [page,setPage]=useState(currentPage),[config,setConfig]=useState<Config|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
   useEffect(()=>{
@@ -26,6 +27,6 @@ function App(){
     window.dispatchEvent(new PopStateEvent('popstate'));window.scrollTo(0,0);
   }
   const loading=<AppLoading error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/>;
-  return page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading;
+  return <><PageMetadata page={page}/>{page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading}</>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

@@ -1,8 +1,9 @@
 import {readFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {isPagePath} from './routing.mjs';
+import {metadataOrigin,renderPageMetadata} from './page-metadata.mjs';
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2'};
-export function staticFiles(directory){
+export function staticFiles(directory,config={}){
   const root=resolve(directory);
   return async(req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
@@ -24,7 +25,10 @@ export function staticFiles(directory){
         content=await readFile(resolve(root,'index.html'));
         res.setHeader('Cache-Control','no-cache');return send(404,content,'text/html');
       }
-      const extension=extname(file);if(extension==='.html')res.setHeader('Cache-Control','no-cache');
+      const extension=extname(file);if(extension==='.html'){
+        res.setHeader('Cache-Control','no-cache');
+        if(page)content=renderPageMetadata(content.toString(),routePath,metadataOrigin(req,config));
+      }
       return send(200,content,types[extension]||'application/octet-stream');
     }catch{return send(500,'Unable to load this page');}
   };

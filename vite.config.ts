@@ -16,12 +16,16 @@ import { gifSearch } from './gifs.mjs';
 
 // @ts-expect-error Server-only indexed feed middleware.
 import { indexedFeed } from './feed/api.mjs';
+// @ts-expect-error Shared server-side social preview metadata.
+import {renderPageMetadata} from './page-metadata.mjs';
 
 export default defineConfig(({mode})=>{
   const config={...loadEnv(mode,process.cwd(),''),...process.env};
   const savedSigners=normalizePath(resolve(config.KITE_SESSION_DIR||'.kite/sessions'));
   return {
-    plugins:[react(),{name:'kite-gateway',configureServer(server){
+    plugins:[react(),{name:'kite-page-metadata',transformIndexHtml(html,context){
+      return renderPageMetadata(html,new URL(context.originalUrl||context.path,'http://localhost').pathname,config.KITE_PUBLIC_URL||'');
+    }},{name:'kite-gateway',configureServer(server){
       const feedMiddleware=indexedFeed(config);
       server.middlewares.use(feedMiddleware);
       server.middlewares.use(gifSearch());

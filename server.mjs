@@ -11,7 +11,7 @@ import { gifSearch } from './gifs.mjs';
 import { indexedFeed } from './feed/api.mjs';
 try { process.loadEnvFile('.env'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 const root = resolve('dist');
-const serve=staticFiles(root);
+const serve=staticFiles(root,process.env);
 const middleware = gateway(process.env);
 const feedMiddleware = indexedFeed(process.env);
 const accountMiddleware = approval(process.env,{enrollFeed:feedMiddleware.enroll});
