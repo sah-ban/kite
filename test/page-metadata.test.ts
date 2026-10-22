@@ -37,6 +37,8 @@ test('metadata respects public origins, HTTPS proxies and safe HTML escaping',()
   assert.throws(()=>metadataOrigin({headers:{}},{KITE_PUBLIC_URL:'https://user:secret@kite.example'}));
   assert.equal(pageMetadata('/client/','https://kite.example').url,'https://kite.example/');
   assert.equal(pageMetadata('/guide/missing').image,'/og-client.png');
+  assert.equal(pageMetadata('/endorsements/','https://kite.example').url,'https://kite.example/endorsements');
+  assert.equal(pageMetadata('/endorsements').title,'Endorsements — Kite');
   const html='<!-- kite:metadata:start --><!-- kite:metadata:end -->';
   assert.ok(renderPageMetadata(html,'/"<unsafe>','https://kite.example').includes('%22%3Cunsafe%3E'));
 });

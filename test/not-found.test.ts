@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {clientRoute,isGuidePath} from '../src/lib/routes';
 // @ts-expect-error Shared production routing.
-import {isPagePath} from '../routing.mjs';
+import {isPagePath,isEndorsementsPath} from '../routing.mjs';
 // @ts-expect-error Server-only static handler.
 import {staticFiles} from '../static.mjs';
 const hash='0x'+'ab'.repeat(20);
@@ -15,6 +15,8 @@ test('client and server agree on explicit page routes, trailing slashes and unkn
  for(const path of valid){assert.notEqual(clientRoute(path).kind,'not-found',path);assert.equal(isPagePath(path),true,path);}
  for(const path of invalid){assert.deepEqual(clientRoute(path,'?fid=37'),{kind:'not-found'},path);assert.equal(isPagePath(path),false,path);}
  for(const path of ['/guide','/guide/']){assert.equal(isGuidePath(path),true);assert.equal(isPagePath(path),true);}
+ for(const path of ['/endorsements','/endorsements/']){assert.equal(isEndorsementsPath(path),true);assert.equal(isPagePath(path),true);}
+ assert.equal(isPagePath('/endorsements/missing'),false);
  assert.equal(isGuidePath('/guide/missing'),false);
  assert.deepEqual(clientRoute('/following/','?fid=268438'),{kind:'following',feedFid:268438});
  assert.deepEqual(clientRoute(`/cast/37/${hash}`,'?tab=recasts'),{kind:'cast',fid:37,hash,tab:'recasts'});
@@ -29,7 +31,7 @@ test('static server returns branded HTML with real 404 status while preserving r
    await serve({url,method,headers:{accept}},{setHeader:(name:string,value:string)=>headers[name.toLowerCase()]=String(value),set statusCode(value:number){status=value;},end:(value?:string|Buffer)=>{body=value?.toString()||'';}});
    return {status,body,headers};
   }
-  for(const path of [...valid,'/guide','/guide/']){const response=await call(path,'text/html');assert.equal(response.status,200,path);assert.ok(response.body.includes('id="root"'));assert.equal(response.headers['cache-control'],'no-cache');}
+  for(const path of [...valid,'/guide','/guide/','/endorsements','/endorsements/']){const response=await call(path,'text/html');assert.equal(response.status,200,path);assert.ok(response.body.includes('id="root"'));assert.equal(response.headers['cache-control'],'no-cache');}
   for(const path of [...invalid,'/missing.page','/index.html/','/assets/app.js/']){const response=await call(path,'text/html');assert.equal(response.status,404,path);assert.ok(response.body.includes('id="root"'),path);assert.equal(response.headers['content-type'],'text/html');}
   const asset=await call('/assets/app.js');assert.equal(asset.status,200);assert.equal(asset.headers['content-type'],'text/javascript');assert.equal(asset.body,'console.log("Kite")');assert.equal(asset.headers['x-content-type-options'],'nosniff');
   for(const path of ['/assets/missing.js','/missing.png','/api/missing','/api']){const response=await call(path);assert.equal(response.status,404);assert.equal(response.headers['content-type'],'text/plain');assert.ok(!response.body.includes('<html'));}

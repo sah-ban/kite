@@ -7,9 +7,10 @@ import './client-ui.css';
 import { AppHeader } from './AppHeader';
 import { AppLoading } from './AppLoading';
 import { PageMetadata } from './PageMetadata';
-import {isGuidePath} from './lib/routes';
+import {Endorsements} from './Endorsements';
+import {isGuidePath,isEndorsementsPath} from './lib/routes';
 const Client = lazy(()=>import('./Client').then(m=>({default:m.Client})));
-const currentPage = ():'guide'|'client' => isGuidePath(location.pathname) ? 'guide' : 'client';
+const currentPage = ():'guide'|'client'|'endorsements' => isGuidePath(location.pathname) ? 'guide' : isEndorsementsPath(location.pathname)?'endorsements':'client';
 function App(){
   const [page,setPage]=useState(currentPage),[config,setConfig]=useState<Config|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
   useEffect(()=>{
@@ -22,11 +23,11 @@ function App(){
     const pop=()=>setPage(currentPage());window.addEventListener('popstate',pop);
     return()=>window.removeEventListener('popstate',pop);
   },[]);
-  function navigate(p:'client'|'guide'){
-    history.pushState({kite:true},'',p==='client'?'/':'/guide');setPage(p);
+  function navigate(p:'client'|'guide'|'endorsements'){
+    history.pushState({kite:true},'',p==='client'?'/':`/${p}`);setPage(p);
     window.dispatchEvent(new PopStateEvent('popstate'));window.scrollTo(0,0);
   }
   const loading=<AppLoading error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/>;
-  return <><PageMetadata page={page}/>{page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading}</>;
+  return <><PageMetadata page={page}/>{page==='endorsements'?<><AppHeader onHome={()=>navigate('client')}/><Endorsements config={config} error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/></>:page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading}</>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

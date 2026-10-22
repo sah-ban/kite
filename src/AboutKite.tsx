@@ -1,4 +1,4 @@
-import {ArrowUpRight,BookOpen,Github} from 'lucide-react';
+import {ArrowUpRight,BookOpen,Github,MessageSquareQuote} from 'lucide-react';
 import {KiteMark} from './KiteMark';
 
 export function AboutKite({onGuide}:{onGuide:()=>void}){
@@ -9,6 +9,7 @@ export function AboutKite({onGuide}:{onGuide:()=>void}){
       <div className="about-kite-links">
         <a href="https://github.com/sah-ban/kite" target="_blank" rel="noopener noreferrer"><Github size={17}/><span>Source code</span><ArrowUpRight size={15}/></a>
         <a href="/guide" onClick={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();onGuide();}}><BookOpen size={17}/><span>Field guide</span><ArrowUpRight size={15}/></a>
+        <a href="/endorsements"><MessageSquareQuote size={17}/><span>Endorsements</span><ArrowUpRight size={15}/></a>
       </div>
     </section>
   </aside>;

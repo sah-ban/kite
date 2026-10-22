@@ -1,5 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
+.endorsements-page{max-width:860px;margin:0 auto;padding:64px 28px 80px}
+.endorsements-heading h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(34px,6vw,54px);letter-spacing:-.045em;line-height:1.1;margin:15px 0 18px}
+.endorsements-heading>p{color:var(--text-body);font-size:18px;line-height:1.65;max-width:600px}
+.endorsements-resources{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+.endorsements-empty{margin-top:40px;padding:46px 24px;text-align:center;background:var(--paper);border:1px solid var(--line);border-radius:18px}
+.endorsements-empty>svg{color:var(--accent);margin-bottom:12px}
+.endorsements-empty h2{font-size:20px;margin:0 0 10px}.endorsements-empty p{color:var(--text-secondary);line-height:1.6;margin:0}
+.endorsements-list{display:grid;gap:24px;margin-top:40px;min-width:0}
+.endorsement-card{min-width:0;padding:20px;background:var(--paper);border:1px solid var(--line);border-radius:18px}
+.endorsement-card .quote-preview{margin:0}.endorsement-card .quoted-cast{background:var(--paper)}
+.endorsement-links{display:flex;flex-wrap:wrap;gap:14px 22px;padding-top:18px;font-size:13px;font-weight:600}
+.endorsement-links a{display:inline-flex;align-items:center;gap:6px;color:var(--link)}
+.endorsements-error p{color:var(--text-secondary);line-height:1.6}
+@media(max-width:600px){.endorsements-page{padding:36px 20px 48px}.endorsements-heading>p{font-size:16px}.endorsement-card{padding:14px}.endorsements-empty{padding:36px 18px}}
+
 :root {
   color-scheme: light;
   font-family: 'DM Sans', sans-serif;

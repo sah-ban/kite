@@ -2,7 +2,7 @@ import {useEffect} from 'react';
 // @ts-expect-error Metadata is shared with the production HTML handler.
 import {pageMetadata} from '../page-metadata.mjs';
 
-export function PageMetadata({page}:{page:'client'|'guide'}){
+export function PageMetadata({page}:{page:'client'|'guide'|'endorsements'}){
   useEffect(()=>{
     const update=()=>{
       const meta=pageMetadata(location.pathname,location.origin);
