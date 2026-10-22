@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
-import {enrollFollowing} from '../src/lib/indexed-feed';
+import {enrollFollowing,indexedPublic,indexedFollowing} from '../src/lib/indexed-feed';
 import {NobleEd25519Signer} from '@farcaster/core';
 // @ts-expect-error Server-only local proof verification.
 import {localFeedEnrollment} from '../feed/enrollment.mjs';
@@ -12,6 +12,17 @@ import {indexedFeed} from '../feed/api.mjs';
 const signer=new NobleEd25519Signer(new Uint8Array(32).fill(7));
 const key='0x'+Buffer.from((await signer.getSignerKey())._unsafeUnwrap()).toString('hex');
 const config={KITE_PUBLIC_URL:'https://kite.example',HUBURL:'https://node.example'};
+test('public feed requests omit viewer FIDs while Following requests keep account scope',async()=>{
+  const previous=globalThis.fetch,urls:URL[]=[];
+  globalThis.fetch=async input=>{urls.push(new URL(String(input),'https://kite.example'));return Response.json({messages:[],nextPageToken:'',status:{}});};
+  try{
+    const filters={mode:'include' as const,clientFids:'9152, 16823',signerKeys:'',selfRegistered:false};
+    await indexedPublic(filters,'oldest','next-page');await indexedFollowing(268438,filters,'newest');
+    assert.equal(urls[0].pathname,'/api/feed/public');assert.equal(urls[0].searchParams.has('fid'),false);
+    assert.equal(urls[0].searchParams.get('clients'),'9152,16823');assert.equal(urls[0].searchParams.get('cursor'),'next-page');assert.equal(urls[0].searchParams.get('order'),'oldest');
+    assert.equal(urls[1].pathname,'/api/feed/following');assert.equal(urls[1].searchParams.get('fid'),'268438');
+  }finally{globalThis.fetch=previous;}
+});
 function request(path:string,body?:unknown,extra:any={}){return {url:path,method:body===undefined?'GET':'POST',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173'},socket:{remoteAddress:'127.0.0.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(body));},...extra};}
 async function proof(now=1000,source:any=1){let time=now,calls=0;const enrolled:number[]=[];
   const handler=localFeedEnrollment(config,async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};},{now:()=>time,fetcher:async(url:URL)=>{assert.equal(url.origin,config.HUBURL);calls++;return Response.json({signers:[{fid:123,key,keyType:1,source,expiresAt:100000,scopes:[1]}]});}});

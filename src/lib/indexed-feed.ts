@@ -2,12 +2,14 @@ import type { Cast } from './hub';
 import type { Filters } from './feed-filters';
 export type FeedStatus={queued?:boolean;followingFailed?:boolean;historyDays:number;following:number;imported:number;failed:number;initializing:boolean;followsSyncedAt:string|null;workerOnline:boolean;connectedShards:number[];checkpoints:{shard:number;lastEventAt:string}[]};
 export type FeedPage={messages:Cast[];nextPageToken:string;status:FeedStatus};
-export async function indexedFollowing(fid:number,filters:Filters,order:'newest'|'oldest',cursor='',signal?:AbortSignal):Promise<FeedPage>{
-  const params=new URLSearchParams({fid:String(fid),mode:filters.mode,clients:filters.clientFids.split(/[\s,]+/).filter(Boolean).join(','),keys:filters.signerKeys.split(/[\s,]+/).filter(Boolean).join(','),self:String(filters.selfRegistered),order,...(cursor?{cursor}:{})});
-  const response=await fetch('/api/feed/following?'+params,{signal:signal||AbortSignal.timeout(20000)});
-  if(!response.ok){const error=await response.json().catch(()=>null);throw new Error(error?.error||'Could not load the Following feed.');}
+async function indexedPage(endpoint:'public'|'following',fid:number|undefined,filters:Filters,order:'newest'|'oldest',cursor='',signal?:AbortSignal):Promise<FeedPage>{
+  const params=new URLSearchParams({...(fid===undefined?{}:{fid:String(fid)}),mode:filters.mode,clients:filters.clientFids.split(/[\s,]+/).filter(Boolean).join(','),keys:filters.signerKeys.split(/[\s,]+/).filter(Boolean).join(','),self:String(filters.selfRegistered),order,...(cursor?{cursor}:{})});
+  const response=await fetch('/api/feed/'+endpoint+'?'+params,{signal:signal||AbortSignal.timeout(20000)});
+  if(!response.ok){const error=await response.json().catch(()=>null);throw new Error(error?.error||`Could not load the ${endpoint==='public'?'public':'Following'} feed.`);}
   return response.json();
 }
+export const indexedFollowing=(fid:number,filters:Filters,order:'newest'|'oldest',cursor='',signal?:AbortSignal)=>indexedPage('following',fid,filters,order,cursor,signal);
+export const indexedPublic=(filters:Filters,order:'newest'|'oldest',cursor='',signal?:AbortSignal)=>indexedPage('public',undefined,filters,order,cursor,signal);
 
 export async function feedEnrollment(fid:number,signal?:AbortSignal):Promise<boolean>{
   const response=await fetch('/api/feed/enrollment?'+new URLSearchParams({fid:String(fid)}),{signal:signal||AbortSignal.timeout(15000)});

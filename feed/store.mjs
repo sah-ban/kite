@@ -55,13 +55,16 @@ export async function deleteCast(db,hash,fid) {
   await db.query(`INSERT INTO kite_feed_casts(hash,author_fid,timestamp,deleted) VALUES($1,$2,0,true)
     ON CONFLICT(hash) DO UPDATE SET deleted=true,payload=NULL,updated_at=now()`,[hash.toLowerCase(),fid]);
 }
+async function nodeStatus(pool) {
+  const health=(await pool.query('SELECT heartbeat,connected_shards FROM kite_feed_health WHERE id=1')).rows[0];
+  const checkpoints=(await pool.query('SELECT shard,updated_at FROM kite_feed_checkpoints ORDER BY shard')).rows;
+  return {workerOnline:Boolean(health&&Date.now()-new Date(health.heartbeat).getTime()<60000),connectedShards:health?.connected_shards||[],checkpoints:checkpoints.map(c=>({shard:c.shard,lastEventAt:c.updated_at}))};
+}
 export async function status(pool,fid) {
   const user=(await pool.query('SELECT follows_synced_at,generation,follows_failed FROM kite_feed_users WHERE fid=$1',[fid])).rows[0];
   const counts=(await pool.query(`SELECT count(*)::int AS following,count(*) FILTER(WHERE a.backfill_done)::int AS imported,count(*) FILTER(WHERE a.failed)::int AS failed FROM kite_feed_follows f JOIN kite_feed_authors a ON a.fid=f.author_fid WHERE f.viewer_fid=$1`,[fid])).rows[0];
-  const health=(await pool.query('SELECT heartbeat,connected_shards FROM kite_feed_health WHERE id=1')).rows[0];
-  const checkpoints=(await pool.query('SELECT shard,updated_at FROM kite_feed_checkpoints ORDER BY shard')).rows;
   return {queued:!user?.follows_synced_at,followingFailed:Boolean(user?.follows_failed),following:counts.following,imported:counts.imported,failed:counts.failed,initializing:!user?.follows_synced_at||counts.imported<counts.following,
-    followsSyncedAt:user?.follows_synced_at||null,workerOnline:Boolean(health&&Date.now()-new Date(health.heartbeat).getTime()<60000),connectedShards:health?.connected_shards||[],checkpoints:checkpoints.map(c=>({shard:c.shard,lastEventAt:c.updated_at})),generation:Number(user?.generation||0)};
+    followsSyncedAt:user?.follows_synced_at||null,...await nodeStatus(pool),generation:Number(user?.generation||0)};
 }
 export function parseFeedQuery(search) {
   const mode=search.get('mode')||'all',order=search.get('order')||'newest';
@@ -74,7 +77,8 @@ export function parseFeedQuery(search) {
 }
 export async function queryFeed(pool,query,cursor='') {
   const {fid,mode,order,fids,keys,self}=query;
-  const state=await status(pool,fid);
+  const publicFeed=query.scope==='public';
+  const state=publicFeed?{scope:'public',queued:false,followingFailed:false,following:0,imported:0,failed:0,initializing:false,followsSyncedAt:null,generation:0,...await nodeStatus(pool)}:await status(pool,fid);
   const fingerprint=createHash('sha256').update(JSON.stringify({...query,generation:state.generation})).digest('hex');
   let page;
   if(cursor){
@@ -83,19 +87,19 @@ export async function queryFeed(pool,query,cursor='') {
     }catch{throw new Error('Feed changed or cursor is invalid. Refresh the feed.');}
   }
   const ceiling=page?.ceiling||(await pool.query('SELECT COALESCE(max(id),0)::text AS id FROM kite_feed_casts')).rows[0].id;
-  const params=[fid,ceiling];
+  const params=publicFeed?[]:[fid];params.push(ceiling);const ceilingParam=params.length;
   let where='';
   if(mode!=='all'){
     params.push(fids,keys,self);
-    const match=`(c.signer=ANY($4::text[]) OR COALESCE(s.requester_fid=ANY($3::bigint[]) OR ($5 AND s.requester_fid=c.author_fid),false))`;
+    const match=`(c.signer=ANY($${params.length-1}::text[]) OR COALESCE(s.requester_fid=ANY($${params.length-2}::bigint[]) OR ($${params.length} AND s.requester_fid=c.author_fid),false))`;
     where+=` AND ${mode==='exclude'?'NOT ':''}${match}`;
   }
   if(page){params.push(page.timestamp,page.hash);where+=` AND (c.timestamp,c.hash) ${order==='newest'?'<':'>'} ($${params.length-1},$${params.length})`;}
   const direction=order==='newest'?'DESC':'ASC';
   const {rows}=await pool.query(`SELECT c.payload,c.timestamp,c.hash FROM kite_feed_casts c
-    JOIN kite_feed_follows f ON f.author_fid=c.author_fid AND f.viewer_fid=$1
-    LEFT JOIN kite_feed_signers s ON s.author_fid=c.author_fid AND s.signer=c.signer
-    WHERE NOT c.deleted AND NOT c.reply AND c.id<=$2 ${where}
+    ${publicFeed?'':'JOIN kite_feed_follows f ON f.author_fid=c.author_fid AND f.viewer_fid=$1'}
+    ${mode==='all'?'':'LEFT JOIN kite_feed_signers s ON s.author_fid=c.author_fid AND s.signer=c.signer'}
+    WHERE NOT c.deleted AND c.payload IS NOT NULL ${publicFeed?'':'AND NOT c.reply'} AND c.id<=$${ceilingParam} ${where}
     ORDER BY c.timestamp ${direction},c.hash ${direction} LIMIT 31`,params);
   const visible=rows.slice(0,30),last=visible.at(-1);
   const nextPageToken=rows.length>30?Buffer.from(JSON.stringify({fingerprint,ceiling,timestamp:Number(last.timestamp),hash:last.hash})).toString('base64url'):'';

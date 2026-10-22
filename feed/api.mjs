@@ -11,12 +11,17 @@ export function indexedFeed(config,{pool,...dependencies}={}) {
   const prove=localFeedEnrollment(config,enroll,dependencies);
   const middleware=async(req,res,next)=>{
     const url=new URL(req.url,'http://localhost');
-    if(!['/api/feed/following','/api/feed/notifications','/api/feed/enrollment','/api/feed/challenge','/api/feed/enroll'].includes(url.pathname))return next();
+    if(!['/api/feed/public','/api/feed/following','/api/feed/notifications','/api/feed/enrollment','/api/feed/challenge','/api/feed/enroll'].includes(url.pathname))return next();
     res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
     const send=(code,body)=>{res.statusCode=code;res.end(JSON.stringify(body));};
     try{
       if(url.pathname==='/api/feed/challenge'||url.pathname==='/api/feed/enroll')return send(200,await prove(req,res,url));
       if(req.method!=='GET')return send(405,{error:'Method not allowed'});
+      if(url.pathname==='/api/feed/public'){
+        let query;try{query={...parseFeedQuery(url.searchParams),fid:0,scope:'public'};}catch(error){return send(400,{error:error.message});}
+        const page=await queryFeed(pool,query,url.searchParams.get('cursor')||'');
+        return send(200,{...page,status:{...page.status,historyDays:Number(config.KITE_FEED_HISTORY_DAYS||30)}});
+      }
       const fid=Number(url.searchParams.get('fid'));if(!validFid(fid))return send(400,{error:'Use a positive FID'});
       let query;if(url.pathname==='/api/feed/following')try{query=parseFeedQuery(url.searchParams);}catch(error){return send(400,{error:error.message});}
       const enrolled=seeds.has(fid)||(await pool.query('SELECT fid FROM kite_feed_users WHERE fid=$1',[fid])).rows.length>0;
