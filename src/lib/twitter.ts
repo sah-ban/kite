@@ -20,7 +20,7 @@ export function twitterIntent(cast:Cast,people:Record<number,Partial<Pick<Profil
   const text=castTextParts(body.text,body.mentions,body.mentionsPositions).parts.map(part=>{
     if(part.fid===undefined)return part.text;
     const person=people[part.fid],handle=xHandle(person?.twitterUsername),username=person?.username?.trim().replace(/^@/,'');
-    return handle?`@${handle}`:username?`@.${username} (on Farcaster)`:`https://farcaster.xyz/${part.fid}`;
+    return handle?`@${handle}`:username?`@.${username} (on Farcaster)`:`https://farcaster.xyz/~/profiles/${part.fid}`;
   }).join('');
   const seen=new Set<string>(textLinks(text)),urls:string[]=[];
   for(const embed of [...(body.embeds||[]),...(body.embedsDeprecated||[]).map(url=>({url}))]){

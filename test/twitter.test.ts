@@ -50,7 +50,7 @@ test('Twitter mentions prefer linked X handles, use Farcaster usernames otherwis
   assert.equal(draft(value,{37:{twitterUsername:'alice_on_x',username:'alice'},88:{username:'bob'}}),'🤓 @alice_on_x hello @.bob (on Farcaster)');
   assert.equal(draft(value,{37:{twitterUsername:'alice.eth',username:'alice.eth'},88:{twitterUsername:'not a handle',username:'bob.base.eth'}}),'🤓 @.alice.eth (on Farcaster) hello @.bob.base.eth (on Farcaster)');
   assert.equal(draft(value,{37:{twitterUsername:'@alice_on_x'},88:{username:' @bob '}}),'🤓 @alice_on_x hello @.bob (on Farcaster)');
-  assert.equal(draft(value,{37:{username:''}}),'🤓 https://farcaster.xyz/37 hello https://farcaster.xyz/88');
+  assert.equal(draft(value,{37:{username:''}}),'🤓 https://farcaster.xyz/~/profiles/37 hello https://farcaster.xyz/~/profiles/88');
 });
 test('quoted casts use full-hash conversation URLs and do not duplicate a conversation link already in the text',()=>{
   const quote={fid:37,hash:'0xc000a48e2836034ad4338e825a33809cdd487b53'},url='https://farcaster.xyz/~/conversations/'+quote.hash;
