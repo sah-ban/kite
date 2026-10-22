@@ -250,6 +250,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
   }
 
   const handlers:CastHandlers={
+    onNotice:(message,error=false)=>{setNotice(error?'':message);setToastError(error?message:'');},
     onProfile:openProfile,onOpen:openCast,reactionOverrides,
     onReactionSynced:(key,override)=>setReactionOverrides(values=>{if(values[key]!==override)return values;const next={...values};delete next[key];return next;}),
     onEdit:cast=>{if(session?.fid===cast.data.fid){setError('');if(!editingCast)setEditingCast(cast);setEditCastOpen(true);}},
