@@ -1,4 +1,5 @@
 /* Client UI. Guide typography keeps its own layout in style.css. */
+.notification-cast-preview{margin:10px 0 0}.notification-cast-preview .quoted-cast{border-radius:12px}.notification-cast-preview .quote-text{margin-top:8px}.notification-cast-preview .cast-embeds{margin-bottom:0}
 .profile-location{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.profile-location small{font-size:10px;color:var(--muted)}
 .app-header{height:72px;position:sticky;top:0;z-index:30;padding:0 max(24px,calc((100% - 1120px)/2));gap:24px;backdrop-filter:blur(18px)}
 .app-header .brand{font-size:28px}.app-header .header-actions{display:flex;align-items:center;gap:14px;margin-left:auto}

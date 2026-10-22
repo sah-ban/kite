@@ -7,6 +7,7 @@ import {Avatar,useProfile} from './social-ui';
 import {CastText} from './CastText';
 import {CastTime} from './CastTime';
 import {FeedSkeleton} from './FeedSkeleton';
+import {QuotedCast} from './QuotedCast';
 import {indexedNotifications,markNotificationsSeen,type IndexedNotificationPage} from './lib/indexed-notifications';
 
 const kinds=[['all','All'],['mention','Mentions'],['reply','Replies'],['like','Likes'],['recast','Recasts'],['follow','Follows']] as const;
@@ -14,17 +15,24 @@ const labels:Record<NotificationKind,string>={mention:'mentioned you',reply:'rep
 const icons={mention:AtSign,reply:MessageCircle,like:Heart,recast:Repeat2,follow:UserPlus};
 function NotificationRow({config,item,onProfile,onCast}:{config:Config;item:NotificationItem;onProfile:(fid:number)=>void;onCast:(cast:Cast)=>void}){
  const person=useProfile(config,item.actor),Icon=icons[item.kind];
+ const root=useRef<HTMLElement>(null),[visible,setVisible]=useState(false);
+ useEffect(()=>{
+  if(visible||!root.current)return;
+  const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'150px'});
+  observer.observe(root.current);return()=>observer.disconnect();
+ },[visible]);
  const cast=item.cast||(item.target?{hash:item.target.hash,signer:'',data:{fid:item.target.fid,timestamp:0,castAddBody:{text:'',mentions:[],mentionsPositions:[],embeds:[]}}}:undefined);
+ const reaction=item.kind==='like'||item.kind==='recast';
  const open=()=>cast?onCast(cast):onProfile(item.actor);
- return <article className={`notification-row notification-${item.kind}`} role="link" tabIndex={0} aria-label={`${person?.name||`FID ${item.actor}`} ${labels[item.kind]}. Open ${cast?'cast':'profile'}.`} onClick={event=>{
-  if(event.defaultPrevented||event.button!==0||(event.target as HTMLElement).closest('a,button,input,textarea,select,[role="button"],[contenteditable]')||window.getSelection()?.toString())return;
+ return <article ref={root} className={`notification-row notification-${item.kind}`} role="link" tabIndex={0} aria-label={`${person?.name||`FID ${item.actor}`} ${labels[item.kind]}. Open ${cast?'cast':'profile'}.`} onClick={event=>{
+  if(event.defaultPrevented||event.button!==0||(event.target as HTMLElement).closest('a,button,input,textarea,select,video,audio,iframe,[role="button"],[contenteditable]')||window.getSelection()?.toString())return;
   open();
  }} onKeyDown={event=>{if(event.key==='Enter'&&event.target===event.currentTarget){event.preventDefault();open();}}}>
   <div className="notification-symbol"><Icon size={18}/></div>
   <button className="avatar-link" aria-label={`Open ${person?.name||`FID ${item.actor}`} profile`} onClick={()=>onProfile(item.actor)}><Avatar person={person}/></button>
   <div className="notification-main"><div className="notification-title"><button className="author" onClick={()=>onProfile(item.actor)}>{person?.name||`FID ${item.actor}`} <ProBadge config={config} fid={item.actor}/></button> <span>{labels[item.kind]}</span></div>
    <CastTime timestamp={item.timestamp}/>
-   {item.cast&&<CastText config={config} cast={item.cast} visible onProfile={onProfile} limit={240} className="notification-cast-text"/>}
+   {reaction&&cast?<QuotedCast config={config} fid={cast.data.fid} hash={cast.hash} initialCast={item.cast} visible={visible} variant="notification" onOpen={onCast} onProfile={onProfile}/>:item.cast&&<CastText config={config} cast={item.cast} visible onProfile={onProfile} limit={240} className="notification-cast-text"/>}
   </div>
  </article>;
 }
