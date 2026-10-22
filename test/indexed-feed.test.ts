@@ -54,23 +54,31 @@ test('public feed API needs no viewer FID or enrollment and validates filters',a
   assert.equal((await call('/api/feed/public?keys=invalid')).status,400);
 });
 
-test('PostgreSQL public feed: all authors and replies, filters, stable pagination, deletion and scoped cursors',{skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
+test('PostgreSQL public feed: all authors, no replies, quotes and channels, stable pagination and filters',{skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
   const schema='public_feed_test_'+randomBytes(6).toString('hex');
   const admin=createPool(process.env.KITE_TEST_DATABASE_URL);await admin.query(`CREATE SCHEMA ${schema}`);
   const db=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
   const publicQuery=(extra='')=>({...parseFeedQuery(new URLSearchParams(extra)),fid:0,scope:'public'});
   try{
     await migrate(db);await replaceFollows(db,268438,[10]);
-    for(let n=1;n<=65;n++)await saveCast(db,cast(n,[10,20,30][n%3]));
+    for(let n=1;n<=65;n++){
+      const message:any=cast(n,[10,20,30][n%3]);
+      if(n===64)message.data.castAddBody.embeds=[{castId:{fid:10,hash:hash(1)}}];
+      if(n===63)message.data.castAddBody.parentUrl='https://example.com/channel';
+      await saveCast(db,message);
+    }
     const reply:any=cast(66,30,2000);reply.data.castAddBody.parentCastId={fid:10,hash:hash(1)};await saveCast(db,reply);
     await db.query('INSERT INTO kite_feed_signers(author_fid,signer,requester_fid) VALUES(10,$1,9152),(20,$2,20)',[key(10),key(20)]);
     await deleteCast(db,hash(65),30);
-    const first=await queryFeed(db,publicQuery());assert.equal(first.messages.length,30);assert.equal(first.messages[0].hash,reply.hash);assert.equal(first.status.initializing,false);
+    const first=await queryFeed(db,publicQuery());assert.equal(first.messages.length,30);assert.equal(first.messages[0].hash,hash(64));assert.equal(first.status.initializing,false);
     const inserted=cast(999,30,1500);await saveCast(db,inserted);
     const second=await queryFeed(db,publicQuery(),first.nextPageToken);
     const third=await queryFeed(db,publicQuery(),second.nextPageToken);
     const messages=[...first.messages,...second.messages,...third.messages] as Cast[];
-    assert.equal(messages.length,65);assert.equal(new Set(messages.map(c=>c.hash)).size,65);
+    assert.equal(messages.length,64);assert.equal(new Set(messages.map(c=>c.hash)).size,64);
+    assert.ok(messages.every(c=>!c.data.castAddBody.parentCastId));
+    assert.ok(messages.find(c=>c.hash===hash(64))?.data.castAddBody.embeds?.some(embed=>embed.castId));
+    assert.equal(messages.find(c=>c.hash===hash(63))?.data.castAddBody.parentUrl,'https://example.com/channel');
     assert.deepEqual([...new Set(messages.map(c=>c.data.fid))].sort(),[10,20,30]);
     assert.ok(!messages.some(c=>c.hash===hash(65)||c.hash===inserted.hash));
     assert.ok((await queryFeed(db,publicQuery())).messages.some((c:Cast)=>c.hash===inserted.hash));

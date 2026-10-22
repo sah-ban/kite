@@ -99,7 +99,7 @@ export async function queryFeed(pool,query,cursor='') {
   const {rows}=await pool.query(`SELECT c.payload,c.timestamp,c.hash FROM kite_feed_casts c
     ${publicFeed?'':'JOIN kite_feed_follows f ON f.author_fid=c.author_fid AND f.viewer_fid=$1'}
     ${mode==='all'?'':'LEFT JOIN kite_feed_signers s ON s.author_fid=c.author_fid AND s.signer=c.signer'}
-    WHERE NOT c.deleted AND c.payload IS NOT NULL ${publicFeed?'':'AND NOT c.reply'} AND c.id<=$${ceilingParam} ${where}
+    WHERE NOT c.deleted AND c.payload IS NOT NULL AND NOT c.reply AND c.id<=$${ceilingParam} ${where}
     ORDER BY c.timestamp ${direction},c.hash ${direction} LIMIT 31`,params);
   const visible=rows.slice(0,30),last=visible.at(-1);
   const nextPageToken=rows.length>30?Buffer.from(JSON.stringify({fingerprint,ceiling,timestamp:Number(last.timestamp),hash:last.hash})).toString('base64url'):'';
