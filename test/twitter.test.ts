@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { twitterIntent } from '../src/lib/twitter';
+import { twitterIntent, twitterMediaUrls } from '../src/lib/twitter';
 import type { Cast } from '../src/lib/hub';
 import { profile, invalidateProfile, type Config } from '../src/lib/hub';
 import { xHandle } from '../src/lib/x-handle';
@@ -12,11 +12,35 @@ test('Twitter intent preserves full Unicode text, newlines and reserved characte
   const text='Hello 🤓 & #friends + 100%?\n'+ 'Long cast '.repeat(100),url=new URL(twitterIntent(cast(text)));
   assert.equal(url.origin,'https://twitter.com');assert.equal(url.pathname,'/intent/tweet');assert.equal(url.searchParams.get('text'),text);assert.deepEqual([...url.searchParams.keys()],['text']);
 });
-test('Twitter draft appends unique link, media, legacy and quoted-cast URLs',()=>{
+test('Twitter draft keeps ordinary and quoted-cast links while excluding media from current and legacy embeds',()=>{
   const quote={fid:37,hash:'0x'+'cd'.repeat(20)},value=cast('Cast text',[{url:'https://example.com/article?a=1&b=2'},{url:'https://example.com/image.png'},{url:'https://example.com/video.mp4'},{url:'https://example.com/image.png'},{castId:quote}]);
   value.data.castAddBody.embedsDeprecated=['https://legacy.example/path','https://example.com/image.png'];
-  assert.equal(draft(value),'Cast text\n\nhttps://example.com/article?a=1&b=2\n\nhttps://example.com/image.png\n\nhttps://example.com/video.mp4\n\nhttps://farcaster.xyz/37/'+quote.hash+'\n\nhttps://legacy.example/path');
-  assert.equal(draft(cast('',[{url:'https://example.com/image.png'}])),'https://example.com/image.png');
+  assert.equal(draft(value),'Cast text\n\nhttps://example.com/article?a=1&b=2\n\nhttps://farcaster.xyz/37/'+quote.hash+'\n\nhttps://legacy.example/path');
+  assert.equal(draft(cast('',[{url:'https://example.com/image.png'}])), '');
+  const media=['https://example.com/IMAGE.JPEG?size=large','https://example.com/animation.gif','https://example.com/clip.webm','https://example.com/stream.m3u8?token=public','https://imagedelivery.net/account/id/public','https://youtu.be/dQw4w9WgXcQ','https://vimeo.com/123456'];
+  assert.equal(draft(cast('Upload media manually',media.map(url=>({url})))),'Upload media manually');
+});
+test('media URLs typed into the cast body remain part of the original text',()=>{
+  const text='Look at https://example.com/image.png and https://example.com/video.mp4';
+  assert.equal(draft(cast(text,[{url:'https://example.com/image.png'},{url:'https://example.com/video.mp4'}])),text);
+});
+test('opaque image and video embeds use preview metadata; ordinary articles and unknown links remain',async()=>{
+  const original=globalThis.fetch,calls:string[]=[];
+  const image='https://media.example/opaque-image',video='https://media.example/opaque-video',article='https://media.example/article',failed='https://media.example/unavailable';
+  const value=cast('Cast text',[{url:image},{url:video},{url:article},{url:failed},{url:'https://media.example/known.png'}]);
+  value.data.castAddBody.embedsDeprecated=[image];
+  globalThis.fetch=async input=>{
+    const target=new URL(String(input),'https://kite.example');assert.equal(target.pathname,'/api/embed');
+    const url=target.searchParams.get('url')!;calls.push(url);
+    if(url===failed)return Response.json({error:'Unavailable'},{status:502});
+    return Response.json({kind:url===image?'image':url===video?'video':'link',url,...(url===article?{image:'https://media.example/article-thumbnail.png'}:{})});
+  };
+  try{
+    const media=await twitterMediaUrls(value);
+    assert.deepEqual(media,new Set([image,video]));
+    assert.deepEqual(new Set(calls),new Set([image,video,article,failed]));assert.equal(calls.length,4);
+    assert.equal(new URL(twitterIntent(value,{},media)).searchParams.get('text'),'Cast text\n\n'+article+'\n\n'+failed);
+  }finally{globalThis.fetch=original;}
 });
 test('Twitter draft retains links already in text without duplicating their embeds and omits unsafe URLs',()=>{
   assert.equal(draft(cast('Read https://EXAMPLE.com/path.',[{url:'https://example.com/path'},{url:'javascript:alert(1)'},{url:'https://user:secret@example.com'},{url:'https://other.example'}])),'Read https://EXAMPLE.com/path.\n\nhttps://other.example/');
