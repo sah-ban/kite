@@ -53,7 +53,7 @@ export function Approval({config,onSession,onClose}:{config:Config;onSession:(s:
     <p>Create a fresh signer and approve it in Farcaster. Your account's seed phrase is not requested. The delegated private key is stored encrypted on this server.</p>
     {configured&&<p className="signer-attribution-note">Your casts will be published by your account, with {appFid?<a href={`/profile/${appFid}`} target="_blank" rel="noopener noreferrer">{app?.username?`@${app.username}`:`FID ${appFid}`}</a>:'the configured app account'} shown as the client.</p>}
     {!secure&&<div className="note">Open this client through localhost or HTTPS to approve an account. This public HTTP view supports reading.</div>}
-    {!configured&&<div className="note">The operator needs to configure a server-only developer app identity before approval requests can be created.</div>}
+    {!configured&&<div className="note" style={{color:'var(--danger)'}}>The operator needs to configure a server-only developer app identity before approval requests can be created.</div>}
     {link?<>
       <img className="approval-qr" src={image} alt="Scan to approve this fresh Farcaster signer"/>
       <a className="button primary full" href={link} target="_blank" rel="noreferrer">Approve in Farcaster <ArrowUpRight size={16}/></a>
