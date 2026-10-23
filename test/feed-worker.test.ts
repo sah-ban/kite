@@ -6,7 +6,7 @@ import {HubEvent,Message} from '@farcaster/core';
 // @ts-expect-error Node worker.
 import {startWorker} from '../feed/worker.mjs';
 // @ts-expect-error Node storage.
-import {createPool,migrate,replaceFollows,enrollViewer,saveCast} from '../feed/store.mjs';
+import {createPool,migrate,replaceFollows,enrollViewer,saveCast,status} from '../feed/store.mjs';
 
 const key='0x'+'11'.repeat(32),hash='0x'+'22'.repeat(20);
 const add={hash,signer:key,data:{fid:10,type:1,timestamp:Math.floor(Date.now()/1000)-1609459200,network:1,castAddBody:{text:'Worker fixture',mentions:[],mentionsPositions:[],embeds:[]}}};
@@ -61,4 +61,66 @@ test('worker integrates backfill, explicit subscriptions, atomic checkpoints, re
     assert.equal((await pool.query('SELECT follows_failed FROM kite_feed_users WHERE fid=888')).rows[0].follows_failed,true,'one failed user must not block another user import');
     assert.equal((await pool.query('SELECT requester_fid FROM kite_feed_signers WHERE author_fid=10 AND signer=$1',[key])).rows[0].requester_fid,'9152');
   }finally{for(const timer of timers)clearTimeout(timer);if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
+});
+
+test('worker retries recent failed authors, preserves real failures and logs safe endpoint diagnostics',{skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
+  const schema='worker_retry_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.KITE_TEST_DATABASE_URL);
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+  await migrate(pool);await replaceFollows(pool,123,[10]);await replaceFollows(pool,456,[20]);
+  await pool.query('UPDATE kite_feed_authors SET failed=true,backfill_done=true,backfilled_at=now(),retry_after=NULL,signers_synced_at=NULL');
+  await pool.query('INSERT INTO kite_feed_checkpoints(shard,event_id) VALUES(1,100)');
+  const server=new Server(),logs:string[]=[],castCalls:number[]=[];let stop:(()=>Promise<void>)|undefined,rpc:any;
+  let signerBlocked=true,castBlocked=true;
+  const privateDetail='https://operator:private-password@private-node.example/?token=private-token';
+  server.addService({subscribe:{path:'/HubService/Subscribe',requestStream:false,responseStream:true,requestDeserialize:(bytes:Buffer)=>bytes,requestSerialize:(bytes:Buffer)=>bytes,responseSerialize:(event:any)=>Buffer.from(HubEvent.encode(HubEvent.create(event)).finish()),responseDeserialize:HubEvent.decode}},
+    {subscribe(call:any){rpc=call;call.on('error',()=>{});call.write({type:1,id:101,mergeMessageBody:{deletedMessages:[]}});}});
+  const port=await new Promise<number>((resolve,reject)=>server.bindAsync('127.0.0.1:0',ServerCredentials.createInsecure(),(error,port)=>error?reject(error):resolve(port)));
+  const fetcher=async(url:URL)=>{
+    const endpoint=url.pathname.split('/').pop(),fid=Number(url.searchParams.get('fid'));
+    if(endpoint==='info')return Response.json({shardInfos:[{shardId:1}]});
+    if(endpoint==='events')return Response.json({events:[{id:100}]});
+    if(endpoint==='linksByFid')return Response.json({messages:[{data:{type:5,linkBody:{targetFid:fid===123?10:20}}}]});
+    if(endpoint==='onChainSignersByFid'||endpoint==='signersByFid'){
+      if(fid===20&&signerBlocked)return Response.json({error:privateDetail},{status:403});
+      return Response.json(endpoint==='signersByFid'?{signers:[]}:{events:[]});
+    }
+    if(endpoint==='castsByFid'){
+      castCalls.push(fid);
+      if(fid===20&&castBlocked)return Response.json({error:privateDetail},{status:503});
+      return Response.json({messages:[]});
+    }
+    throw Error('Unexpected fixture endpoint');
+  };
+  async function until(check:()=>Promise<boolean>){for(let i=0;i<100;i++){if(await check())return;await sleep(100);}throw Error('Retry fixture timed out');}
+  const author=async(fid:number)=>(await pool.query('SELECT * FROM kite_feed_authors WHERE fid=$1',[fid])).rows[0];
+  try{
+    stop=await startWorker({DATABASE_URL:'fixture',HUBURL:'https://private-node.example',KITE_FEED_FIDS:'123',KITE_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:(line:string)=>logs.push(line)});
+    await until(async()=>!((await author(10)).failed)&&logs.some(line=>line.includes('FID 20 signer sync failed')));
+    assert.ok(castCalls.includes(10),'a recently completed but failed author must retry actual history');
+    assert.equal((await author(20)).failed,true);
+    assert.ok(!castCalls.includes(20),'failed signer validation must not be silently treated as recovery');
+    assert.ok(logs.some(line=>line.includes('Feed worker started for 2 viewer(s), 1 shards')),'startup includes database-enrolled viewers');
+    assert.ok(logs.some(line=>line.includes('onChainSignersByFid: HTTP 403')&&line.includes('signersByFid: HTTP 403')));
+    assert.ok(logs.some(line=>line==='Feed author FID 10 indexing recovered'));
+
+    await until(async()=>Boolean(rpc));
+    const liveHash=Buffer.alloc(20,0x77);
+    rpc.write({type:1,id:102,mergeMessageBody:{message:Message.create({hash:liveHash,signer:Buffer.from(key.slice(2),'hex'),data:{...add.data,fid:20}}),deletedMessages:[]}});
+    await until(async()=>Boolean((await pool.query('SELECT hash FROM kite_feed_casts WHERE hash=$1',['0x'+liveHash.toString('hex')])).rows.length));
+    assert.equal((await author(20)).failed,true,'a live cast does not hide a failed background import');
+    assert.equal((await status(pool,456)).failed,1);
+
+    await until(async()=>Boolean((await author(20)).retry_after));
+    signerBlocked=false;await pool.query('UPDATE kite_feed_authors SET retry_after=NULL WHERE fid=20');
+    await until(async()=>castCalls.includes(20)&&logs.some(line=>line.includes('FID 20 cast history failed')&&line.includes('castsByFid: HTTP 503')));
+    assert.equal((await author(20)).failed,true,'an ongoing history error must keep the retry flag');
+    await until(async()=>Boolean((await author(20)).retry_after));
+    castBlocked=false;await pool.query('UPDATE kite_feed_authors SET retry_after=NULL WHERE fid=20');
+    await until(async()=>!((await author(20)).failed));
+    assert.ok(castCalls.filter(fid=>fid===20).length>=2);
+    assert.equal((await status(pool,456)).failed,0,'successful retry clears the API banner count');
+    assert.ok(logs.some(line=>line==='Feed author FID 20 indexing recovered'));
+    assert.ok(logs.every(line=>!line.includes('private-')&&!line.includes('https://')&&!line.includes('127.0.0.1')));
+  }finally{if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
 });
