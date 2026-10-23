@@ -2,7 +2,7 @@ import { xHandle } from './x-handle';
 export type Cast = { hash: string; signer: string; data: { fid: number; timestamp: number; castAddBody: { text: string; mentions: number[]; mentionsPositions: number[]; parentCastId?: { fid: number; hash: string }; parentUrl?:string; embedsDeprecated?:string[]; type?:number|string; embeds: { url?: string; castId?: { fid: number; hash: string } }[] } } };
 export type Profile = { fid: number; name: string; username: string; avatar: string; bio: string; banner?: string; website?:string; displayName?:string;twitterUsername?:string;githubUsername?:string;location?:string;primaryEthereumAddress?:string;primarySolanaAddress?:string;profileToken?:string;liveActivityUrl?:string };
 export type Config = { readUrl: string; optimismRpcUrl: string; useGateway?: boolean; approvalConfigured?: boolean; indexedFeedEnabled?:boolean; indexedFeedFids?:number[]; defaultFeedFid?:number };
-export type NodeInfo = { version: string; dbStats?: { numMessages: number }; shardInfos: { shardId: number; maxHeight: number; blockDelay: number }[] };
+export type NodeStatus = {available:boolean;syncDelaySeconds:number|null};
 export type HubMessage = { data: { type?: string | number; userDataBody?: { type: string | number; value: string }; linkBody?: { targetFid: number } }; signer?: string };
 export class HubError extends Error {
   readonly notFound: boolean;
@@ -41,6 +41,14 @@ export async function getConfig(signal?:AbortSignal): Promise<Config> {
     }
   }
   return { ...config, useGateway: true };
+}
+export async function getNodeStatus(signal?:AbortSignal):Promise<NodeStatus>{
+  try{
+    const response=await fetch('/api/node/status',{signal:signal||AbortSignal.timeout(15000)});
+    const value=await response.json();
+    if(!response.ok||value?.available!==true||(value.syncDelaySeconds!==null&&(!Number.isSafeInteger(value.syncDelaySeconds)||value.syncDelaySeconds<0)))throw new Error();
+    return {available:true,syncDelaySeconds:value.syncDelaySeconds};
+  }catch{throw new Error('The node is unavailable. Please try again.');}
 }
 export async function hub<T>(config: Config, endpoint: string, params: Record<string, string | number> = {}, signal?: AbortSignal): Promise<T> {
   const base = config.useGateway || localOrigin() ? '/api/read' : config.readUrl.replace(/\/$/, '');

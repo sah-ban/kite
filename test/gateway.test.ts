@@ -16,6 +16,27 @@ test('gateway fixes read destination and preserves opaque query parameters',asyn
 test('gateway blocks unsupported read endpoints and writes on read path',async()=>{
   for(const [url,method] of [['/api/read/v1/submitMessage','GET'],['/api/read/v1/castsByFid','POST']]){const {req,res}=await request(url,method);await gateway({})(req,res,()=>{});assert.equal(res.statusCode,405);}
 });
+test('raw node info and nested endpoint paths cannot reach the configured node',async()=>{
+  const original=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return Response.json({peer_id:'private-peer'});};
+  try{
+    for(const path of ['/api/read/v1/info','/api/read/v1/info?anything=1','/api/read/v1/info/','/api/read/v1/%69nfo','/api/read/v1/extra/info','/api/read/v1/info/castsByFid','/api/read/v1/extra/castsByFid','/api/read/v1/castsByFid/../info']){
+      const {req,res}=await request(path);await gateway({})(req,res,()=>{throw Error('Unexpected next');});
+      assert.ok([404,405].includes(res.statusCode),path);assert.ok(!String(res.body).includes('private-peer'));
+    }
+    assert.equal(calls,0);
+  }finally{globalThis.fetch=original;}
+});
+test('minimal status ignores request-supplied upstream addresses and gateway network errors stay private',async()=>{
+  const original=globalThis.fetch;
+  try{
+    globalThis.fetch=async input=>{assert.equal(String(input),'https://private-node.example/v1/info');return Response.json({shardInfos:[{blockDelay:0}],peer_id:'private-peer'});};
+    const status=await request('/api/node/status?url=https://attacker.example&endpoint=info');await gateway({HUBURL:'https://private-node.example'})(status.req,status.res,()=>{});
+    assert.equal(status.res.statusCode,200);assert.deepEqual(JSON.parse(String(status.res.body)),{available:true,syncDelaySeconds:0});
+    globalThis.fetch=async()=>{throw Error('Unable to connect to https://private-node.example with private-token');};
+    const failure=await request('/api/read/v1/castsByFid?fid=37');await gateway({HUBURL:'https://private-node.example'})(failure.req,failure.res,()=>{});
+    assert.equal(failure.res.statusCode,502);assert.ok(!String(failure.res.body).includes('private-'));
+  }finally{globalThis.fetch=original;}
+});
 test('conversation and follower reads are allowed only on the configured read node',async()=>{
   const original=globalThis.fetch;const calls:string[]=[];
   globalThis.fetch=async input=>{calls.push(String(input));return Response.json({messages:[]});};

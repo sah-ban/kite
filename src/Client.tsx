@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { Home, PenLine, Bell, Radio, UserRound, ArrowUpRight, RefreshCw, Search, ArrowRight, AlertCircle } from 'lucide-react';
-import { hub, profile, following, localOrigin, type Cast, type Profile, type Config, type NodeInfo } from './lib/hub';
+import { hub, profile, following, localOrigin, getNodeStatus, type Cast, type Profile, type Config, type NodeStatus } from './lib/hub';
 import { clearRememberedAppKey, rememberedAccessCurrent, ACCESS_CLEARED_EVENT, REMEMBER_KEY, STORAGE_KEY, LOCK_KEY } from './lib/vault';
 import { attribute } from './lib/attribution';
 import type { Session } from './lib/signing';
@@ -51,7 +51,7 @@ import { castPath, type ActivityTab } from './lib/social';
 type FeedSnapshot={casts:Cast[];pageToken:string;hasMore:boolean;followPage:number;followFids:number[];status:FeedStatus|null;newPosts:boolean;autoPages:number;refresh:number};
 
 export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
-  const [info,setInfo]=useState<NodeInfo|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false);
+  const [info,setInfo]=useState<NodeStatus|null>(null),[nodeError,setNodeError]=useState(''),[session,setSession]=useState<Session|null>(null),[accountOpen,setAccountOpen]=useState(false),[controls,setControls]=useState(false);
   const [fid,setFid]=useState(37),[casts,setCasts]=useState<Cast[]>([]),[profiles,setProfiles]=useState<Record<number,Profile>>({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState<ReactNode>(''),[pageToken,setPageToken]=useState(''),[hasMore,setHasMore]=useState(false),[refresh,setRefresh]=useState(0),[followPage,setFollowPage]=useState(0),[followFids,setFollowFids]=useState<number[]>([]),[text,setText]=useState(''),[reply,setReply]=useState<Cast|null>(null),[quote,setQuote]=useState<Cast|null>(null),[replyText,setReplyText]=useState(''),[publishing,setPublishing]=useState(false),[actionBusy,setActionBusy]=useState(''),[mode,setMode]=useState<'all'|'include'|'exclude'>('all'),[signerKeys,setSignerKeys]=useState(''),[clientFids,setClientFids]=useState(''),[selfRegistered,setSelfRegistered]=useState(false),[attribution,setAttribution]=useState<Map<string,number>>(new Map()),[attributing,setAttributing]=useState(false),[followed,setFollowed]=useState<Set<number>>(new Set());
   const [draftMentions,setDraftMentions]=useState<DraftMention[]>([]),[replyMentions,setReplyMentions]=useState<DraftMention[]>([]);
   const [images,setImages]=useState<string[]>([]),[replyImages,setReplyImages]=useState<string[]>([]),[uploading,setUploading]=useState(false),[replyUploading,setReplyUploading]=useState(false);
@@ -187,7 +187,7 @@ export function Client({config,openGuide}:{config:Config;openGuide:()=>void}) {
     if(view.kind==='home'||view.kind==='following'){navigate('/');}
   }
 
-  useEffect(()=>{let active=true;hub<NodeInfo>(config,'info').then(v=>{if(active){setInfo(v);setNodeError('');}}).catch(e=>{if(active)setNodeError(e.message);});return()=>{active=false;};},[config,refresh]);
+  useEffect(()=>{const controller=new AbortController();getNodeStatus(controller.signal).then(value=>{if(!controller.signal.aborted){setInfo(value);setNodeError('');}}).catch(error=>{if(!controller.signal.aborted){setInfo(null);setNodeError(error.message);}});return()=>controller.abort();},[config,refresh]);
   useEffect(()=>{if(!session){setFollowed(new Set());return;}let active=true;following(config,session.fid).then(fids=>{if(active)setFollowed(new Set(fids));}).catch(e=>{if(active)setNotice(`Follow list unavailable: ${e.message}`);});return()=>{active=false;};},[session,config,refresh]);
   useEffect(()=>{if(!feedView)return;if(enrolling){setCasts([]);setFeedStatus(null);setHasMore(false);setBusy(false);return;}const id=++requestId.current;setError('');const cached=feedCache.current.get(feedKey);
     if(cached&&cached.refresh===refresh){reading.current=false;loadedFeedKey.current=feedKey;loadedFeedRevision.current=cached.refresh;autoPages.current=cached.autoPages;setCasts(cached.casts);setPageToken(cached.pageToken);setHasMore(cached.hasMore);setFollowPage(cached.followPage);setFollowFids(cached.followFids);setFeedStatus(cached.status);setNewPosts(cached.newPosts);setBusy(false);return()=>{requestId.current++;};}

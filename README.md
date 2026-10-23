@@ -22,6 +22,8 @@ From your repository checkout:
 
 Open http://127.0.0.1:5173 for Kite or http://127.0.0.1:5173/guide for the tutorial. The first run creates `.env` if it is missing. Configure your node through `HUBURL` for both reads and signed submissions; existing configuration is never overwritten. Node addresses and credentials belong in ignored local configuration. No seed phrase is needed for reads.
 
+Browser connection checks use `GET /api/node/status`, which returns only node availability and an aggregate sync delay in seconds. The gateway does not expose `/api/read/v1/info`; peer IDs, versions, database statistics, shard IDs, and heights stay out of the public status response. Settings shows connection status and sync delay. Operators can inspect the full `/v1/info` response directly on their node host.
+
 On Windows, `./kite client` requires Bash. With Node.js 22.13+ and npm installed, start the client directly from the repository folder in PowerShell:
 
 ```powershell
