@@ -21,6 +21,8 @@ export async function migrate(pool) {
     CREATE INDEX IF NOT EXISTS kite_feed_follow_author ON kite_feed_follows(author_fid);
     CREATE TABLE IF NOT EXISTS kite_feed_authors(fid bigint PRIMARY KEY,backfill_cursor text,backfill_done boolean NOT NULL DEFAULT false,backfilled_at timestamptz,signers_synced_at timestamptz,retry_after timestamptz,failed boolean NOT NULL DEFAULT false,epoch bigint NOT NULL DEFAULT 0);
     ALTER TABLE kite_feed_authors ADD COLUMN IF NOT EXISTS epoch bigint NOT NULL DEFAULT 0;
+    ALTER TABLE kite_feed_authors ADD COLUMN IF NOT EXISTS last_attempted_at timestamptz;
+    CREATE INDEX IF NOT EXISTS kite_feed_author_attempt ON kite_feed_authors(last_attempted_at NULLS FIRST,backfilled_at NULLS FIRST,fid);
     CREATE TABLE IF NOT EXISTS kite_feed_casts(id bigserial UNIQUE,hash text PRIMARY KEY,author_fid bigint NOT NULL,timestamp bigint NOT NULL,signer text NOT NULL DEFAULT '',reply boolean NOT NULL DEFAULT false,payload jsonb,deleted boolean NOT NULL DEFAULT false,updated_at timestamptz NOT NULL DEFAULT now());
     CREATE INDEX IF NOT EXISTS kite_feed_cast_author_time ON kite_feed_casts(author_fid,timestamp DESC,hash DESC) WHERE NOT deleted;
     CREATE INDEX IF NOT EXISTS kite_feed_cast_time ON kite_feed_casts(timestamp DESC,hash DESC) WHERE NOT deleted;
@@ -42,6 +44,13 @@ export async function replaceFollows(pool,fid,authors) {
     await db.query('UPDATE kite_feed_users SET follows_synced_at=now(),follows_failed=false,follows_retry_after=NULL,generation=generation+$2 WHERE fid=$1',[fid,JSON.stringify(previous)===JSON.stringify(next)?0:1]);
     await db.query('COMMIT');return next;
   } catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+}
+export async function pendingAuthors(pool) {
+  // Rotate eligible work by attempt time so healthy refreshes cannot starve retries.
+  return (await pool.query(`SELECT a.* FROM kite_feed_authors a
+    WHERE EXISTS(SELECT 1 FROM kite_feed_follows f WHERE f.author_fid=a.fid)
+      AND (a.retry_after IS NULL OR a.retry_after<now())
+    ORDER BY a.last_attempted_at NULLS FIRST,a.backfilled_at NULLS FIRST,a.fid LIMIT 4`)).rows;
 }
 export async function saveCast(db,cast,{backfill=false}={}) {
   if(!validFid(cast?.data?.fid)||!/^0x[\da-f]{40}$/i.test(cast.hash)||!/^0x[\da-f]{64}$/i.test(cast.signer)||!Number.isSafeInteger(cast.data.timestamp)||typeof cast.data.castAddBody?.text!=='string')throw new Error('Invalid indexed cast');

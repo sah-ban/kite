@@ -1,6 +1,6 @@
 import {hubUrl} from '../node-config.mjs';
 import {Client,credentials} from '@grpc/grpc-js';
-import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid} from './store.mjs';
+import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid,pendingAuthors} from './store.mjs';
 import {castOf,dataOf,hex,requesterOf,subscriptionRequest,decodeEvent} from './protocol.mjs';
 import {feedFids} from './api.mjs';
 import {indexNotification} from './notifications.mjs';
@@ -148,8 +148,11 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   }
   async function backfill(author){
     const fid=Number(author.fid);
-    let stage='signer sync';
+    let stage='scheduling';
     try{
+      const attempt=await pool.query('UPDATE kite_feed_authors SET last_attempted_at=now() WHERE fid=$1 AND epoch=$2',[fid,author.epoch]);
+      if(!attempt.rowCount)return;
+      stage='signer sync';
       if(!author.signers_synced_at||Date.now()-new Date(author.signers_synced_at).getTime()>300000)await syncSigners(fid);
       stage='cached history';
       // A failed author must complete a real retry, even when its history is recent.
@@ -183,7 +186,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   const jobs=(async()=>{while(!stopped){
     try{
       if(Date.now()-lastGraph>2000)await syncGraph();
-      const authors=(await pool.query(`SELECT a.* FROM kite_feed_authors a WHERE EXISTS(SELECT 1 FROM kite_feed_follows f WHERE f.author_fid=a.fid) AND (retry_after IS NULL OR retry_after<now()) ORDER BY backfill_done,failed,backfilled_at NULLS FIRST,fid LIMIT 4`)).rows;
+      const authors=await pendingAuthors(pool);
       await Promise.all(authors.map(backfill));
       if(Date.now()-lastCleanup>3600000){await pool.query('DELETE FROM kite_feed_casts WHERE (NOT deleted AND timestamp<$1) OR (deleted AND updated_at<now()-interval \'45 days\')',[cutoff()]);await pool.query('DELETE FROM kite_notifications WHERE timestamp<$1',[cutoff()]);await pool.query("DELETE FROM kite_notification_deleted_casts WHERE deleted_at<now()-interval '45 days'");lastCleanup=Date.now();}
       diagnostics.recovered('jobs','Feed sync recovered');

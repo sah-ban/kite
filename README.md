@@ -313,4 +313,6 @@ Checkpoints commit atomically with processed events. Imports are idempotent, and
 
 The feed's **Retrying N accounts** status counts failed background author imports. Live casts can still arrive while history or signer lookup is failing. Failed authors retry their history even if a previous import finished recently; the flag clears after a successful import. Worker logs identify the affected FID, operation, HTTP endpoint/status, or database/network error category. For example: `Feed author FID 123 cast history failed; retry scheduled in 30s: castsByFid: HTTP 503`. Recovery is logged separately. Identical errors for the same job are limited to once per five minutes; changed errors are reported immediately. Startup counts include existing enrolled viewers. Node URLs, credentials, raw error bodies, and database error details are omitted from these logs.
 
+Eligible author jobs rotate by their last attempt time. Healthy refreshes cannot continually jump ahead of failed authors, and new authors receive an initial attempt promptly. The worker adds its scheduling timestamp and index automatically on startup; existing casts, follows, and retry state are preserved.
+
 Run the regular suite with `npm test`. Set `KITE_TEST_DATABASE_URL` to run PostgreSQL integration tests as well; they create and remove an isolated temporary schema rather than modifying feed tables.

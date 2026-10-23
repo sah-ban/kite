@@ -6,11 +6,44 @@ import {HubEvent,Message} from '@farcaster/core';
 // @ts-expect-error Node worker.
 import {startWorker} from '../feed/worker.mjs';
 // @ts-expect-error Node storage.
-import {createPool,migrate,replaceFollows,enrollViewer,saveCast,status} from '../feed/store.mjs';
+import {createPool,migrate,replaceFollows,enrollViewer,saveCast,status,pendingAuthors} from '../feed/store.mjs';
 
 const key='0x'+'11'.repeat(32),hash='0x'+'22'.repeat(20);
 const add={hash,signer:key,data:{fid:10,type:1,timestamp:Math.floor(Date.now()/1000)-1609459200,network:1,castAddBody:{text:'Worker fixture',mentions:[],mentionsPositions:[],embeds:[]}}};
 const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+
+test('author scheduling gives retries a turn under continuous healthy work and preserves upgrade data',{skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
+  const schema='worker_queue_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.KITE_TEST_DATABASE_URL);
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  const pool=createPool(process.env.KITE_TEST_DATABASE_URL,{options:'-c search_path='+schema});
+  try{
+    await migrate(pool);await replaceFollows(pool,123,[10,20,30,40,50,60]);await saveCast(pool,add);
+    await pool.query("UPDATE kite_feed_authors SET backfill_done=true,backfilled_at=now()-interval '2 hours'");
+    await pool.query("UPDATE kite_feed_authors SET failed=true,backfilled_at=now()-interval '6 hours' WHERE fid=60");
+    // Exercise the automatic upgrade with existing casts and retry flags.
+    await pool.query('DROP INDEX kite_feed_author_attempt');
+    await pool.query('ALTER TABLE kite_feed_authors DROP COLUMN last_attempted_at');
+    await migrate(pool);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM kite_feed_casts')).rows[0].n,1);
+    assert.equal((await pool.query('SELECT failed FROM kite_feed_authors WHERE fid=60')).rows[0].failed,true);
+    const first=await pendingAuthors(pool);assert.ok(first.some((row:any)=>Number(row.fid)===60),'an eligible failed author cannot be hidden behind healthy accounts');
+    const seen=new Set<number>();
+    for(let cycle=0;cycle<2;cycle++){
+      const batch=await pendingAuthors(pool);
+      for(const author of batch){
+        seen.add(Number(author.fid));
+        // Keep healthy jobs eligible, as in an overloaded refresh queue.
+        await pool.query("UPDATE kite_feed_authors SET last_attempted_at=now(),retry_after=now()-interval '1 second' WHERE fid=$1",[author.fid]);
+      }
+    }
+    assert.deepEqual([...seen].sort((a,b)=>a-b),[10,20,30,40,50,60]);
+    await replaceFollows(pool,123,[10,20,30,40,50,60,70,80]);
+    await pool.query("UPDATE kite_feed_authors SET retry_after=now()+interval '1 hour' WHERE fid=80");
+    const next=await pendingAuthors(pool);
+    assert.equal(Number(next[0].fid),70,'new authors get their first attempt promptly');
+    assert.ok(next.every((row:any)=>Number(row.fid)!==80),'backoff is still respected');
+  }finally{await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
+});
 
 test('worker integrates backfill, explicit subscriptions, atomic checkpoints, reconnect and cast removal', {skip:!process.env.KITE_TEST_DATABASE_URL},async()=>{
   const schema='worker_test_'+randomBytes(6).toString('hex'),admin=createPool(process.env.KITE_TEST_DATABASE_URL);
