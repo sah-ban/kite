@@ -32,8 +32,16 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   await migrate(pool);
   // Prevent two workers consuming the same checkpoints or claiming the same backfill pages.
   const lock=await pool.connect();
-  if(!(await lock.query('SELECT pg_try_advisory_lock(hashtext(current_schema()),268438) AS locked')).rows[0].locked){lock.release();throw new Error('A feed worker is already running');}
   lock.on('error',error=>{stopped=true;stopController.abort();for(const stream of streams)stream.cancel();log(`Feed database connection lost; stopping: ${workerError(error)}`);process.exit(1);});
+  try{
+    let acquired=false;
+    for(let attempt=0;attempt<60;attempt++){
+      if((await lock.query('SELECT pg_try_advisory_lock(hashtext(current_schema()),268438) AS locked')).rows[0].locked){acquired=true;break;}
+      if(attempt===0)log('Feed worker waiting for the previous worker to stop');
+      if(attempt<59)await pause(1000);
+    }
+    if(!acquired)throw new Error('A feed worker is already running');
+  }catch(error){lock.release();throw error;}
   for(const viewer of viewers)await enrollViewer(pool,viewer);
   let notificationViewers=new Map();
   async function activateNotifications(){

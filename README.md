@@ -315,4 +315,6 @@ The feed's **Retrying N accounts** status counts failed background author import
 
 Eligible author jobs rotate by their last attempt time. Healthy refreshes cannot continually jump ahead of failed authors, and new authors receive an initial attempt promptly. The worker adds its scheduling timestamp and index automatically on startup; existing casts, follows, and retry state are preserved.
 
+During a rolling deployment, a replacement worker waits up to about one minute for the previous worker to release its database lock. It does not process feeds or notifications while waiting. A separately running worker that never releases the lock still prevents startup, preserving the one-worker-per-database rule.
+
 Run the regular suite with `npm test`. Set `KITE_TEST_DATABASE_URL` to run PostgreSQL integration tests as well; they create and remove an isolated temporary schema rather than modifying feed tables.

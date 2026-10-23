@@ -104,6 +104,8 @@ test('worker retries recent failed authors, preserves real failures and logs saf
   await pool.query('UPDATE kite_feed_authors SET failed=true,backfill_done=true,backfilled_at=now(),retry_after=NULL,signers_synced_at=NULL');
   await pool.query('INSERT INTO kite_feed_checkpoints(shard,event_id) VALUES(1,100)');
   const server=new Server(),logs:string[]=[],castCalls:number[]=[];let stop:(()=>Promise<void>)|undefined,rpc:any;
+  const previousWorker=await pool.connect();let previousReleased=false;
+  await previousWorker.query('SELECT pg_advisory_lock(hashtext(current_schema()),268438)');
   let signerBlocked=true,castBlocked=true;
   const privateDetail='https://operator:private-password@private-node.example/?token=private-token';
   server.addService({subscribe:{path:'/HubService/Subscribe',requestStream:false,responseStream:true,requestDeserialize:(bytes:Buffer)=>bytes,requestSerialize:(bytes:Buffer)=>bytes,responseSerialize:(event:any)=>Buffer.from(HubEvent.encode(HubEvent.create(event)).finish()),responseDeserialize:HubEvent.decode}},
@@ -128,7 +130,11 @@ test('worker retries recent failed authors, preserves real failures and logs saf
   async function until(check:()=>Promise<boolean>){for(let i=0;i<100;i++){if(await check())return;await sleep(100);}throw Error('Retry fixture timed out');}
   const author=async(fid:number)=>(await pool.query('SELECT * FROM kite_feed_authors WHERE fid=$1',[fid])).rows[0];
   try{
-    stop=await startWorker({DATABASE_URL:'fixture',HUBURL:'https://private-node.example',KITE_FEED_FIDS:'123',KITE_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:(line:string)=>logs.push(line)});
+    const starting=startWorker({DATABASE_URL:'fixture',HUBURL:'https://private-node.example',KITE_FEED_FIDS:'123',KITE_FEED_GRPC_URL:'http://127.0.0.1:'+port},{pool,fetcher,log:(line:string)=>logs.push(line)});
+    await until(async()=>logs.includes('Feed worker waiting for the previous worker to stop'));
+    assert.equal(castCalls.length,0,'the replacement cannot process jobs while the previous worker holds the lock');
+    await previousWorker.query('SELECT pg_advisory_unlock(hashtext(current_schema()),268438)');previousWorker.release();previousReleased=true;
+    stop=await starting;
     await until(async()=>!((await author(10)).failed)&&logs.some(line=>line.includes('FID 20 signer sync failed')));
     assert.ok(castCalls.includes(10),'a recently completed but failed author must retry actual history');
     assert.equal((await author(20)).failed,true);
@@ -155,5 +161,5 @@ test('worker retries recent failed authors, preserves real failures and logs saf
     assert.equal((await status(pool,456)).failed,0,'successful retry clears the API banner count');
     assert.ok(logs.some(line=>line==='Feed author FID 20 indexing recovered'));
     assert.ok(logs.every(line=>!line.includes('private-')&&!line.includes('https://')&&!line.includes('127.0.0.1')));
-  }finally{if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
+  }finally{if(!previousReleased){await previousWorker.query('SELECT pg_advisory_unlock(hashtext(current_schema()),268438)');previousWorker.release();}if(stop)await stop();else await pool.end();server.forceShutdown();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();}
 });
