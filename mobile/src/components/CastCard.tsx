@@ -9,6 +9,7 @@ import {useQuery} from '../lib/hooks';
 import {Avatar,space} from './ui';
 import {CastActions} from './CastActions';
 import {CastMenu} from './CastMenu';
+import {ClientLabel} from './ClientLabel';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean}) {
@@ -53,6 +54,7 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
     {embeds.slice(0,4).map((embed,index)=>'castId' in embed&&embed.castId?<Quote key={index} {...embed.castId}/>:embed.url?<UrlEmbed key={`${index}:${embed.url}`} url={embed.url}/>:null)}
     {expanded&&<Text style={{fontSize:12,color:colors.muted,marginTop:4}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>}
+    {expanded&&<ClientLabel fid={cast.data.fid} signer={cast.signer}/>}
     <CastActions cast={cast} enabled={loadActivity}/>
     </View>
   </Pressable>;
