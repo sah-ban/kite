@@ -1,0 +1,20 @@
+# Upload only mobile sources and the one pure formatter shared with the web app.
+**
+!mobile/
+!mobile/**
+!src/
+!src/lib/
+!src/lib/mentions.ts
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/artifacts/
+mobile/android/
+mobile/ios/
+**/.env*
+**/*.jks
+**/*.keystore
+**/*.key
+**/*.pem
+**/credentials.json
+.git/
