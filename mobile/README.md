@@ -2,7 +2,7 @@
 
 A native React Native / Expo app, built alongside the Kite web client. Android application ID: `dev.sahban.kite`. The source is MIT licensed; see the repository license. The Expo starter license is retained in `LICENSE`.
 
-This first preview supports the public chronological feed, profiles with posts and replies, exact profile/cast search, conversations, reaction details, quoted casts, image/link previews, native sharing, and system/light/dark themes. Settings contains appearance preferences and About Kite. Video embeds open externally in this preview.
+This first preview supports the public chronological feed, profiles with posts and replies, exact profile/cast search, conversations, reaction details, quoted casts, image/link previews, native sharing, and system/light/dark themes. Cast menus offer Copy link, Share and Open in Farcaster; your own casts also offer confirmed deletion using the device signer. Deleted casts disappear locally after a successful submission. Settings contains appearance preferences and About Kite. Video embeds open externally in this preview.
 
 Sign in through Farcaster approval, keep the approved signer in device secure storage, and like/repost or undo reactions as your own account. The app restores that connection after restarting. Compose casts and replies with linked mentions, up to four image/GIF/link embeds, automatic link attachment and Pro-aware UTF-8 limits. Drafts are saved per account and reply target, retained on failure, and cleared after a successful submission. Following feeds, cast editing and notifications are the next milestone. Recovery-phrase imports, custody operations and fname changes are intentionally outside the mobile scope.
 

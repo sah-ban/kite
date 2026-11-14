@@ -68,3 +68,21 @@ test('long casting checks current Pro, rejects invalid drafts before submission 
   await assert.rejects(account.cast({...input,text:'a'.repeat(10001)}),/10,000/);assert.equal(h.submitted.length,1);
   h.failPost(true);await assert.rejects(account.cast({...input,text:'retry this draft'}),/Node unavailable/);assert.equal(account.snapshot().session?.fid,545039);assert.equal(h.submitted.length,1);
 });
+
+test('cast deletion signs only the active account’s full cast hash and does not poll after submission',async()=>{
+  const h=harness(),account=h.create();await account.restore();
+  await assert.rejects(account.deleteCast(target),/Sign in/);
+  await account.begin();h.approve();const active=await account.check(),polls=h.providerPolls;
+  await assert.rejects(account.deleteCast(target),/own casts/);
+  const own={...target,data:{...target.data,fid:545039}};
+  await assert.rejects(account.deleteCast({...own,hash:'0x22'}),/own casts/);
+  assert.equal(h.submitted.length,0);
+  await account.deleteCast(own);
+  assert.equal(h.submitted.length,1);assert.equal(h.providerPolls,polls);
+  const message=Message.decode(h.submitted[0]);assert.equal(message.data?.type,2);assert.equal(message.data?.fid,545039);
+  assert.equal('0x'+bytesToHex(message.signer),active.session?.key);
+  assert.equal('0x'+bytesToHex(message.data!.castRemoveBody!.targetHash),own.hash);
+  assert.ok((await validations.validateMessage(message)).isOk());
+  h.failPost(true);await assert.rejects(account.deleteCast(own),/Node unavailable/);
+  assert.equal(h.submitted.length,1);assert.equal(account.snapshot().session?.fid,545039);
+});

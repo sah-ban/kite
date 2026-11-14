@@ -1,6 +1,6 @@
 import {ed25519} from '@noble/curves/ed25519';
 import {bytesToHex,hexToBytes} from '@noble/hashes/utils';
-import {FarcasterNetwork,Message,NobleEd25519Signer,ReactionType,makeReactionAdd,makeReactionRemove} from '@farcaster/core';
+import {FarcasterNetwork,Message,NobleEd25519Signer,ReactionType,makeCastRemove,makeReactionAdd,makeReactionRemove} from '@farcaster/core';
 // Public ownership claim shared with the Node gateway.
 import {mobileClaim} from '../../../mobile-proof.mjs';
 import type {Api} from './api';
@@ -81,6 +81,16 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
         const dataBytes=sdk.MessageData.encode(message.data).finish();
         await api.submit(sdk.Message.encode({...message,dataBytes,data:undefined}).finish());
         return publishedCast(record.fid!,record.key,'0x'+bytesToHex(message.hash),message.data.timestamp,input);
+      }finally{secret.fill(0);}
+    }),
+    deleteCast:(cast:Cast)=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      if(cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only delete your own casts.');
+      const secret=hexToBytes(saved.privateKey.slice(2));
+      try{
+        const result=await makeCastRemove({targetHash:hexToBytes(cast.hash.slice(2))},{fid:saved.fid!,network:FarcasterNetwork.MAINNET},new NobleEd25519Signer(secret));
+        if(result.isErr())throw new Error('Could not sign this deletion. Please try again.');
+        await api.submit(Message.encode(result.value).finish());
       }finally{secret.fill(0);}
     }),
     react:(cast:Cast,kind:'likes'|'recasts',remove:boolean)=>exclusive(async()=>{

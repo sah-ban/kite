@@ -14,6 +14,7 @@
     "@types/node": "^22",
     "eslint-config-expo": "~58.0.4",
     "expo": "~58.0.25",
+    "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.16",
     "expo-crypto": "~58.0.8",
     "expo-dev-client": "~58.0.20",

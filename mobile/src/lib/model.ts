@@ -20,6 +20,7 @@ export function mergeCasts(before: Cast[], after: Cast[]) {
   return [...new Map([...before, ...after].map(cast => [`${cast.data.fid}:${cast.hash.toLowerCase()}`, cast])).values()];
 }
 export const castRoute = (cast: Pick<Cast, 'data'|'hash'>) => `/cast/${cast.data.fid}/${cast.hash}` as const;
+export const castKey = (cast: {data:{fid:number};hash:string}) => `${cast.data.fid}:${cast.hash.toLowerCase()}`;
 export const castDate = (timestamp: number) => new Date((timestamp + 1609459200) * 1000);
 export function relativeTime(timestamp: number) {
   const seconds = Math.max(0, Math.floor((Date.now() - castDate(timestamp).getTime()) / 1000));

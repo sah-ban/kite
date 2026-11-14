@@ -1,7 +1,7 @@
 import {useLocalSearchParams} from 'expo-router';
 import {useState} from 'react';
 import {Pressable,ScrollView,Text,View} from 'react-native';
-import {type Cast,isFid,isHash,mergeCasts} from '../../../lib/model';
+import {type Cast,castKey,isFid,isHash,mergeCasts} from '../../../lib/model';
 import {useApp} from '../../../lib/state';
 import {useCastPage,useQuery} from '../../../lib/hooks';
 import {CastCard,Person} from '../../../components/CastCard';
@@ -9,9 +9,10 @@ import {CastList} from '../../../components/CastList';
 import {Button,Loading,Notice} from '../../../components/ui';
 
 export default function Conversation(){
-  const {fid,hash}=useLocalSearchParams<{fid:string;hash:string}>(),{api}=useApp();const author=Number(fid);
+  const {fid,hash}=useLocalSearchParams<{fid:string;hash:string}>(),{api,deletedCasts}=useApp();const author=Number(fid);
   const valid=isFid(author)&&isHash(hash);
   const cast=useQuery(signal=>valid?api.resolveCast(String(author),hash,signal):Promise.reject(new Error('This cast link is invalid.')),[api,author,hash,valid]);
+  if(valid&&deletedCasts.has(castKey({data:{fid:author},hash})))return <Notice title="Cast deleted">Your cast has been deleted.</Notice>;
   return cast.loading?<Loading/>:cast.error?<Notice title="Cast unavailable" retry={cast.reload}>{cast.error}</Notice>:cast.value?<Thread cast={cast.value}/>:null;
 }
 function Thread({cast}:{cast:Cast}){
