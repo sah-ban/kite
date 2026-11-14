@@ -5,6 +5,13 @@ type NodePage = {messages?: unknown[]; nextPageToken?: string};
 const FIFTEEN_SECONDS = 15000;
 export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profiles = new Map<number, Promise<Profile>>();
+  const activityCache = new Map<string,{expires:number;value:Promise<{likes:Page<number>|null;recasts:Page<number>|null}>}>();
+  let activeActivity = 0;
+  const activityQueue:(()=>void)[]=[];
+  async function queuedActivity<T>(load:()=>Promise<T>):Promise<T>{
+    if(activeActivity>=3)await new Promise<void>(resolve=>activityQueue.push(resolve));else activeActivity++;
+    try{return await load();}finally{const next=activityQueue.shift();if(next)next();else activeActivity--;}
+  }
   async function request<T>(path: string, params: Record<string,string|number> = {}, signal?: AbortSignal): Promise<T> {
     const controller = new AbortController();
     const cancel = () => controller.abort();
@@ -78,17 +85,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     }
     throw new Error('Could not find this short hash. Paste the full Kite cast link.');
   }
-  return {
-    request,profile,resolveProfile,resolveCast,
-    config: (signal?:AbortSignal)=>request<{indexedFeedEnabled:boolean}>('/api/config',{},signal),
-    status: (signal?:AbortSignal)=>request<{available:boolean;syncDelaySeconds:number|null}>('/api/node/status',{},signal),
-    publicFeed:async(cursor='',signal?:AbortSignal)=>page(await request<NodePage>('/api/feed/public',{order:'newest',...(cursor?{cursor}:{})},signal)),
-    profileCasts:async(fid:number,cursor='',signal?:AbortSignal)=>page(await hub<NodePage>('castsByFid',{fid,pageSize:30,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal)),
-    replies:async(cast:Cast,cursor='',signal?:AbortSignal)=>{
-      const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize:30,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
-      return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
-    },
-    reactions:async(cast:Cast,kind:'likes'|'recasts',cursor='',signal?:AbortSignal):Promise<Page<number>>=>{
+  async function reactions(cast:Cast,kind:'likes'|'recasts',cursor='',signal?:AbortSignal):Promise<Page<number>>{
       const value=await hub<NodePage>('reactionsByCast',{target_fid:cast.data.fid,target_hash:cast.hash,reaction_type:kind==='likes'?'Like':'Recast',pageSize:100,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal);
       if(!Array.isArray(value.messages))throw new Error('Reaction details are unavailable.');
       const fids=value.messages.flatMap(item=>{
@@ -97,6 +94,27 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
         return data&&isFid(data.fid)&&(data.type===3||data.type==='MESSAGE_TYPE_REACTION_ADD')&&[kind==='likes'?1:2,kind==='likes'?'REACTION_TYPE_LIKE':'REACTION_TYPE_RECAST'].includes(data.reactionBody?.type??'')&&target?.fid===cast.data.fid&&target.hash?.toLowerCase()===cast.hash.toLowerCase()?[data.fid]:[];
       });
       return {items:[...new Set(fids)],next:typeof value.nextPageToken==='string'?value.nextPageToken:''};
+  }
+  function activity(cast:Cast){
+    const key=`${cast.data.fid}:${cast.hash.toLowerCase()}`;
+    const saved=activityCache.get(key);if(saved&&saved.expires>Date.now())return saved.value;
+    const entry={expires:Infinity,value:Promise.resolve<{likes:Page<number>|null;recasts:Page<number>|null}>({likes:null,recasts:null})};
+    entry.value=Promise.allSettled([queuedActivity(()=>reactions(cast,'likes')),queuedActivity(()=>reactions(cast,'recasts'))]).then(([likes,recasts])=>{
+      entry.expires=Date.now()+(likes.status==='fulfilled'&&recasts.status==='fulfilled'?30000:3000);
+      return {likes:likes.status==='fulfilled'?likes.value:null,recasts:recasts.status==='fulfilled'?recasts.value:null};
+    });
+    activityCache.set(key,entry);if(activityCache.size>200)activityCache.delete(activityCache.keys().next().value!);
+    return entry.value;
+  }
+  return {
+    request,profile,resolveProfile,resolveCast,reactions,activity,
+    config: (signal?:AbortSignal)=>request<{indexedFeedEnabled:boolean}>('/api/config',{},signal),
+    status: (signal?:AbortSignal)=>request<{available:boolean;syncDelaySeconds:number|null}>('/api/node/status',{},signal),
+    publicFeed:async(cursor='',signal?:AbortSignal)=>page(await request<NodePage>('/api/feed/public',{order:'newest',...(cursor?{cursor}:{})},signal)),
+    profileCasts:async(fid:number,cursor='',signal?:AbortSignal)=>page(await hub<NodePage>('castsByFid',{fid,pageSize:30,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal)),
+    replies:async(cast:Cast,cursor='',signal?:AbortSignal)=>{
+      const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize:30,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
+      return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
     },
     counts:(fid:number,signal?:AbortSignal)=>request<{followerCount?:number;followingCount?:number;followers?:number;following?:number}>('/api/profile/counts',{fid},signal),
     embed:(url:string,signal?:AbortSignal)=>request<{kind:'image'|'video'|'link';url:string;title?:string;description?:string;image?:string;poster?:string}>('/api/embed',{url},signal),

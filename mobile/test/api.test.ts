@@ -60,3 +60,20 @@ test('caller cancellation aborts the in-flight gateway request',async()=>{
   const api=createApi('https://kite.example',async(_input,init)=>new Promise((_resolve,reject)=>{init?.signal?.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});}));
   const request=api.publicFeed('',signal.signal);signal.abort();await assert.rejects(request,/aborted/);
 });
+
+test('reaction summaries coalesce duplicate reads, cache results and limit request concurrency',async()=>{
+  let active=0,peak=0,calls=0;
+  const api=createApi('https://kite.example',async()=>{
+    calls++;active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>setTimeout(resolve,5));active--;
+    return json({messages:[]});
+  });
+  const [first,duplicate]=await Promise.all([api.activity(cast),api.activity(cast),...Array.from({length:5},(_,index)=>api.activity({...cast,hash:'0x'+String(index+1).padStart(40,'0')}))]);
+  assert.deepEqual(first,duplicate);assert.equal(calls,12);assert.ok(peak<=3);
+  await api.activity(cast);assert.equal(calls,12);assert.deepEqual(first.likes,{items:[],next:''});
+});
+test('a failed reaction count stays unknown without hiding a successful count or its pagination',async()=>{
+  const api=createApi('https://kite.example',async input=>new URL(String(input)).searchParams.get('reaction_type')==='Like'?json({messages:[{data:{fid:37,type:3,reactionBody:{type:1,targetCastId:{fid:cast.data.fid,hash}}}}],nextPageToken:'more-likes'}):json({},503));
+  const result=await api.activity(cast);
+  assert.deepEqual(result.likes,{items:[37],next:'more-likes'});assert.equal(result.recasts,null);
+});

@@ -1,12 +1,13 @@
 import {Image} from 'expo-image';
 import {router} from 'expo-router';
 import {memo,useState} from 'react';
-import {Linking,Pressable,Share,Text,View} from 'react-native';
+import {Linking,Pressable,Text,View} from 'react-native';
 import {castTextParts} from '../../../src/lib/mentions';
 import {type Cast,castDate,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
-import {Avatar,Icon,space} from './ui';
+import {Avatar,space} from './ui';
+import {CastActions} from './CastActions';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean}) {
@@ -37,7 +38,7 @@ function Quote({fid,hash}:{fid:number;hash:string}){
   const {api,colors}=useApp(),{value,error}=useQuery(signal=>api.resolveCast(String(fid),hash,signal),[api,fid,hash]);
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:12,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:8}}><Person fid={fid} compact/>{value?<CastText cast={value} limit={280}/>:<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>}</Pressable>;
 }
-export const CastCard=memo(function CastCard({cast,expanded=false}:{cast:Cast;expanded?:boolean}){
+export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=true}:{cast:Cast;expanded?:boolean;loadActivity?:boolean}){
   const {colors}=useApp();const body=cast.data.castAddBody;
   const [textExpanded,setTextExpanded]=useState(false);
   const route=()=>router.push(castRoute(cast));
@@ -50,10 +51,7 @@ export const CastCard=memo(function CastCard({cast,expanded=false}:{cast:Cast;ex
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
     {embeds.slice(0,4).map((embed,index)=>'castId' in embed&&embed.castId?<Quote key={index} {...embed.castId}/>:embed.url?<UrlEmbed key={`${index}:${embed.url}`} url={embed.url}/>:null)}
     {expanded&&<Text style={{fontSize:12,color:colors.muted,marginTop:4}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>}
-    <View style={{flexDirection:'row',justifyContent:'space-between',paddingTop:2}}>
-      <Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="View replies" style={[space.row,{minHeight:36,paddingRight:20}]}><Icon name="message-circle" size={17} color={colors.muted}/><Text style={{fontSize:12,color:colors.muted}}>Conversation</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Share cast" hitSlop={8} onPress={event=>{event.stopPropagation();void Share.share({message:`https://kite.sahban.dev${castRoute(cast)}`}).catch(()=>{});}} style={{minWidth:40,minHeight:36,alignItems:'center',justifyContent:'center'}}><Icon name="share" size={17} color={colors.muted}/></Pressable>
-    </View>
+    <CastActions cast={cast} enabled={loadActivity}/>
     </View>
   </Pressable>;
 });
