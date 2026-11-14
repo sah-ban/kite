@@ -2,13 +2,15 @@ import {Image} from 'expo-image';
 import {router,Stack,useLocalSearchParams} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import {useRef,useState} from 'react';
-import {ActivityIndicator,FlatList,Pressable,Share,Text,View} from 'react-native';
+import {ActivityIndicator,FlatList,Pressable,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {safeLink} from '../lib/model';
 import {galleryEmbeds,resolveGallery} from '../lib/image-gallery';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
 import {Icon} from '../components/ui';
+import {downloadImage} from '../lib/download-image';
+import {ImageSavePermissionError} from '../lib/download-image-core';
 
 export default function ImageScreen(){
   const {url,source,embeds}=useLocalSearchParams<{url?:string;source?:string;embeds?:string}>(),{api}=useApp();
@@ -21,9 +23,15 @@ function ImageViewer({images,selected,loadingGallery}:{images:string[];selected?
   const insets=useSafeAreaInsets(),list=useRef<FlatList<string>>(null);
   const [index,setIndex]=useState(()=>Math.max(0,images.indexOf(selected||''))),[notice,setNotice]=useState('');
   const [size,setSize]=useState({width:0,height:0});
+  const [downloading,setDownloading]=useState(false),downloadLock=useRef(false);
   const url=images[index];
   function close(){if(router.canGoBack())router.back();else router.replace('/');}
-  async function share(){if(!url)return;try{await Share.share({message:url});}catch{setNotice('Couldn’t share this image. Please try again.');}}
+  async function download(){
+    if(!url||downloadLock.current)return;downloadLock.current=true;setDownloading(true);setNotice('');
+    try{setNotice(await downloadImage(url));}
+    catch(error){setNotice(error instanceof ImageSavePermissionError?error.message:'Couldn’t download this image. Please try again.');}
+    finally{downloadLock.current=false;setDownloading(false);}
+  }
   function go(next:number){list.current?.scrollToIndex({index:next,animated:true});setIndex(next);setNotice('');}
   return <View style={{flex:1,backgroundColor:'#000',paddingTop:insets.top,paddingBottom:insets.bottom}}>
     <Stack.Screen options={{headerShown:false,presentation:'fullScreenModal',contentStyle:{backgroundColor:'#000'}}}/>
@@ -31,14 +39,14 @@ function ImageViewer({images,selected,loadingGallery}:{images:string[];selected?
     <View style={{height:56,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Close image" onPress={close} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="x" size={24} color="#fff"/></Pressable>
       <Text accessibilityLiveRegion="polite" style={{color:'#fff',fontSize:16,fontWeight:'600'}}>{images.length>1?`${index+1} / ${images.length}`:'Image'}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Share image" disabled={!url} onPress={()=>void share()} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:url?1:.4}}><Icon name="share" size={21} color="#fff"/></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Download image" accessibilityState={{disabled:!url||downloading,busy:downloading}} disabled={!url||downloading} onPress={()=>void download()} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:url?1:.4}}>{downloading?<ActivityIndicator color="#fff"/>:<Icon name="download" size={21} color="#fff"/>}</Pressable>
     </View>
     <View style={{flex:1}} onLayout={event=>{const {width,height}=event.nativeEvent.layout;setSize(previous=>previous.width===width&&previous.height===height?previous:{width,height});}}>
-      {!images.length?<ImagePage/>:size.width>0&&size.height>0&&<FlatList ref={list} key={`${size.width}:${size.height}`} accessibilityLabel="Cast images" data={images} horizontal pagingEnabled showsHorizontalScrollIndicator={false} initialScrollIndex={index} initialNumToRender={4} getItemLayout={(_,position)=>({length:size.width,offset:size.width*position,index:position})} keyExtractor={item=>item} renderItem={({item,index:position})=><View style={{width:size.width,height:size.height}}><ImagePage url={item} position={position+1}/></View>} scrollEventThrottle={16} onScroll={event=>{setIndex(Math.max(0,Math.min(images.length-1,Math.round(event.nativeEvent.contentOffset.x/size.width))));setNotice('');}}/>}
+      {!images.length?<ImagePage/>:size.width>0&&size.height>0&&<FlatList ref={list} key={`${size.width}:${size.height}`} accessibilityLabel="Cast images" data={images} horizontal pagingEnabled showsHorizontalScrollIndicator={false} initialScrollIndex={index} initialNumToRender={4} getItemLayout={(_,position)=>({length:size.width,offset:size.width*position,index:position})} keyExtractor={item=>item} renderItem={({item,index:position})=><View style={{width:size.width,height:size.height}}><ImagePage url={item} position={position+1}/></View>} scrollEventThrottle={16} onScroll={event=>{const next=Math.max(0,Math.min(images.length-1,Math.round(event.nativeEvent.contentOffset.x/size.width)));if(next!==index){setIndex(next);setNotice('');}}}/>}
     </View>
     {images.length>1&&<View style={{height:52,paddingHorizontal:16,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Pressable accessibilityRole="button" accessibilityLabel="Previous image" disabled={index===0} onPress={()=>go(index-1)} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:index===0?.3:1}}><Icon name="chevron-left" color="#fff"/></Pressable><Text style={{color:'#aaa',fontSize:12}}>Swipe between images</Text><Pressable accessibilityRole="button" accessibilityLabel="Next image" disabled={index===images.length-1} onPress={()=>go(index+1)} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:index===images.length-1?.3:1}}><Icon name="chevron-right" color="#fff"/></Pressable></View>}
     {loadingGallery&&<ActivityIndicator accessibilityLabel="Loading cast images" size="small" color="#aaa" style={{padding:8}}/>}
-    {!!notice&&<Text accessibilityRole="alert" style={{color:'#fff',textAlign:'center',fontSize:13,padding:14}}>{notice}</Text>}
+    {!!notice&&<Text accessibilityRole="alert" style={{position:'absolute',left:18,right:18,bottom:insets.bottom+(images.length>1?60:12),borderRadius:12,backgroundColor:'#262626',color:'#fff',textAlign:'center',fontSize:13,padding:14}}>{notice}</Text>}
   </View>;
 }
 function ImagePage({url,position=1}:{url?:string;position?:number}){
