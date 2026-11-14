@@ -31,7 +31,8 @@ function UrlEmbed({url}:{url:string}) {
   const [failed,setFailed]=useState(false);
   const normalized=safeLink(url);if(!normalized)return null;
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
-  return <Pressable onPress={event=>{event.stopPropagation();void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+  const viewImage=value?.kind==='image'&&image;
+  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
     {image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>}
     {value?.kind!=='image'&&<View style={{padding:12,gap:4}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{value?.kind==='video'?'▶ Video · ':''}{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
