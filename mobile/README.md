@@ -6,6 +6,8 @@ This first preview supports the public chronological feed, profiles with posts a
 
 Sign in through Farcaster approval, keep the approved signer in device secure storage, and like/repost or undo reactions as your own account. The app restores that connection after restarting. Compose casts and replies with linked mentions, up to four image/GIF/link embeds, automatic link attachment and Pro-aware UTF-8 limits. Drafts are saved per account and reply target, retained on failure, and cleared after a successful submission. Following feeds, cast editing and notifications are the next milestone. Recovery-phrase imports, custody operations and fname changes are intentionally outside the mobile scope.
 
+Cast images open in a swipeable viewer. On Android, Download saves original image files to `Internal storage/Download/Kite`. The first download asks you to create or select that folder in the system picker; access is remembered for later downloads. If the folder is deleted or access is revoked, select it again. Downloads do not request photo-library or broad storage permissions.
+
 ## Development
 
 Use Node.js 22.13 or newer. From this directory:

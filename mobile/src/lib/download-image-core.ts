@@ -1,8 +1,9 @@
 import {safeLink} from './model';
 
 export class ImageSavePermissionError extends Error {
-  constructor(){super('Allow Kite to save images in your device settings, then try again.');}
+  constructor(message='Allow Kite to save images in your device settings, then try again.'){super(message);}
 }
+export class ImageSaveCancelledError extends Error {}
 export function imageExtension(bytes:Uint8Array):string{
   if(bytes.length>=8&&[137,80,78,71,13,10,26,10].every((value,index)=>bytes[index]===value))return 'png';
   if(bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return 'jpg';

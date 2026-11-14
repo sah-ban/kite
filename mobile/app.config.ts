@@ -15,9 +15,9 @@ const config: ExpoConfig = {
     package: development ? 'dev.sahban.kite.dev' : 'dev.sahban.kite',
     versionCode: 1,
     adaptiveIcon: {foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#ffffff'},
-    blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_IMAGES', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VISUAL_USER_SELECTED', 'android.permission.SYSTEM_ALERT_WINDOW'],
+    blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_IMAGES', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VISUAL_USER_SELECTED', 'android.permission.SYSTEM_ALERT_WINDOW'],
   },
-  plugins: ['expo-router', 'expo-status-bar', 'expo-image', 'expo-font', ['expo-secure-store',{configureAndroidBackup:true}], ['expo-image-picker',{cameraPermission:false,microphonePermission:false}], ['expo-media-library',{photosPermission:false,savePhotosPermission:'Allow Kite to save images to your photos.',granularPermissions:[],isAccessMediaLocationEnabled:false}]],
+  plugins: ['expo-router', 'expo-status-bar', 'expo-image', 'expo-font', ['expo-secure-store',{configureAndroidBackup:true}], ['expo-image-picker',{cameraPermission:false,microphonePermission:false}]],
   experiments: {typedRoutes: true},
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://kite.sahban.dev',

@@ -10,7 +10,7 @@ import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
 import {Icon} from '../components/ui';
 import {downloadImage} from '../lib/download-image';
-import {ImageSavePermissionError} from '../lib/download-image-core';
+import {ImageSaveCancelledError,ImageSavePermissionError} from '../lib/download-image-core';
 
 export default function ImageScreen(){
   const {url,source,embeds}=useLocalSearchParams<{url?:string;source?:string;embeds?:string}>(),{api}=useApp();
@@ -29,7 +29,7 @@ function ImageViewer({images,selected,loadingGallery}:{images:string[];selected?
   async function download(){
     if(!url||downloadLock.current)return;downloadLock.current=true;setDownloading(true);setNotice('');
     try{setNotice(await downloadImage(url));}
-    catch(error){setNotice(error instanceof ImageSavePermissionError?error.message:'Couldn’t download this image. Please try again.');}
+    catch(error){if(!(error instanceof ImageSaveCancelledError))setNotice(error instanceof ImageSavePermissionError?error.message:'Couldn’t download this image. Please try again.');}
     finally{downloadLock.current=false;setDownloading(false);}
   }
   function go(next:number){list.current?.scrollToIndex({index:next,animated:true});setIndex(next);setNotice('');}
