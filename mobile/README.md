@@ -2,7 +2,7 @@
 
 A native React Native / Expo app, built alongside the Kite web client. Android application ID: `dev.sahban.kite`. The source is MIT licensed; see the repository license. The Expo starter license is retained in `LICENSE`.
 
-This first preview supports the public chronological feed, profiles with posts and replies, exact profile/cast search, conversations, reaction details, quoted casts, image/link previews, native sharing, and system/light/dark themes. Settings can connect to any HTTPS Kite server. Video embeds open externally in this preview.
+This first preview supports the public chronological feed, profiles with posts and replies, exact profile/cast search, conversations, reaction details, quoted casts, image/link previews, native sharing, and system/light/dark themes. Settings contains appearance preferences and About Kite. Video embeds open externally in this preview.
 
 Account approval, local signer storage, following feeds, posting, editing, uploads and notifications are the next milestone. This preview cannot connect or publish as an account. Recovery-phrase imports, custody operations and fname changes are intentionally outside the mobile scope.
 
@@ -17,7 +17,7 @@ npm start
 
 Use an Android development build or a compatible Expo Go installation. Build a development client with `npx eas-cli@latest build --platform android --profile development`. It uses the separate application ID `dev.sahban.kite.dev`.
 
-The default backend is `https://kite.sahban.dev`. Change it in Settings, or set `EXPO_PUBLIC_API_URL` before building. Public environment variables are compiled into the app; never put database credentials, app mnemonics or private API keys there. Non-sensitive settings are stored in AsyncStorage. No account keys are collected or stored in this preview.
+The default backend is `https://kite.sahban.dev`. Developers can set `EXPO_PUBLIC_API_URL` before building their own distribution. Connection settings and diagnostics are not exposed in the app's user interface. Public environment variables are compiled into the app; never put database credentials, app mnemonics or private API keys there. Non-sensitive appearance settings are stored in AsyncStorage. No account keys are collected or stored in this preview.
 
 ```sh
 npm run typecheck

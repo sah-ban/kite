@@ -17,14 +17,14 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         if (response.status === 404 || (response.status === 400 && typeof body?.error_detail === 'string' && /^status:\s*NotFound\b/.test(body.error_detail))) throw new Error('This item is unavailable or has been removed.');
-        throw new Error(`The server could not complete this request (${response.status}). Please try again.`);
+        throw new Error('Kite couldn’t load this right now. Please try again.');
       }
-      if (!body || typeof body !== 'object') throw new Error('The server returned an invalid response.');
+      if (!body || typeof body !== 'object') throw new Error('Kite couldn’t load this right now. Please try again.');
       return body as T;
     } catch(error) {
       if (signal?.aborted) throw error;
       if (controller.signal.aborted) throw new Error('The request timed out. Check your connection and try again.');
-      if (error instanceof TypeError) throw new Error('Could not reach your Kite server. Check your connection.');
+      if (error instanceof TypeError) throw new Error('Could not connect to Kite. Check your internet connection.');
       throw error;
     } finally {clearTimeout(timeout); signal?.removeEventListener('abort',cancel);}
   }
@@ -32,7 +32,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     return request<T>('/api/read/v1/' + endpoint, params, signal);
   }
   const page = (value:NodePage): Page<Cast> => {
-    if (!Array.isArray(value.messages)) throw new Error('The server returned an invalid cast list.');
+    if (!Array.isArray(value.messages)) throw new Error('Could not load casts. Please try again.');
     return {items:mergeCasts([],value.messages.filter(isCast)),next:typeof value.nextPageToken==='string'?value.nextPageToken:''};
   };
   async function profile(fid:number):Promise<Profile> {
@@ -62,7 +62,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     const fid = await resolveProfile(author,signal);
     if (isHash(hash)) {
       const result = await hub<Cast>('castById',{fid,hash},signal);
-      if (!isCast(result) || result.data.fid !== fid || result.hash.toLowerCase() !== hash.toLowerCase()) throw new Error('The server returned a different cast.');
+      if (!isCast(result) || result.data.fid !== fid || result.hash.toLowerCase() !== hash.toLowerCase()) throw new Error('Could not find the requested cast.');
       return result;
     }
     if (!/^0x[0-9a-f]{8,40}$/i.test(hash)) throw new Error('Invalid cast hash.');

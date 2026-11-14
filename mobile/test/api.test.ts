@@ -32,7 +32,7 @@ test('feed requests use the selected gateway, preserve cursors and discard remov
 test('full cast lookup validates the returned author and hash',async()=>{
   const api=createApi('https://kite.example',async()=>json(cast));
   assert.deepEqual(await api.resolveCast('1059075',hash),cast);
-  await assert.rejects(api.resolveCast('37',hash),/different cast/);
+  await assert.rejects(api.resolveCast('37',hash),/requested cast/);
 });
 test('profiles coalesce requests and a failed lookup can be retried',async()=>{
   let calls=0;
