@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 import { gateway } from './proxy.mjs';
 // @ts-expect-error Server-only middleware is shared with the Node production server.
 import { approval } from './approval.mjs';
+// @ts-expect-error Server-only approval for device-owned mobile signers.
+import {mobileApproval} from './mobile-approval.mjs';
 // @ts-expect-error Server-only metadata fetcher is shared with production.
 import { embedPreviews } from './embeds.mjs';
 
@@ -31,6 +33,7 @@ export default defineConfig(({mode})=>{
       server.middlewares.use(gifSearch());
       server.middlewares.use(imageUploads(config));
       server.middlewares.use(approval(config,{enrollFeed:feedMiddleware.enroll}));
+      server.middlewares.use(mobileApproval(config));
       server.middlewares.use(embedPreviews());
       server.middlewares.use(gateway(config));
     }}],

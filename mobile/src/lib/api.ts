@@ -3,6 +3,9 @@ import {type Cast, type Profile, type Page, isCast, isFid, isHash, mergeCasts} f
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
 const FIFTEEN_SECONDS = 15000;
+export class ApiError extends Error {
+  constructor(public status:number,message:string,public notFound=false){super(message);}
+}
 export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profiles = new Map<number, Promise<Profile>>();
   const activityCache = new Map<string,{expires:number;value:Promise<{likes:Page<number>|null;recasts:Page<number>|null}>}>();
@@ -23,8 +26,8 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       const response = await fetcher(`${server}${path}${query.size ? `?${query}` : ''}`, {signal:controller.signal, redirect:'error', credentials:'omit'});
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        if (response.status === 404 || (response.status === 400 && typeof body?.error_detail === 'string' && /^status:\s*NotFound\b/.test(body.error_detail))) throw new Error('This item is unavailable or has been removed.');
-        throw new Error('Kite couldn’t load this right now. Please try again.');
+        if (response.status === 404 || (response.status === 400 && typeof body?.error_detail === 'string' && /^status:\s*NotFound\b/.test(body.error_detail))) throw new ApiError(response.status,'This item is unavailable or has been removed.',true);
+        throw new ApiError(response.status,'Kite couldn’t load this right now. Please try again.');
       }
       if (!body || typeof body !== 'object') throw new Error('Kite couldn’t load this right now. Please try again.');
       return body as T;
@@ -106,8 +109,35 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     activityCache.set(key,entry);if(activityCache.size>200)activityCache.delete(activityCache.keys().next().value!);
     return entry.value;
   }
+  async function accountPost<T>(path:'approval'|'verify',body:unknown):Promise<T>{
+    const response=await fetcher(`${server}/api/mobile/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
+    const value=await response.json().catch(()=>null);
+    if(!response.ok)throw new ApiError(response.status,typeof value?.error==='string'?value.error:'Could not connect your account. Please try again.');
+    if(!value||typeof value!=='object')throw new Error('Could not connect your account. Please try again.');
+    return value;
+  }
   return {
-    request,profile,resolveProfile,resolveCast,reactions,activity,
+    origin:server,request,profile,resolveProfile,resolveCast,reactions,activity,accountPost,
+    approvalStatus:async(token:string)=>{
+      const response=await fetcher('https://api.farcaster.xyz/v2/signed-key-request?'+new URLSearchParams({token}),{redirect:'error',credentials:'omit',signal:AbortSignal.timeout(15000)});
+      if(!response.ok)throw new Error('Could not check Farcaster approval. Please try again.');
+      const value=(await response.json())?.result?.signedKeyRequest;
+      if(typeof value?.state!=='string')throw new Error('Could not check Farcaster approval. Please try again.');
+      return {state:value.state as string,userFid:value.userFid as unknown};
+    },
+    submit:async(bytes:Uint8Array)=>{
+      const response=await fetcher(`${server}/api/write/v1/submitMessage`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
+      if(!response.ok)throw new ApiError(response.status,'Couldn’t submit this reaction. Check your connection and account access, then try again.');
+      // A successful submission is final; do not poll the read node afterward.
+    },
+    hasReaction:async(fid:number,cast:Cast,kind:'likes'|'recasts')=>queuedActivity(async()=>{
+      try{
+        const value=await hub<{data?:{fid:number;type:number|string;reactionBody?:{type:number|string;targetCastId?:{fid:number;hash:string}}}}>('reactionById',{fid,target_fid:cast.data.fid,target_hash:cast.hash,reaction_type:kind==='likes'?'Like':'Recast'});
+        const data=value.data,target=data?.reactionBody?.targetCastId;
+        if(data?.fid!==fid||![3,'MESSAGE_TYPE_REACTION_ADD'].includes(data.type)||![kind==='likes'?1:2,kind==='likes'?'REACTION_TYPE_LIKE':'REACTION_TYPE_RECAST'].includes(data.reactionBody?.type??'')||target?.fid!==cast.data.fid||target.hash?.toLowerCase()!==cast.hash.toLowerCase())throw new Error('Could not check your reaction. Please try again.');
+        return true;
+      }catch(error){if(error instanceof ApiError&&error.notFound)return false;throw error;}
+    }),
     config: (signal?:AbortSignal)=>request<{indexedFeedEnabled:boolean}>('/api/config',{},signal),
     status: (signal?:AbortSignal)=>request<{available:boolean;syncDelaySeconds:number|null}>('/api/node/status',{},signal),
     publicFeed:async(cursor='',signal?:AbortSignal)=>page(await request<NodePage>('/api/feed/public',{order:'newest',...(cursor?{cursor}:{})},signal)),

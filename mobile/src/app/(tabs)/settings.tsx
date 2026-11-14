@@ -1,14 +1,21 @@
 import {useState} from 'react';
+import {router} from 'expo-router';
 import {ScrollView,Text,View} from 'react-native';
 import {useApp,type ThemeMode} from '../../lib/state';
 import {Button,space} from '../../components/ui';
-import {openLink} from '../../components/CastCard';
+import {openLink,Person} from '../../components/CastCard';
 
 export default function Settings(){
-  const {theme,setTheme,colors}=useApp();
+  const {theme,setTheme,colors,account,accountBusy,accountError,signOut}=useApp();
   const [error,setError]=useState('');
   return <ScrollView contentContainerStyle={space.content}>
     <Text style={[space.title,{color:colors.ink}]}>Make it yours.</Text>
+    <View style={{gap:12}}>
+      <Text style={[space.heading,{color:colors.ink}]}>Account</Text>
+      {account.session?<><Person fid={account.session.fid}/><Button label="Sign out" quiet disabled={accountBusy} onPress={()=>void signOut().catch(()=>{})}/></>:<><Button label="Sign in with Farcaster" onPress={()=>router.push('/sign-in')}/>{account.hasSavedKey&&<Button label="Reset saved connection" quiet disabled={accountBusy} onPress={()=>void signOut().catch(()=>{})}/>}</>}
+      {!!accountError&&<Text accessibilityRole="alert" style={{color:colors.danger,lineHeight:21}}>{accountError}</Text>}
+    </View>
+    <View style={{height:1,backgroundColor:colors.line,marginVertical:4}}/>
     <View style={{gap:12}}>
       <Text style={[space.heading,{color:colors.ink}]}>Appearance</Text>
       <View style={[space.row,{flexWrap:'wrap'}]}>

@@ -27,7 +27,7 @@ const SESSION_TTL = 30 * 24 * 60 * 60_000;
 class Failure extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
-class RegistrationPending extends Error {}
+export class RegistrationPending extends Error {}
 class SignerInactive extends Failure {
   constructor(){super(403,'The approved signer is inactive or has been revoked.');}
 }
@@ -80,7 +80,7 @@ export async function loadApprovalIdentity(config) {
   return { fid: Number(fid), account: mnemonicToAccount(mnemonic) };
 }
 
-async function verifyRegistration(config, fid, key, request) {
+export async function verifyRegistration(config, fid, key, request) {
   const client = createPublicClient({chain:optimism,transport:http(config.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io')});
   const state = await client.readContract({address:KEY_REGISTRY_ADDRESS,abi:keyRegistryABI,functionName:'keys',args:[BigInt(fid),key]});
   if (Number(state[0]) === 0) throw new RegistrationPending();

@@ -17,7 +17,7 @@ const config: ExpoConfig = {
     adaptiveIcon: {foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#ffffff'},
     blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_IMAGES', 'android.permission.SYSTEM_ALERT_WINDOW'],
   },
-  plugins: ['expo-router', 'expo-status-bar', 'expo-image', 'expo-font'],
+  plugins: ['expo-router', 'expo-status-bar', 'expo-image', 'expo-font', ['expo-secure-store',{configureAndroidBackup:true}]],
   experiments: {typedRoutes: true},
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://kite.sahban.dev',

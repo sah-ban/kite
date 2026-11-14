@@ -47,3 +47,4 @@ artifacts/
 *.keystore
 credentials.json
 .env
+!.env.example

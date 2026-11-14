@@ -1,6 +1,7 @@
 # Upload only mobile sources and the one pure formatter shared with the web app.
 /*
 !/mobile
+!/mobile-proof.mjs
 !/src
 /src/*
 !/src/lib
