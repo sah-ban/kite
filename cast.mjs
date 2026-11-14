@@ -1,5 +1,5 @@
 import { linkEmbeds } from './link-embeds.mjs';
-import { replacementBody } from './replacement.mjs';
+import { replacementBody } from './cast-body.mjs';
 export function imageEmbeds(images,quoted=false,maximum=2) {
   if(!Array.isArray(images)||images.length>(maximum-(quoted?1:0)))throw new Error(`Attach up to ${maximum-(quoted?1:0)} images${quoted?' with a quote':''}.`);
   return images.map(value=>{

@@ -6,7 +6,7 @@ The client is the homepage at `/`; the tutorial lives at `/guide`. Public tester
 
 ## Try the client
 
-An Android app is being developed in [`mobile/`](mobile/README.md), using React Native and Expo. Its first preview supports native browsing of feeds, profiles and conversations; account approval and posting are planned next. The Android application ID is `dev.sahban.kite`.
+An Android app is being developed in [`mobile/`](mobile/README.md), using React Native and Expo. It supports native browsing, Farcaster approval with device-held signers, reactions, and casting/replies with mentions, images, GIFs and link embeds. The Android application ID is `dev.sahban.kite`.
 
 Home shows public casts from the shared index while signed out and the chronological Following feed when connected. Desktop navigation and the mobile bottom bar provide Home, Search, Notifications, and Profile; the account menu opens Settings and account actions. Mobile navigation uses icons, with a centered New cast button between Search and Notifications. On mobile, Home keeps the app header and places refresh after Filters; other screens use their own page headers. Desktop places the Kite brand and theme switch above the left navigation, without a top app header. The guide remains available at `/guide`, linked from Settings alongside node diagnostics and protocol references. Existing `/following` and public FID links continue to work. The feed picker is hidden while indexed feed coverage is limited. Wide desktop screens include a sticky About Kite panel with source code and field guide links.
 

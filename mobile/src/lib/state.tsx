@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import {createContext, useCallback, useContext, useEffect, useState, type ReactNode} from 'react';
+import {createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react';
 import {useColorScheme} from 'react-native';
 import {createApi, type Api} from './api';
 import {normalizeServer} from './model';
 import type {Cast} from './model';
 import {deviceAccount} from './account';
 import type {AccountSnapshot} from './account-core';
+import type {CastInput} from './composer';
 
 export type ThemeMode = 'system'|'light'|'dark';
 const palettes = {
@@ -17,7 +18,8 @@ export type Colors = typeof palettes.light;
 type ReactionOverride={active:boolean;count:number|null;more:boolean};
 type State = {api:Api;theme:ThemeMode;dark:boolean;colors:Colors;ready:boolean;setTheme:(value:ThemeMode)=>Promise<void>;
   account:AccountSnapshot;accountBusy:boolean;accountError:string;beginSignIn:()=>Promise<AccountSnapshot>;checkSignIn:()=>Promise<AccountSnapshot>;signOut:()=>Promise<AccountSnapshot>;
-  reactions:Map<string,ReactionOverride>;react:(cast:Cast,kind:'likes'|'recasts',active:boolean,count:number|null,more:boolean)=>Promise<void>};
+  reactions:Map<string,ReactionOverride>;react:(cast:Cast,kind:'likes'|'recasts',active:boolean,count:number|null,more:boolean)=>Promise<void>;
+  publish:(input:CastInput)=>Promise<Cast>;publishing:boolean;published:Cast[];publishNotice:Cast|null;dismissPublishNotice:()=>void};
 export const reactionKey=(fid:number,cast:Cast,kind:'likes'|'recasts')=>`${fid}:${cast.data.fid}:${cast.hash.toLowerCase()}:${kind}`;
 const Context = createContext<State|null>(null);
 const SETTINGS = 'kite.mobile.settings.v1';
@@ -29,6 +31,8 @@ export function AppProvider({children}:{children:ReactNode}) {
   const [device]=useState(()=>deviceAccount(api));
   const [account,setAccount]=useState<AccountSnapshot>({session:null,pending:null,hasSavedKey:false}),[accountBusy,setAccountBusy]=useState(false),[accountError,setAccountError]=useState('');
   const [reactions,setReactions]=useState<Map<string,ReactionOverride>>(()=>new Map());
+  const [publishing,setPublishing]=useState(false),[published,setPublished]=useState<Cast[]>([]),[publishNotice,setPublishNotice]=useState<Cast|null>(null);
+  const publishLock=useRef(false);
   useEffect(()=>{
     let active=true;
     const preferences=AsyncStorage.getItem(SETTINGS).then(value=>{
@@ -54,8 +58,14 @@ export function AppProvider({children}:{children:ReactNode}) {
     await device.react(cast,kind,active);
     setReactions(previous=>{const next=new Map(previous);const key=reactionKey(session.fid,cast,kind),before=next.get(key);const baseline=before?.count??count;next.set(key,{active:!active,count:baseline===null?null:more?baseline:Math.max(0,baseline+(active?-1:1)),more});if(next.size>500)next.delete(next.keys().next().value!);return next;});
   }
+  async function publish(input:CastInput){
+    if(publishLock.current)throw new Error('Your cast is already being published.');
+    publishLock.current=true;setPublishing(true);
+    try{const cast=await device.cast(input);api.rememberCast(cast);setPublished(previous=>[cast,...previous.filter(value=>value.hash!==cast.hash)].slice(0,30));setPublishNotice(cast);return cast;}
+    finally{publishLock.current=false;setPublishing(false);}
+  }
   const dark=theme==='dark'||(theme==='system'&&system==='dark');
   async function setTheme(value:ThemeMode){await AsyncStorage.setItem(SETTINGS,JSON.stringify({theme:value}));changeTheme(value);}
-  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react}}>{children}</Context.Provider>;
+  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null)}}>{children}</Context.Provider>;
 }
 export function useApp(){const state=useContext(Context);if(!state)throw new Error('AppProvider is missing.');return state;}

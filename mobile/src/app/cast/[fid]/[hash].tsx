@@ -1,7 +1,7 @@
 import {useLocalSearchParams} from 'expo-router';
 import {useState} from 'react';
 import {Pressable,ScrollView,Text,View} from 'react-native';
-import {type Cast,isFid,isHash} from '../../../lib/model';
+import {type Cast,isFid,isHash,mergeCasts} from '../../../lib/model';
 import {useApp} from '../../../lib/state';
 import {useCastPage,useQuery} from '../../../lib/hooks';
 import {CastCard,Person} from '../../../components/CastCard';
@@ -15,10 +15,11 @@ export default function Conversation(){
   return cast.loading?<Loading/>:cast.error?<Notice title="Cast unavailable" retry={cast.reload}>{cast.error}</Notice>:cast.value?<Thread cast={cast.value}/>:null;
 }
 function Thread({cast}:{cast:Cast}){
-  const {api,colors}=useApp();const [tab,setTab]=useState<'replies'|'likes'|'recasts'>('replies');
+  const {api,colors,published}=useApp();const [tab,setTab]=useState<'replies'|'likes'|'recasts'>('replies');
   const page=useCastPage((cursor,signal)=>api.replies(cast,cursor,signal),[api,cast.hash,cast.data.fid]);
+  const replies={...page,items:mergeCasts(page.items,published.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())).sort((a,b)=>a.data.timestamp-b.data.timestamp)};
   const header=<View><CastCard cast={cast} expanded/><View style={{flexDirection:'row',borderBottomWidth:1,borderColor:colors.line}}>{(['replies','likes','recasts'] as const).map(value=><Pressable key={value} accessibilityRole="tab" accessibilityState={{selected:tab===value}} onPress={()=>setTab(value)} style={{flex:1,alignItems:'center',padding:16,borderBottomWidth:2,borderBottomColor:tab===value?colors.accent:'transparent'}}><Text style={{color:tab===value?colors.ink:colors.muted,fontWeight:'600'}}>{value==='recasts'?'Reposts':value[0].toUpperCase()+value.slice(1)}</Text></Pressable>)}</View></View>;
-  return tab==='replies'?<CastList page={page} header={header} empty="No replies yet"/>:<ScrollView>{header}<Reactions key={tab} cast={cast} kind={tab}/></ScrollView>;
+  return tab==='replies'?<CastList page={replies} header={header} empty="No replies yet"/>:<ScrollView>{header}<Reactions key={tab} cast={cast} kind={tab}/></ScrollView>;
 }
 function Reactions({cast,kind}:{cast:Cast;kind:'likes'|'recasts'}){
   const {api,colors}=useApp();const first=useQuery(signal=>api.reactions(cast,kind,'',signal),[api,cast.hash,kind]);

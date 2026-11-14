@@ -9,11 +9,11 @@ import {mobileClaim} from '../../mobile-proof.mjs';
 const origin='https://kite.example',address='0x'+'11'.repeat(20),now=1700000000000;
 const target={hash:'0x'+'22'.repeat(20),signer:'public',data:{fid:37,timestamp:1,castAddBody:{text:'Fixture'}}};
 function harness(){
-  let saved:string|null=null,counter=1,approved=false,failSave=false,failPost=false;
+  let saved:string|null=null,counter=1,approved=false,failSave=false,failPost=false,pro=false;
   let seedCount=0,approvalCalls=0,providerPolls=0;
   const submitted:Uint8Array[]=[],claims:unknown[]=[];
   const storage:AccountStorage={get:async()=>saved,set:async(value)=>{if(failSave)throw Error('Storage unavailable');saved=value;},remove:async()=>{saved=null;}};
-  const api={origin,accountPost:async<T>(purpose:'approval'|'verify',body:unknown):Promise<T>=>{
+  const api={origin,proStatus:async()=>pro,accountPost:async<T>(purpose:'approval'|'verify',body:unknown):Promise<T>=>{
     const claim=body as {key:string;signature:string;issuedAt:number;nonce:string;fid?:number};claims.push(body);
     assert.ok(!('privateKey' in claim));assert.ok(saved,'key must be saved before the approval request');
     assert.ok(ed25519.verify(hexToBytes(claim.signature.slice(2)),mobileClaim(origin,purpose==='approval'?'approve':'verify',claim.key,claim.issuedAt,claim.nonce,claim.fid||0),hexToBytes(claim.key.slice(2))));
@@ -22,7 +22,7 @@ function harness(){
   },approvalStatus:async()=>{providerPolls++;return approved?{state:'completed',userFid:545039}:{state:'pending_approval',userFid:undefined};},submit:async(bytes:Uint8Array)=>{if(failPost)throw Error('Node unavailable');submitted.push(bytes);}};
   const random=async(size:number)=>{if(size===32)seedCount++;return new Uint8Array(size).fill(counter++);};
   const create=()=>createAccount(api,storage,random,()=>now);
-  return {create,storage,api,submitted,claims,get saved(){return saved;},get seedCount(){return seedCount;},get approvalCalls(){return approvalCalls;},get providerPolls(){return providerPolls;},approve:()=>{approved=true;},failSave:(value:boolean)=>{failSave=value;},failPost:(value:boolean)=>{failPost=value;},tamper:(value:string)=>{saved=value;}};
+  return {create,storage,api,submitted,claims,get saved(){return saved;},get seedCount(){return seedCount;},get approvalCalls(){return approvalCalls;},get providerPolls(){return providerPolls;},approve:()=>{approved=true;},setPro:(value:boolean)=>{pro=value;},failSave:(value:boolean)=>{failSave=value;},failPost:(value:boolean)=>{failPost=value;},tamper:(value:string)=>{saved=value;}};
 }
 test('mobile approval saves a device key first, coalesces starts and exposes no secret in public state',async()=>{
   const h=harness(),account=h.create();await account.restore();
@@ -50,4 +50,21 @@ test('corrupt saved keys cannot be silently replaced, and sign-out resets them e
 });
 test('failed submissions retain the signed-in account and do not claim successful reactions',async()=>{
   const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();h.failPost(true);await assert.rejects(account.react(target,'likes',false),/Node unavailable/);assert.equal(h.submitted.length,0);assert.equal(account.snapshot().session?.fid,545039);
+});
+
+test('casting signs mentions, replies and four embeds using the approved device key and exact dataBytes',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();const active=await account.check(),polls=h.providerPolls;
+  const links=Array.from({length:4},(_,i)=>`https://example.com/${i}`);
+  const cast=await account.cast({text:'Hello 🌱',mentions:[925685],mentionsPositions:[6],images:[],links,parent:{fid:37,hash:target.hash}});
+  assert.equal(h.submitted.length,1);assert.equal(cast.data.fid,545039);assert.equal(cast.signer,active.session?.key);assert.equal(cast.data.castAddBody.embeds?.length,4);assert.equal(h.providerPolls,polls);
+  const {castSdk}=await import('../src/lib/cast-sdk');const sdk=await castSdk(),message=sdk.Message.decode(h.submitted[0]);assert.equal(message.data,undefined);assert.ok(message.dataBytes?.length);const data=sdk.MessageData.decode(message.dataBytes!);
+  assert.equal(data.fid,545039);assert.deepEqual(data.castAddBody?.mentions,[925685]);assert.deepEqual(data.castAddBody?.mentionsPositions,[6]);assert.equal(data.castAddBody?.embeds.length,4);assert.equal(data.castAddBody?.parentCastId?.fid,37);assert.equal('0x'+bytesToHex(data.castAddBody!.parentCastId!.hash),target.hash);
+  assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());assert.equal(cast.hash,'0x'+bytesToHex(message.hash));
+});
+test('long casting checks current Pro, rejects invalid drafts before submission and retains the account on failure',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
+  const input={text:'a'.repeat(1025),mentions:[],mentionsPositions:[],images:[],links:[]};
+  await assert.rejects(account.cast(input),/Pro/);assert.equal(h.submitted.length,0);h.setPro(true);const cast=await account.cast(input);assert.equal(cast.data.castAddBody.text.length,1025);
+  await assert.rejects(account.cast({...input,text:'a'.repeat(10001)}),/10,000/);assert.equal(h.submitted.length,1);
+  h.failPost(true);await assert.rejects(account.cast({...input,text:'retry this draft'}),/Node unavailable/);assert.equal(account.snapshot().session?.fid,545039);assert.equal(h.submitted.length,1);
 });

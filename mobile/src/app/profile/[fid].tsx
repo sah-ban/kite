@@ -3,7 +3,7 @@ import {useLocalSearchParams} from 'expo-router';
 import {useState} from 'react';
 import {Pressable,Text,View} from 'react-native';
 import {useApp} from '../../lib/state';
-import {isFid,safeLink} from '../../lib/model';
+import {isFid,safeLink,mergeCasts} from '../../lib/model';
 import {useCastPage,useQuery} from '../../lib/hooks';
 import {CastList} from '../../components/CastList';
 import {Avatar,Button,Loading,Notice,space} from '../../components/ui';
@@ -14,10 +14,10 @@ export default function ProfileScreen(){
   return <Profile fid={fid}/>;
 }
 function Profile({fid}:{fid:number}){
-  const {api,colors}=useApp();const [tab,setTab]=useState<'posts'|'replies'>('posts');
+  const {api,colors,published}=useApp();const [tab,setTab]=useState<'posts'|'replies'>('posts');
   const profile=useQuery(()=>api.profile(fid),[api,fid]);const counts=useQuery(signal=>api.counts(fid,signal),[api,fid]);
   const page=useCastPage((cursor,signal)=>api.profileCasts(fid,cursor,signal),[api,fid]);
-  const selected={...page,items:page.items.filter(cast=>!!cast.data.castAddBody.parentCastId===(tab==='replies'))};
+  const selected={...page,items:mergeCasts(published.filter(cast=>cast.data.fid===fid),page.items).filter(cast=>!!cast.data.castAddBody.parentCastId===(tab==='replies')).sort((a,b)=>b.data.timestamp-a.data.timestamp)};
   const p=profile.value;
   return <CastList page={selected} empty={tab==='posts'?'No posts on this page':'No replies on this page'} header={<View>
     {p?.banner&&safeLink(p.banner)?<Image source={{uri:p.banner}} contentFit="cover" style={{width:'100%',height:120}}/>:<View style={{height:80,backgroundColor:colors.accentSoft}}/>}

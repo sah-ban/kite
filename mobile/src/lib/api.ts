@@ -1,4 +1,7 @@
 import {type Cast, type Profile, type Page, isCast, isFid, isHash, mergeCasts} from './model';
+import {MAX_IMAGE_BYTES,imageMime} from './composer';
+import {imageEmbeds} from '../../../cast.mjs';
+import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
@@ -8,6 +11,7 @@ export class ApiError extends Error {
 }
 export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profiles = new Map<number, Promise<Profile>>();
+  const published=new Map<string,{cast:Cast;expires:number}>();
   const activityCache = new Map<string,{expires:number;value:Promise<{likes:Page<number>|null;recasts:Page<number>|null}>}>();
   let activeActivity = 0;
   const activityQueue:(()=>void)[]=[];
@@ -71,6 +75,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   async function resolveCast(author:string, hash:string, signal?:AbortSignal):Promise<Cast> {
     const fid = await resolveProfile(author,signal);
     if (isHash(hash)) {
+      const cached=published.get(`${fid}:${hash.toLowerCase()}`);if(cached&&cached.expires>Date.now())return cached.cast;
       const result = await hub<Cast>('castById',{fid,hash},signal);
       if (!isCast(result) || result.data.fid !== fid || result.hash.toLowerCase() !== hash.toLowerCase()) throw new Error('Could not find the requested cast.');
       return result;
@@ -118,6 +123,23 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   }
   return {
     origin:server,request,profile,resolveProfile,resolveCast,reactions,activity,accountPost,
+    rememberCast:(cast:Cast)=>{if(!isCast(cast))throw new Error('Invalid published cast.');published.set(`${cast.data.fid}:${cast.hash.toLowerCase()}`,{cast,expires:Date.now()+120000});if(published.size>100)published.delete(published.keys().next().value!);},
+    proExpiry:async(fid:number,signal?:AbortSignal)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid},signal)),
+    proStatus:async(fid:number)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid}))>Date.now()/1000,
+    uploadImage:async(bytes:Uint8Array,signal?:AbortSignal)=>{
+      if(!bytes.length||bytes.length>MAX_IMAGE_BYTES)throw new Error('Images must be 10 MB or smaller.');
+      const type=imageMime(bytes);
+      const response=await fetcher(`${server}/api/images/upload`,{method:'POST',headers:{'Content-Type':type,Origin:server},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:signal||AbortSignal.timeout(65000)});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok)throw new Error(response.status===429?'Too many image uploads. Please try again later.':response.status===413?'Images must be 10 MB or smaller.':'Could not upload this image. Please try again.');
+      return imageEmbeds([result?.url],false,4)[0].url as string;
+    },
+    gifs:async(query='',cursor='',signal?:AbortSignal)=>{
+      const value=await request<{items:{id:string;url:string;preview:string;title:string}[];next?:string}>('/api/gifs',{q:query,...(cursor?{pos:cursor}:{})},signal);
+      if(!Array.isArray(value.items))throw new Error('Could not load GIFs.');
+      const items=value.items.filter(item=>{try{return typeof item.id==='string'&&typeof item.title==='string'&&!!imageEmbeds([item.url],false,4)&&!!imageEmbeds([item.preview],false,4);}catch{return false;}});
+      return {items,next:typeof value.next==='string'&&value.next!==cursor?value.next:''};
+    },
     approvalStatus:async(token:string)=>{
       const response=await fetcher('https://api.farcaster.xyz/v2/signed-key-request?'+new URLSearchParams({token}),{redirect:'error',credentials:'omit',signal:AbortSignal.timeout(15000)});
       if(!response.ok)throw new Error('Could not check Farcaster approval. Please try again.');
@@ -127,7 +149,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     },
     submit:async(bytes:Uint8Array)=>{
       const response=await fetcher(`${server}/api/write/v1/submitMessage`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
-      if(!response.ok)throw new ApiError(response.status,'Couldn’t submit this reaction. Check your connection and account access, then try again.');
+      if(!response.ok)throw new ApiError(response.status,'Couldn’t submit this message. Check your connection and account access, then try again.');
       // A successful submission is final; do not poll the read node afterward.
     },
     hasReaction:async(fid:number,cast:Cast,kind:'likes'|'recasts')=>queuedActivity(async()=>{

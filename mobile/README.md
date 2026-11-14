@@ -4,7 +4,7 @@ A native React Native / Expo app, built alongside the Kite web client. Android a
 
 This first preview supports the public chronological feed, profiles with posts and replies, exact profile/cast search, conversations, reaction details, quoted casts, image/link previews, native sharing, and system/light/dark themes. Settings contains appearance preferences and About Kite. Video embeds open externally in this preview.
 
-Sign in through Farcaster approval, keep the approved signer in device secure storage, and like/repost or undo reactions as your own account. The app restores that connection after restarting. Following feeds, composing casts, editing, uploads and notifications are the next milestone. Recovery-phrase imports, custody operations and fname changes are intentionally outside the mobile scope.
+Sign in through Farcaster approval, keep the approved signer in device secure storage, and like/repost or undo reactions as your own account. The app restores that connection after restarting. Compose casts and replies with linked mentions, up to four image/GIF/link embeds, automatic link attachment and Pro-aware UTF-8 limits. Drafts are saved per account and reply target, retained on failure, and cleared after a successful submission. Following feeds, cast editing and notifications are the next milestone. Recovery-phrase imports, custody operations and fname changes are intentionally outside the mobile scope.
 
 ## Development
 
@@ -22,6 +22,8 @@ The default backend is `https://kite.sahban.dev`. Copy `.env.example` to `.env` 
 
 The backend must include `/api/mobile/approval` and `/api/mobile/verify`. They reuse the server's existing `FARCASTER_APP_FID` and `FARCASTER_APP_MNEMONIC` (or `FARCASTER_APP_ENV_FILE`). No developer mnemonic belongs in the mobile environment. The phone creates its own signer, signs a short-lived ownership claim, and sends only the public key and proof. Farcaster approval is checked against the registered onchain signer before the account becomes active. Signed reaction messages are submitted from the phone through Kite's existing gateway; success does not trigger post-submission read polling. Signing out deletes the saved device connection and does not revoke the onchain key.
 
+Casting also uses the existing signed-message gateway. The phone uses the same shared cast, URL and mention validation as the web composer and the modern cast builder for four embeds and 10,000-byte Pro casts. A successful submission displays **Cast published** with a View action; its locally signed content is cached so opening it does not wait for a confirmation read. Images (JPEG, PNG, GIF, WebP, up to 10 MB each) use the existing `/api/images/upload` endpoint with its server-only `IMGBB_API_KEY`; GIF search uses the existing Tenor-backed endpoint. Video URLs can be attached as links; video file uploads are not included. Plain draft content and attachment URLs use AsyncStorage, while signer secrets remain in SecureStore.
+
 ```sh
 npm run typecheck
 npm run lint
@@ -31,7 +33,7 @@ npx expo export --platform android
 
 ## Android builds
 
-The checked-in Expo project belongs to the Kite maintainers. For a fork, change `owner`, `slug`, `android.package` and `extra.eas.projectId` in `app.config.ts` to your own identity, then link your project with `npx eas-cli@latest init`. EAS commands run from this directory. The repository-root `.easignore` uploads only mobile sources, the shared UTF-8 mention formatter and the public ownership-claim helper, excluding server configuration and credentials.
+The checked-in Expo project belongs to the Kite maintainers. For a fork, change `owner`, `slug`, `android.package` and `extra.eas.projectId` in `app.config.ts` to your own identity, then link your project with `npx eas-cli@latest init`. EAS commands run from this directory. The repository-root `.easignore` uploads only mobile sources and explicitly shared public helpers for mentions, cast/URL validation, Pro status and key-ownership claims, excluding server configuration and credentials.
 
 ```sh
 # Standalone APK for installation on an Android phone (no development server)

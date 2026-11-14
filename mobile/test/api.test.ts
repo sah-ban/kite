@@ -77,3 +77,14 @@ test('a failed reaction count stays unknown without hiding a successful count or
   const result=await api.activity(cast);
   assert.deepEqual(result.likes,{items:[37],next:'more-likes'});assert.equal(result.recasts,null);
 });
+
+test('a freshly published signed cast opens locally without a read-after-submit lookup',async()=>{
+  let calls=0;const api=createApi('https://kite.example',async()=>{calls++;throw Error('No node request expected');});api.rememberCast(cast);assert.deepEqual(await api.resolveCast(String(cast.data.fid),cast.hash),cast);assert.equal(calls,0);
+});
+test('native uploads use the web endpoint origin and image type, and GIF search accepts only validated media URLs',async()=>{
+  const api=createApi('https://kite.example',async(input,init)=>{
+    if(String(input).includes('/api/images/upload')){assert.equal((init?.headers as Record<string,string>).Origin,'https://kite.example');assert.equal((init?.headers as Record<string,string>)['Content-Type'],'image/jpeg');return json({url:'https://i.ibb.co/a/image.jpg'});}
+    return json({items:[{id:'one',title:'Hello',url:'https://media.tenor.com/a/hello.gif',preview:'https://media.tenor.com/b/hello.gif'},{id:'bad',title:'Bad',url:'https://evil.example/a.gif',preview:'https://evil.example/b.gif'}],next:'cursor'});
+  });
+  assert.equal(await api.uploadImage(Uint8Array.from([255,216,255,1])),'https://i.ibb.co/a/image.jpg');assert.equal((await api.gifs('hello')).items.length,1);
+});

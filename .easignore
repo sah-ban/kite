@@ -1,7 +1,11 @@
-# Upload only mobile sources and the one pure formatter shared with the web app.
+# Upload mobile sources and explicitly shared public validation helpers.
 /*
 !/mobile
 !/mobile-proof.mjs
+!/cast.mjs
+!/cast-body.mjs
+!/link-embeds.mjs
+!/pro-subscription.mjs
 !/src
 /src/*
 !/src/lib
