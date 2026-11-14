@@ -11,7 +11,7 @@ import {Avatar,Icon,space} from './ui';
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false}:{fid:number;compact?:boolean}) {
   const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
-  return <Pressable onPress={()=>router.push(`/profile/${fid}`)} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={[space.row,{flex:1,minHeight:compact?32:52}]}><Avatar url={value?.avatar} size={compact?32:42}/><View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{value?.name||`FID ${fid}`}</Text>{!compact&&value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:13}}>@{value.username}</Text>}</View></Pressable>;
+  return <Pressable onPress={()=>router.push(`/profile/${fid}`)} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={[space.row,{flex:1,minHeight:compact?32:52}]}><Avatar url={value?.avatar} size={compact?32:42}/><View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{value?.name||`FID ${fid}`}</Text>{!compact&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:13}}>@{value.username}</Text>}</View></Pressable>;
 }
 function Mention({fid}:{fid:number}){const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={()=>router.push(`/profile/${fid}`)}>@{value?.username||fid}</Text>;}
 function CastText({cast}:{cast:Cast}) {
