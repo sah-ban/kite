@@ -1,4 +1,4 @@
-import {Feather} from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import {Image} from 'expo-image';
 import {useState,type ComponentProps,type ReactNode} from 'react';
 import {ActivityIndicator,Pressable,StyleSheet,Text,TextInput,View,type TextInputProps} from 'react-native';

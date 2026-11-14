@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
-  platforms: ['android'],
+  platforms: ['android', 'web'],
   android: {
     package: development ? 'dev.sahban.kite.dev' : 'dev.sahban.kite',
     versionCode: 1,

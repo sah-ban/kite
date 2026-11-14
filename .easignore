@@ -1,10 +1,11 @@
 # Upload only mobile sources and the one pure formatter shared with the web app.
-**
-!mobile/
-!mobile/**
-!src/
-!src/lib/
-!src/lib/mentions.ts
+/*
+!/mobile
+!/src
+/src/*
+!/src/lib
+/src/lib/*
+!/src/lib/mentions.ts
 mobile/node_modules/
 mobile/.expo/
 mobile/dist/
