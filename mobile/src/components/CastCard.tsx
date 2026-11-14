@@ -53,8 +53,10 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
     <Pressable onPress={expanded?undefined:event=>{event.stopPropagation();route();}} disabled={expanded} accessibilityRole={expanded?undefined:'link'} accessibilityLabel={expanded?undefined:'Open conversation'}><CastText cast={cast} limit={expanded||textExpanded?Infinity:500}/></Pressable>
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
     {embeds.slice(0,4).map((embed,index)=>'castId' in embed&&embed.castId?<Quote key={index} {...embed.castId}/>:embed.url?<UrlEmbed key={`${index}:${embed.url}`} url={embed.url}/>:null)}
-    {expanded&&<Text style={{fontSize:12,color:colors.muted,marginTop:4}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>}
-    {expanded&&<ClientLabel fid={cast.data.fid} signer={cast.signer}/>}
+    {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:12,rowGap:4,marginTop:4}}>
+      <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
+      <View style={{marginLeft:'auto',maxWidth:'100%'}}><ClientLabel fid={cast.data.fid} signer={cast.signer}/></View>
+    </View>}
     <CastActions cast={cast} enabled={loadActivity}/>
     </View>
   </Pressable>;
