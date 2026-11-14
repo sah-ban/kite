@@ -3,6 +3,7 @@ import {Directory,File,FileMode,Paths} from 'expo-file-system';
 import {Alert,Platform} from 'react-native';
 import {ImageSaveCancelledError,saveDownloadedImage} from './download-image-core';
 import {createDownloadFolder,DOWNLOAD_FOLDER_HINT} from './download-folder';
+import {nativeDownloads} from '../../modules/kite-downloads';
 
 const downloadFolder=createDownloadFolder(AsyncStorage,{
   exists:async uri=>{try{return new Directory(uri).exists;}catch{return false;}},
@@ -18,12 +19,14 @@ let sequence=0;
 export async function downloadImage(url:string):Promise<string>{
   if(Platform.OS!=='android')throw new ImageSaveCancelledError();
   const name=`kite-${Date.now()}-${++sequence}`,directory=new Directory(Paths.cache,name);
+  const mediaStore=Number(Platform.Version)>=29&&nativeDownloads?.isSupported?nativeDownloads:null;
   let file=new File(directory,'image.download'),destination:Directory|undefined;
   await saveDownloadedImage(url,{
-    requestPermission:async()=>{destination=new Directory(await downloadFolder());return true;},
+    requestPermission:async()=>{if(!mediaStore)destination=new Directory(await downloadFolder());return true;},
     download:async source=>{directory.create();file=await File.downloadFileAsync(source,file,{signal:AbortSignal.timeout(65000)});},
     header:async()=>{const handle=file.open(FileMode.ReadOnly);try{return await handle.readBytes(64);}finally{handle.close();}},
     save:async extension=>{
+      if(mediaStore){await mediaStore.saveImageAsync(file.uri,`${name}.${extension}`,mimeTypes[extension]);return;}
       const target=destination!.createFile(`${name}.${extension}`,mimeTypes[extension]);
       try{await file.copy(target,{overwrite:true});}
       catch(error){try{await target.delete();}catch{}throw error;}
