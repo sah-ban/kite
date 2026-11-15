@@ -16,6 +16,8 @@ Your own cast menus also include **Edit cast**. The composer restores text, ment
 
 Client attribution uses a bundled registry for Warpcast (9152), Firefly (16823), and Kite (925685), including local logos. Update `src/lib/cast-clients.ts` and `assets/clients` when those identities change. Other clients use cached profile data; self-requesting clients share the author's profile request. Signer registration is still resolved before choosing a client identity.
 
+Public X post links render as native quote-style cards with the author, relative time, text, and media thumbnails. Single thumbnails sit to the left of the text; multiple thumbnails sit below it. Cards open the original post on X. The updated `/api/embed` backend reads public embed metadata with an oEmbed fallback; unavailable posts retain a View on X link. Deploy the backend update before testing these cards against an existing server.
+
 ## Development
 
 Use Node.js 22.13 or newer. From this directory:

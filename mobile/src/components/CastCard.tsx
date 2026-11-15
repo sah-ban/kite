@@ -14,6 +14,8 @@ import {CastMenu} from './CastMenu';
 import {ClientLabel} from './ClientLabel';
 import {MiniAppEmbed} from './MiniAppEmbed';
 import {miniAppLaunchURL} from '../lib/miniapp';
+import {TweetEmbed} from './TweetEmbed';
+import {xPostLink} from '../lib/x-post';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
@@ -36,6 +38,7 @@ function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];vi
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
   const [failed,setFailed]=useState(false);
   const normalized=safeLink(url);if(!normalized)return null;
+  if(value?.tweet&&xPostLink(value.tweet.url))return <TweetEmbed key={value.tweet.url} post={value.tweet} height={height}/>;
   if(value?.miniapp&&miniAppLaunchURL(value.miniapp.url)&&safeLink(value.miniapp.imageUrl))return <MiniAppEmbed key={value.miniapp.imageUrl} app={value.miniapp} height={height}/>;
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
   const viewImage=value?.kind==='image'&&image;

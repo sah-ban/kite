@@ -115,3 +115,19 @@ test('miniapp previews take precedence over OG video, validate destinations and 
   const result=await call(embedPreviews({request:privateAsset.request,lookup:async(host:string)=>host==='private.example'?[{address:'10.0.0.1',family:4}]:publicLookup()}),'https://public.example/share');
   assert.equal(result.body.miniapp,undefined);assert.equal(result.body.kind,'link');
 });
+test('X post previews fetch bounded public JSON and keep the ordinary link response contract',async()=>{
+  const id='463440424141459456';
+  const t=transport(url=>{
+    assert.equal(url.hostname,'cdn.syndication.twimg.com');assert.equal(url.searchParams.get('id'),id);
+    return {type:'application/json',body:JSON.stringify({id_str:id,text:'A public post',created_at:'2014-05-05T22:09:42.000Z',user:{screen_name:'Interior',name:'Interior'},mediaDetails:[{type:'photo',media_url_https:'https://pbs.twimg.com/media/photo.jpg'}]})};
+  });
+  const middleware=embedPreviews({request:t.request,lookup:publicLookup});
+  const result=await call(middleware,'https://x.com/Interior/status/'+id);assert.equal(result.status,200);assert.equal(result.body.kind,'link');assert.equal(result.body.tweet.text,'A public post');assert.equal(result.body.tweet.username,'Interior');assert.equal(result.body.image,'https://pbs.twimg.com/media/photo.jpg');
+  assert.equal(t.calls[0].options.headers.Accept,'application/json');assert.equal(t.calls[0].options.headers.cookie,undefined);
+  await call(middleware,'https://x.com/Interior/status/'+id);assert.equal(t.calls.length,1);
+});
+test('X embed redirects cannot fetch private services and fail to a usable post link',async()=>{
+  const t=transport(()=>({status:302,location:'http://169.254.169.254/private'}));
+  const result=await call(embedPreviews({request:t.request,lookup:publicLookup}),'https://x.com/Interior/status/463440424141459456');
+  assert.equal(result.status,200);assert.equal(result.body.tweet.unavailable,true);assert.ok(t.calls.every(call=>['cdn.syndication.twimg.com','publish.twitter.com'].includes(call.url.hostname)));assert.equal(t.calls.length,2);
+});

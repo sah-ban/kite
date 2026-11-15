@@ -172,7 +172,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
     },
     counts:(fid:number,signal?:AbortSignal)=>request<{followerCount?:number;followingCount?:number;followers?:number;following?:number}>('/api/profile/counts',{fid},signal),
-    embed:(url:string,signal?:AbortSignal)=>request<{kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;miniapp?:import('./miniapp').MiniAppEmbed}>('/api/embed',{url},signal),
+    embed:(url:string,signal?:AbortSignal)=>request<{kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;miniapp?:import('./miniapp').MiniAppEmbed;tweet?:import('./x-post').XPost}>('/api/embed',{url},signal),
   };
 }
 export type Api = ReturnType<typeof createApi>;

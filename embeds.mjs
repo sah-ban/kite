@@ -3,6 +3,8 @@ import { BlockList, isIP } from 'node:net';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { Parser } from 'htmlparser2';
+import {xPostURL} from './x-post-url.mjs';
+import {loadXPost} from './x-post-embeds.mjs';
 
 const blocked=new BlockList();
 for(const [address,prefix] of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.0.0.0',24],['192.0.2.0',24],['192.168.0.0',16],['198.18.0.0',15],['198.51.100.0',24],['203.0.113.0',24],['224.0.0.0',4],['240.0.0.0',4]])blocked.addSubnet(address,prefix,'ipv4');
@@ -40,7 +42,7 @@ export async function loadDocument(input,dependencies={},redirects=0,deadline=Da
     const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value);};
     const req=send(url,{
       // Request HTML-only preview metadata so streaming sites include it in the head.
-      method:'GET',headers:{Accept:'text/html,application/xhtml+xml,image/*,video/*,application/vnd.apple.mpegurl;q=0.8','Accept-Encoding':'identity','User-Agent':'Kite-LinkPreview/1.0 (compatible; Twitterbot/1.0)'},
+      method:'GET',headers:{Accept:dependencies.json?'application/json':'text/html,application/xhtml+xml,image/*,video/*,application/vnd.apple.mpegurl;q=0.8','Accept-Encoding':'identity','User-Agent':'Kite-LinkPreview/1.0 (compatible; Twitterbot/1.0)'},
       // Pin the validated DNS answer so the connection cannot resolve a private address later.
       lookup:(_host,options,callback)=>options?.all?callback(null,[address]):callback(null,address.address,address.family),
       agent:false,
@@ -52,7 +54,8 @@ export async function loadDocument(input,dependencies={},redirects=0,deadline=Da
       if(status!==200){finish(new Error('Preview origin unavailable.'));response.destroy();return;}
       const kind=mediaKind(type);
       if(kind){finish(null,{kind,type,body:''});response.destroy();return;}
-      if(!['text/html','application/xhtml+xml'].includes(type)||!['','identity'].includes(String(response.headers['content-encoding']||''))){finish(null,{kind:'link',type,body:''});response.destroy();return;}
+      const supported=dependencies.json?type==='application/json':['text/html','application/xhtml+xml'].includes(type);
+      if(!supported||!['','identity'].includes(String(response.headers['content-encoding']||''))){finish(null,{kind:'link',type,body:''});response.destroy();return;}
       const chunks=[];let size=0,tail='';
       response.on('data',chunk=>{
         size+=chunk.length;
@@ -60,7 +63,7 @@ export async function loadDocument(input,dependencies={},redirects=0,deadline=Da
         chunks.push(chunk);
         // Metadata is in the head; stop downloading before the page body and scripts.
         const marker=tail+chunk.toString('utf8').toLowerCase();tail=marker.slice(-7);
-        if(marker.includes('</head>')){finish(null,{kind:'link',type,body:Buffer.concat(chunks).toString('utf8')});response.destroy();}
+        if(!dependencies.json&&marker.includes('</head>')){finish(null,{kind:'link',type,body:Buffer.concat(chunks).toString('utf8')});response.destroy();}
       });
       response.on('end',()=>finish(null,{kind:'link',type,body:Buffer.concat(chunks).toString('utf8')}));
       response.on('error',error=>finish(error));
@@ -138,6 +141,11 @@ export function embedPreviews(dependencies={}) {
     rate.count++;rates.set(ip,rate);active++;
     const value=(async()=>{
       const deadline=Date.now()+12_000;
+      const post=xPostURL(url);
+      if(post){
+        const tweet=await loadXPost(post,async(target,end)=>{const document=await loadDocument(target,{...dependencies,json:true},0,end);if(document.type!=='application/json')throw new Error('X preview unavailable.');return JSON.parse(document.body);},deadline);
+        return {kind:'link',url:tweet.url,title:tweet.username?`@${tweet.username} on X`:'Post on X',description:tweet.text,site:'X',image:tweet.media[0]?.url,tweet};
+      }
       const data=await loadDocument(url,dependencies,0,deadline);
       if(data.kind!=='link')return {kind:data.kind,url:data.url,contentType:data.type};
       const meta=parseMetadata(data.body,data.url);
