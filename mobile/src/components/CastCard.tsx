@@ -15,19 +15,19 @@ import {MiniAppEmbed} from './MiniAppEmbed';
 import {miniAppLaunchURL} from '../lib/miniapp';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
-export function Person({fid,compact=false,dense=false,showAvatar=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean}) {
+export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean}) {
   const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{value?.name||`FID ${fid}`}</Text>{!compact&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Pressable>;
+  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Pressable>;
 }
 function AuthorAvatar({fid}:{fid:number}){
   const {api}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={{width:40,alignSelf:'flex-start'}}><Avatar url={value?.avatar} size={40}/></Pressable>;
 }
 function Mention({fid}:{fid:number}){const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
-export function CastText({cast,limit=Infinity,compact=false}:{cast:Cast;limit?:number;compact?:boolean}) {
+export function CastText({cast,limit=Infinity,compact=false,numberOfLines}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
-  return <Text selectable style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
+  return <Text selectable numberOfLines={numberOfLines} style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
 }
 function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];visible:boolean;height?:number}) {
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
@@ -43,9 +43,28 @@ function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];vi
     {!viewImage&&<View style={{padding:10,gap:2}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
 }
+type QuoteEmbed=NonNullable<Cast['data']['castAddBody']['embeds']>[number];
+function QuoteThumbnail({embed}:{embed:QuoteEmbed}){
+  const {api,colors}=useApp(),url=embed.url?safeLink(embed.url):undefined;
+  const {value}=useQuery(signal=>url?api.embed(url,signal):Promise.resolve(undefined),[api,url]);
+  const [failed,setFailed]=useState('');
+  const image=safeLink(value?.miniapp?.imageUrl||(value?.kind==='image'?value.url:value?.image||value?.poster)||'');
+  const kind=embed.castId?'quote':value?.kind||'link';
+  return <View accessibilityRole="image" accessibilityLabel={kind==='image'?'Quoted cast image':kind==='video'?'Quoted video preview':kind==='quote'?'Nested quoted cast':'Quoted website preview'} style={{width:'100%',height:'100%',borderRadius:10,overflow:'hidden',backgroundColor:colors.soft,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'}}>
+    {image&&failed!==image?<Image source={{uri:image}} onError={()=>setFailed(image)} style={{width:'100%',height:'100%'}} contentFit="cover" transition={150}/>:<Icon name={kind==='image'?'image':kind==='video'?'video':kind==='quote'?'message-square':'globe'} size={22} color={colors.muted}/>}
+    {kind==='video'&&image&&failed!==image&&<View style={{position:'absolute',width:28,height:28,borderRadius:14,backgroundColor:'#00000088',alignItems:'center',justifyContent:'center'}}><Icon name="play" size={15} color="#fff"/></View>}
+  </View>;
+}
 export function Quote({fid,hash}:{fid:number;hash:string}){
   const {api,colors}=useApp(),{value,error}=useQuery(signal=>api.resolveCast(String(fid),hash,signal),[api,fid,hash]);
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:4}}><Person fid={fid} compact/>{value?<CastText cast={value} limit={280} compact/>:<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>}</Pressable>;
+  const body=value?.data.castAddBody;
+  const attachments:QuoteEmbed[]=body?.embeds?.length?body.embeds:(body?.embedsDeprecated||[]).map(url=>({url}));
+  const embeds=attachments.filter(embed=>embed.castId||embed.url&&safeLink(embed.url)).slice(0,4);
+  const text=value&&!!(body?.text||body?.mentions?.length)?<CastText cast={value} limit={280} numberOfLines={5} compact/>:null;
+  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
+    <Person fid={fid} compact usernameOnly/>
+    {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{flex:1,minWidth:0}}>{text}</View><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
+  </Pressable>;
 }
 function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
   const [width,setWidth]=useState(0),[offset,setOffset]=useState(0);
