@@ -34,7 +34,7 @@ function UrlEmbed({url,castUrls,visible}:{url:string;castUrls:string[];visible:b
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
   const viewImage=value?.kind==='image'&&image;
   const viewVideo=value?.kind==='video'&&safeLink(value.url);
-  if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image}/>;
+  if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible}/>;
   return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
     {image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>}
     {!viewImage&&<View style={{padding:12,gap:4}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
