@@ -64,11 +64,12 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
   if(deletedCasts.has(castKey(cast)))return null;
   const route=()=>router.push(castRoute(cast));
   const embeds=body.embeds?.length?body.embeds:(body.embedsDeprecated||[]).map(url=>({url}));
-  return <Pressable accessible={false} focusable={false} onPress={expanded?undefined:route} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:18,paddingVertical:expanded?14:12,flexDirection:'column',gap:10,backgroundColor:colors.surface}}>
+  const Container=expanded?View:Pressable;
+  return <Container accessible={false} focusable={false} {...(expanded?{}:{onPress:route})} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:18,paddingVertical:expanded?14:12,flexDirection:'column',gap:10,backgroundColor:colors.surface}}>
     {!expanded&&<View style={{position:'absolute',left:18,top:12,width:40,height:40,zIndex:1}}><AuthorAvatar fid={cast.data.fid}/></View>}
     <View style={{minWidth:0,paddingLeft:expanded?0:50,gap:expanded?8:6}}>
     <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense={!expanded} showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
-    <Pressable onPress={expanded?undefined:event=>{event.stopPropagation();route();}} disabled={expanded} accessibilityRole={expanded?undefined:'link'} accessibilityLabel={expanded?undefined:'Open conversation'}><CastText cast={cast} limit={expanded||textExpanded?Infinity:500}/></Pressable>
+    {expanded?<CastText cast={cast}/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500}/></Pressable>}
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
     {embeds.length>0&&<CastEmbeds embeds={embeds} visible={loadActivity} gutter={expanded?0:50}/>}
     {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:12,rowGap:4,marginTop:4}}>
@@ -77,5 +78,5 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
     </View>}
     <CastActions cast={cast} enabled={loadActivity}/>
     </View>
-  </Pressable>;
+  </Container>;
 });
