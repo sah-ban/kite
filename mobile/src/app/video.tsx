@@ -3,7 +3,7 @@ import {router,Stack,useFocusEffect,useLocalSearchParams} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import {useVideoPlayer,VideoView,type VideoSource} from 'expo-video';
 import {useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,AppState,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,AppState,Platform,Pressable,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {videoSource} from '../lib/video-source';
 import {Icon} from '../components/ui';
@@ -23,7 +23,8 @@ function Playback({source,retry}:{source:VideoSource;retry:()=>void}){
   const {status}=useEvent(player,'statusChange',{status:player.status});
   const {muted}=useEvent(player,'mutedChange',{muted:player.muted});
   useFocusEffect(useCallback(()=>{player.play();return()=>{player.pause();};},[player]));
-  useEffect(()=>{const subscription=AppState.addEventListener('change',state=>{if(state!=='active')player.pause();});return()=>subscription.remove();},[player]);
+  // Native expo-video handles backgrounding and its separate fullscreen activity.
+  useEffect(()=>{if(Platform.OS!=='web')return;const subscription=AppState.addEventListener('change',state=>{if(state!=='active')player.pause();});return()=>subscription.remove();},[player]);
   function toggleMute(){
     // eslint-disable-next-line react-hooks/immutability -- expo-video exposes mutable native player properties for playback controls.
     player.muted=!player.muted;
