@@ -5,7 +5,8 @@ import {type Cast,type Page} from '../lib/model';
 import {reactionKey,useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
 import {useCastClient} from '../lib/use-cast-client';
-import {Avatar,Icon} from './ui';
+import {Icon} from './ui';
+import {ClientAvatar} from './ClientAvatar';
 import {FarcasterIcon} from './FarcasterIcon';
 import {LikeIcon,QuoteIcon} from './CastActionIcons';
 
@@ -43,7 +44,7 @@ export function CastActions({cast,enabled=true,conversation=false}:{cast:Cast;en
           {busy===kind?<ActivityIndicator size="small" color={colors.accent}/>:kind==='likes'?<LikeIcon color={color} filled={!!active}/>:<Icon name="repeat" size={18} color={color}/>}<Text style={{fontSize:12,color}}>{countLabel(count,more)}</Text>
         </Pressable>;
       })}
-      {conversation?<Pressable accessibilityRole="link" accessibilityLabel="Open in Farcaster" onPress={event=>{event.stopPropagation();void Linking.openURL(`https://farcaster.xyz/~/conversations/${cast.hash}`).catch(()=>setError('Could not open Farcaster. Please try again.'));}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}><FarcasterIcon/></Pressable>:<Pressable accessibilityRole="link" accessibilityLabel={client.value?`View client ${client.value.username?'@'+client.value.username:'FID '+client.value.fid}`:client.loading?'Resolving client':'Unknown client'} accessibilityState={{disabled:!client.value}} disabled={!client.value} onPress={event=>{event.stopPropagation();if(client.value)router.push(`/profile/${client.value.fid}`);}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}>{client.value?<Avatar key={client.value.avatar||client.value.fid} url={client.value.avatar} size={22}/>:client.loading?<ActivityIndicator size="small" color={colors.muted}/>:<Icon name="grid" size={18} color={colors.muted}/>}</Pressable>}
+      {conversation?<Pressable accessibilityRole="link" accessibilityLabel="Open in Farcaster" onPress={event=>{event.stopPropagation();void Linking.openURL(`https://farcaster.xyz/~/conversations/${cast.hash}`).catch(()=>setError('Could not open Farcaster. Please try again.'));}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}><FarcasterIcon/></Pressable>:<Pressable accessibilityRole="link" accessibilityLabel={client.value?`View client ${client.value.username?'@'+client.value.username:'FID '+client.value.fid}`:client.loading?'Resolving client':'Unknown client'} accessibilityState={{disabled:!client.value}} disabled={!client.value} onPress={event=>{event.stopPropagation();if(client.value)router.push(`/profile/${client.value.fid}`);}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}>{client.value?<ClientAvatar key={`${client.value.fid}:${client.value.avatar||client.value.logo||''}`} client={client.value}/>:client.loading?<ActivityIndicator size="small" color={colors.muted}/>:<Icon name="grid" size={18} color={colors.muted}/>}</Pressable>}
     </View>
     {!!(error||mine.error)&&<View accessibilityRole="alert" style={{gap:4}}><Text style={{fontSize:12,lineHeight:18,color:colors.danger}}>{error||'Could not check your reactions.'}</Text>{!!mine.error&&<Pressable accessibilityRole="button" onPress={event=>{event.stopPropagation();mine.reload();}} style={{minHeight:44,justifyContent:'center'}}><Text style={{fontSize:13,fontWeight:'600',color:colors.accent}}>Retry</Text></Pressable>}</View>}
   </View>;

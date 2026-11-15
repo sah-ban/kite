@@ -14,6 +14,8 @@ Your own cast menus include **Post on X**. It opens an X draft with linked X men
 
 Your own cast menus also include **Edit cast**. The composer restores text, mentions, all original embeds, and reply/channel context, and shows the previous likes, recasts, and replies. **Delete previous and cast again** prepares and saves the replacement before deleting the original. Engagement does not transfer. Failed attempts retain their exact signed message for retry; unfinished replacements can be resumed from Settings with the same account and signer. Edit drafts and signed replacement messages contain no private keys and are stored in AsyncStorage.
 
+Client attribution uses a bundled registry for Warpcast (9152), Firefly (16823), and Kite (925685), including local logos. Update `src/lib/cast-clients.ts` and `assets/clients` when those identities change. Other clients use cached profile data; self-requesting clients share the author's profile request. Signer registration is still resolved before choosing a client identity.
+
 ## Development
 
 Use Node.js 22.13 or newer. From this directory:
