@@ -9,9 +9,9 @@ import {Button,Icon,Loading,Notice,space} from './ui';
 function FeedSkeleton(){
   const {colors}=useApp();
   return <View accessibilityRole="progressbar" accessibilityLabel="Loading casts" accessibilityState={{busy:true}}>
-    {[0,1,2,3].map(index=><View key={index} importantForAccessibility="no-hide-descendants" style={{padding:18,gap:10,flexDirection:'row',borderBottomWidth:1,borderColor:colors.line,backgroundColor:colors.surface}}>
+    {[0,1,2,3].map(index=><View key={index} importantForAccessibility="no-hide-descendants" style={{paddingHorizontal:14,paddingVertical:8,gap:8,flexDirection:'row',borderBottomWidth:1,borderColor:colors.line,backgroundColor:colors.surface}}>
       <View style={{width:40,height:40,borderRadius:20,backgroundColor:colors.soft}}/>
-      <View style={{flex:1,gap:12}}><View style={{gap:7,minHeight:40,justifyContent:'center'}}><View style={{height:12,width:118,borderRadius:5,backgroundColor:colors.soft}}/><View style={{height:10,width:80,borderRadius:5,backgroundColor:colors.soft}}/></View>
+      <View style={{flex:1,gap:8}}><View style={{gap:4,minHeight:40,justifyContent:'center'}}><View style={{height:12,width:118,borderRadius:5,backgroundColor:colors.soft}}/><View style={{height:10,width:80,borderRadius:5,backgroundColor:colors.soft}}/></View>
       {[100,index%2?94:87,62].map((width,line)=><View key={line} style={{height:11,width:`${width}%`,borderRadius:5,backgroundColor:colors.soft}}/>)}
       </View>
     </View>)}
