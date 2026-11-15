@@ -8,6 +8,7 @@ import type {Cast} from './model';
 import {deviceAccount} from './account';
 import type {AccountSnapshot} from './account-core';
 import type {CastInput} from './composer';
+import {runCastEdit} from './cast-edit';
 
 export type ThemeMode = 'system'|'light'|'dark';
 const palettes = {
@@ -20,7 +21,8 @@ type State = {api:Api;theme:ThemeMode;dark:boolean;colors:Colors;ready:boolean;s
   account:AccountSnapshot;accountBusy:boolean;accountError:string;beginSignIn:()=>Promise<AccountSnapshot>;checkSignIn:()=>Promise<AccountSnapshot>;signOut:()=>Promise<AccountSnapshot>;
   reactions:Map<string,ReactionOverride>;react:(cast:Cast,kind:'likes'|'recasts',active:boolean,count:number|null,more:boolean)=>Promise<void>;
   publish:(input:CastInput)=>Promise<Cast>;publishing:boolean;published:Cast[];publishNotice:Cast|null;dismissPublishNotice:()=>void;
-  deletedCasts:Set<string>;deleteCast:(cast:Cast)=>Promise<void>};
+  deletedCasts:Set<string>;deleteCast:(cast:Cast)=>Promise<void>;
+  replaceCast:(source:Cast,input:CastInput,onProgress:(message:string)=>void,onPrepared:()=>void)=>Promise<Cast>};
 export const reactionKey=(fid:number,cast:Cast,kind:'likes'|'recasts')=>`${fid}:${cast.data.fid}:${cast.hash.toLowerCase()}:${kind}`;
 const Context = createContext<State|null>(null);
 const SETTINGS = 'kite.mobile.settings.v1';
@@ -68,13 +70,25 @@ export function AppProvider({children}:{children:ReactNode}) {
   }
   async function deleteCast(cast:Cast){
     await device.deleteCast(cast);
+    markDeleted(cast);
+  }
+  function markDeleted(cast:Cast){
     const key=castKey(cast);
     setDeletedCasts(previous=>new Set([...previous,key]));
     setPublished(previous=>previous.filter(value=>castKey(value)!==key));
     setPublishNotice(previous=>previous&&castKey(previous)===key?null:previous);
   }
+  async function replaceCast(source:Cast,input:CastInput,onProgress:(message:string)=>void,onPrepared:()=>void){
+    const session=account.session;if(!session)throw new Error('Sign in to Kite first.');
+    if(publishLock.current)throw new Error('Your cast is already being published.');
+    publishLock.current=true;setPublishing(true);
+    try{
+      const cast=await runCastEdit({source,input,session,origin:api.origin,storage:AsyncStorage,prepare:device.prepareReplacement,validate:device.validatePreparedCast,remove:device.deleteCast,submit:device.submitPreparedCast,onDeleted:()=>markDeleted(source),onProgress,onPrepared});
+      api.rememberCast(cast);setPublished(previous=>[cast,...previous.filter(value=>value.hash!==cast.hash)].slice(0,30));setPublishNotice(cast);return cast;
+    }finally{publishLock.current=false;setPublishing(false);}
+  }
   const dark=theme==='dark'||(theme==='system'&&system==='dark');
   async function setTheme(value:ThemeMode){await AsyncStorage.setItem(SETTINGS,JSON.stringify({theme:value}));changeTheme(value);}
-  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast}}>{children}</Context.Provider>;
+  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast,replaceCast}}>{children}</Context.Provider>;
 }
 export function useApp(){const state=useContext(Context);if(!state)throw new Error('AppProvider is missing.');return state;}

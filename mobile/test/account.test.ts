@@ -97,3 +97,16 @@ test('cast deletion signs only the active account’s full cast hash and does no
   h.failPost(true);await assert.rejects(account.deleteCast(own),/Node unavailable/);
   assert.equal(h.submitted.length,1);assert.equal(account.snapshot().session?.fid,545039);
 });
+test('replacement preparation signs without submitting, preserves all embeds and validates stored messages',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
+  const {castSdk}=await import('../src/lib/cast-sdk'),sdk=await castSdk();
+  const original={...target,data:{...target.data,fid:545039,timestamp:sdk.getFarcasterTime()._unsafeUnwrap()}};
+  const embeds=[{url:'https://external.example/image'},{castId:{fid:37,hash:target.hash}}];
+  const input={text:'Replacement',mentions:[],mentionsPositions:[],images:[],links:[],embeds,parentUrl:'https://channel.example/topic'};
+  await assert.rejects(account.prepareReplacement(target,input),/own casts/);
+  const prepared=await account.prepareReplacement(original,input);assert.equal(h.submitted.length,0);assert.ok(prepared.cast.data.timestamp>original.data.timestamp);
+  const validated=await account.validatePreparedCast(prepared);assert.deepEqual(validated.data.castAddBody.embeds,embeds);assert.equal(validated.data.castAddBody.parentUrl,input.parentUrl);
+  await assert.rejects(account.validatePreparedCast({...prepared,bytes:'0x00'}));assert.equal(h.submitted.length,0);
+  const receipt=await account.submitPreparedCast(prepared);assert.equal(receipt.hash,prepared.cast.hash);assert.equal(h.submitted.length,1);
+  h.setPro(false);await assert.rejects(account.prepareReplacement(original,{...input,text:'x'.repeat(1025)}),/Pro/);assert.equal(h.submitted.length,1);
+});

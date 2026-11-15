@@ -4,6 +4,7 @@ export type Cast = {
   data: {fid: number; timestamp: number; castAddBody: {
     text: string; mentions?: number[]; mentionsPositions?: number[];
     parentCastId?: {fid: number; hash: string};
+    parentUrl?:string;
     embeds?: {url?: string; castId?: {fid: number; hash: string}}[];
     embedsDeprecated?: string[];
   }};

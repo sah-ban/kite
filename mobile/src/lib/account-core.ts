@@ -6,9 +6,9 @@ import {mobileClaim} from '../../../mobile-proof.mjs';
 import type {Api} from './api';
 import {type Cast,isFid,isHash} from './model';
 import {castSdk} from './cast-sdk';
-import {type CastInput,publishedCast} from './composer';
-import {newCastBody} from '../../../cast.mjs';
+import {type CastInput,castBody,publishedCast} from './composer';
 
+export type PreparedCast={bytes:string;cast:Cast};
 export type AccountSession={fid:number;key:string;address:string};
 export type PendingAccount={deepLinkUrl:string;appFid:number;expiresAt:number};
 export type AccountSnapshot={session:AccountSession|null;pending:PendingAccount|null;hasSavedKey:boolean};
@@ -29,6 +29,31 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
     const secret=hexToBytes(record.privateKey.slice(2));
     try{return {key:record.key,issuedAt,nonce,signature:'0x'+bytesToHex(ed25519.sign(mobileClaim(api.origin,purpose,record.key,issuedAt,nonce,fid),secret)),...(purpose==='verify'?{fid}:{})};}
     finally{secret.fill(0);}
+  }
+  async function prepareCast(input:CastInput,minimumTimestamp?:number):Promise<PreparedCast>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      const record=saved,body=castBody(input);
+      if(body.type===2&&!await api.proStatus(record.fid!))throw new Error('Active Farcaster Pro is required for text over 1,024 bytes.');
+      const sdk=await castSdk(),secret=hexToBytes(record.privateKey.slice(2));
+      const now=sdk.getFarcasterTime()._unsafeUnwrap();
+      if(minimumTimestamp!==undefined&&(!Number.isSafeInteger(minimumTimestamp)||minimumTimestamp<1||minimumTimestamp>now+301)){secret.fill(0);throw new Error('Invalid original cast timestamp.');}
+      const reference=(value:{fid:number;hash:string})=>({...value,hash:hexToBytes(value.hash.slice(2))});
+      try{
+        const result=await sdk.makeCastAdd({...body,embeds:body.embeds.map((embed:{url?:string;castId?:{fid:number;hash:string}})=>embed.castId?{castId:reference(embed.castId)}:{url:embed.url!}),embedsDeprecated:[],...(body.parentCastId?{parentCastId:reference(body.parentCastId)}:{})},{fid:record.fid!,network:sdk.FarcasterNetwork.MAINNET,...(minimumTimestamp!==undefined?{timestamp:Math.max(now,minimumTimestamp)}:{})},new sdk.NobleEd25519Signer(secret));
+        if(result.isErr())throw new Error(result.error.message);
+        const message=result.value;if(!message.data)throw new Error('Could not prepare this cast.');
+        const dataBytes=sdk.MessageData.encode(message.data).finish();
+        return {bytes:'0x'+bytesToHex(sdk.Message.encode({...message,dataBytes,data:undefined}).finish()),cast:publishedCast(record.fid!,record.key,'0x'+bytesToHex(message.hash),message.data.timestamp,input)};
+      }finally{secret.fill(0);}
+  }
+  async function validatePrepared(prepared:PreparedCast):Promise<Cast>{
+    if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+    if(typeof prepared.bytes!=='string'||prepared.bytes.length>100000||!/^0x(?:[0-9a-f]{2})+$/i.test(prepared.bytes))throw new Error('Invalid saved replacement.');
+    const sdk=await castSdk(),message=sdk.Message.decode(hexToBytes(prepared.bytes.slice(2)));
+    const data=message.dataBytes?.length?sdk.MessageData.decode(message.dataBytes):message.data;
+    if(!data?.castAddBody||data.type!==sdk.MessageType.CAST_ADD||data.network!==sdk.FarcasterNetwork.MAINNET||data.fid!==saved.fid||'0x'+bytesToHex(message.signer)!==saved.key||'0x'+bytesToHex(message.hash)!==prepared.cast.hash||!(await sdk.validations.validateMessage({...message,data})).isOk())throw new Error('This saved replacement does not match the connected account.');
+    const body=data.castAddBody,reference=(value:{fid:number;hash:Uint8Array})=>({fid:value.fid,hash:'0x'+bytesToHex(value.hash)});
+    return {hash:'0x'+bytesToHex(message.hash),signer:saved.key,data:{fid:data.fid,timestamp:data.timestamp,castAddBody:{text:body.text,mentions:body.mentions,mentionsPositions:body.mentionsPositions,embeds:body.embeds.map(embed=>embed.castId?{castId:reference(embed.castId)}:{url:embed.url}),...(body.parentCastId?{parentCastId:reference(body.parentCastId)}:{}),...(body.parentUrl?{parentUrl:body.parentUrl}:{})}}};
   }
   return {
     snapshot,
@@ -68,21 +93,13 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
       await persist({version:1,server:record.server,privateKey:record.privateKey,key:record.key,phase:'active',fid:verified.fid,address:verified.address});return snapshot();
     }),
     signOut:()=>exclusive(async()=>{await storage.remove();saved=null;restored=true;return snapshot();}),
-    cast:(input:CastInput)=>exclusive(async()=>{
-      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
-      const record=saved,body=newCastBody(input);
-      if(body.type===2&&!await api.proStatus(record.fid!))throw new Error('Active Farcaster Pro is required for text over 1,024 bytes.');
-      const sdk=await castSdk(),secret=hexToBytes(record.privateKey.slice(2));
-      const reference=(value:{fid:number;hash:string})=>({...value,hash:hexToBytes(value.hash.slice(2))});
-      try{
-        const result=await sdk.makeCastAdd({...body,embeds:body.embeds.map((embed:{url?:string;castId?:{fid:number;hash:string}})=>embed.castId?{castId:reference(embed.castId)}:{url:embed.url!}),embedsDeprecated:[],...(body.parentCastId?{parentCastId:reference(body.parentCastId)}:{})},{fid:record.fid!,network:sdk.FarcasterNetwork.MAINNET},new sdk.NobleEd25519Signer(secret));
-        if(result.isErr())throw new Error(result.error.message);
-        const message=result.value;if(!message.data)throw new Error('Could not prepare this cast.');
-        const dataBytes=sdk.MessageData.encode(message.data).finish();
-        await api.submit(sdk.Message.encode({...message,dataBytes,data:undefined}).finish());
-        return publishedCast(record.fid!,record.key,'0x'+bytesToHex(message.hash),message.data.timestamp,input);
-      }finally{secret.fill(0);}
+    cast:(input:CastInput)=>exclusive(async()=>{const prepared=await prepareCast(input);await api.submit(hexToBytes(prepared.bytes.slice(2)));return prepared.cast;}),
+    prepareReplacement:(cast:Cast,input:CastInput)=>exclusive(async()=>{
+      if(saved?.phase!=='active'||cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only edit your own casts.');
+      return prepareCast(input,cast.data.timestamp+1);
     }),
+    validatePreparedCast:(prepared:PreparedCast)=>exclusive(()=>validatePrepared(prepared)),
+    submitPreparedCast:(prepared:PreparedCast)=>exclusive(async()=>{const cast=await validatePrepared(prepared);await api.submit(hexToBytes(prepared.bytes.slice(2)));return cast;}),
     deleteCast:(cast:Cast)=>exclusive(async()=>{
       if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
       if(cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only delete your own casts.');

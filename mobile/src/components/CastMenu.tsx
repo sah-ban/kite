@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import {router} from 'expo-router';
 import {useEffect,useRef,useState,type ComponentProps} from 'react';
 import {ActivityIndicator,Linking,Modal,Pressable,ScrollView,Share,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -52,6 +53,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
             <MenuItem label="Copy link" icon="link" disabled={busy} onPress={()=>void run('copy')}/>
             <MenuItem label="Share cast" icon="share" disabled={busy} onPress={()=>void run('share')}/>
             {own&&<MenuItem label={xDraft.loading?'Post on X…':xDraft.error?'Retry Post on X':'Post on X'} icon="brand-x" disabled={busy||xDraft.loading} onPress={()=>xDraft.error?xDraft.reload():void run('x')}/>}
+            {own&&<MenuItem label="Edit cast" icon="edit-2" disabled={busy||accountBusy} onPress={()=>{api.rememberCast(cast);onClose();router.push(`/edit/${cast.data.fid}/${cast.hash}`);}}/>}
             <Pressable accessibilityRole="button" accessibilityLabel="Open in Farcaster" disabled={busy} onPress={()=>void run('farcaster')} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',alignItems:'center',gap:14,borderRadius:12,backgroundColor:pressed?colors.soft:'transparent',opacity:busy?.45:1})}><FarcasterIcon/><Text style={{fontSize:16,fontWeight:'500',color:colors.ink}}>Open in Farcaster</Text></Pressable>
             {own&&<MenuItem label="Delete cast" icon="trash-2" disabled={busy||accountBusy} danger onPress={()=>{setConfirm(true);setError('');}}/>}
             <MenuItem label="Cancel" icon="x" disabled={busy} onPress={close}/>
