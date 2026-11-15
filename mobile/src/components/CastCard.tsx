@@ -1,7 +1,7 @@
 import {Image} from 'expo-image';
 import {router} from 'expo-router';
 import {memo,useState} from 'react';
-import {Linking,Pressable,Text,View} from 'react-native';
+import {Linking,Pressable,ScrollView,Text,View} from 'react-native';
 import {castTextParts} from '../../../src/lib/mentions';
 import {type Cast,castDate,castKey,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
@@ -44,20 +44,33 @@ function Quote({fid,hash}:{fid:number;hash:string}){
   const {api,colors}=useApp(),{value,error}=useQuery(signal=>api.resolveCast(String(fid),hash,signal),[api,fid,hash]);
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:12,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:8}}><Person fid={fid} compact/>{value?<CastText cast={value} limit={280}/>:<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>}</Pressable>;
 }
+function CastEmbeds({embeds,visible}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean}){
+  const [width,setWidth]=useState(0),[offset,setOffset]=useState(0);
+  const items=embeds.slice(0,4),urls=items.flatMap(embed=>!embed.castId&&embed.url?[embed.url]:[]),quotes=items.flatMap(embed=>embed.castId?[embed.castId]:[]);
+  const itemWidth=Math.max(160,width*.88),gap=10;
+  const activeIndex=Math.max(0,Math.min(urls.length-1,Math.round(offset/(itemWidth+gap))));
+  return <View style={{gap:8,minWidth:0}}>
+    {urls.length>0&&<View onLayout={event=>setWidth(event.nativeEvent.layout.width)}>
+      {urls.length===1?<UrlEmbed url={urls[0]} castUrls={urls} visible={visible}/>:width>0&&<ScrollView horizontal accessibilityLabel="Cast embeds" showsHorizontalScrollIndicator={false} nestedScrollEnabled directionalLockEnabled decelerationRate="fast" snapToInterval={itemWidth+gap} snapToAlignment="start" scrollEventThrottle={32} onScroll={event=>setOffset(event.nativeEvent.contentOffset.x)} contentContainerStyle={{gap,alignItems:'flex-start'}}>
+        {urls.map((url,index)=><View key={`${index}:${url}`} style={{width:itemWidth}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex}/></View>)}
+      </ScrollView>}
+    </View>}
+    {quotes.map((quote,index)=><Quote key={`${index}:${quote.fid}:${quote.hash}`} {...quote}/>)}
+  </View>;
+}
 export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=true}:{cast:Cast;expanded?:boolean;loadActivity?:boolean}){
   const {colors,deletedCasts}=useApp();const body=cast.data.castAddBody;
   const [textExpanded,setTextExpanded]=useState(false);
   if(deletedCasts.has(castKey(cast)))return null;
   const route=()=>router.push(castRoute(cast));
   const embeds=body.embeds?.length?body.embeds:(body.embedsDeprecated||[]).map(url=>({url}));
-  const castUrls=embeds.slice(0,4).flatMap(embed=>embed.url?[embed.url]:[]);
   return <Pressable accessible={false} focusable={false} onPress={expanded?undefined:route} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:18,paddingVertical:expanded?14:12,flexDirection:expanded?'column':'row',gap:10,backgroundColor:colors.surface}}>
     {!expanded&&<AuthorAvatar fid={cast.data.fid}/>}
     <View style={{flex:expanded?undefined:1,minWidth:0,gap:expanded?8:6}}>
     <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense={!expanded} showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
     <Pressable onPress={expanded?undefined:event=>{event.stopPropagation();route();}} disabled={expanded} accessibilityRole={expanded?undefined:'link'} accessibilityLabel={expanded?undefined:'Open conversation'}><CastText cast={cast} limit={expanded||textExpanded?Infinity:500}/></Pressable>
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
-    {embeds.slice(0,4).map((embed,index)=>'castId' in embed&&embed.castId?<Quote key={index} {...embed.castId}/>:embed.url?<UrlEmbed key={`${index}:${embed.url}`} url={embed.url} castUrls={castUrls} visible={loadActivity}/>:null)}
+    {embeds.length>0&&<CastEmbeds embeds={embeds} visible={loadActivity}/>}
     {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:12,rowGap:4,marginTop:4}}>
       <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
       <View style={{marginLeft:'auto',maxWidth:'100%'}}><ClientLabel fid={cast.data.fid} signer={cast.signer}/></View>
