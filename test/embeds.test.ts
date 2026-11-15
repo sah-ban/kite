@@ -8,14 +8,14 @@ import { classifyEmbed, embedURL } from '../src/lib/embeds';
 
 const publicLookup=async()=>[{address:'93.184.216.34',family:4}];
 type Route={status?:number;type?:string;body?:string;location?:string};
-function transport(route:(url:URL)=>Route) {
+function transport(route:(url:URL,options:any)=>Route) {
   const calls:{url:URL;options:any;response?:PassThrough}[]=[];
   const request=(url:URL,options:any,callback:(res:any)=>void)=>{
     const record:{url:URL;options:any;response?:PassThrough}={url,options};calls.push(record);
     const req=new EventEmitter() as any;
     req.destroy=()=>{};
     req.end=()=>queueMicrotask(()=>{
-      const item=route(url),response=new PassThrough() as any;record.response=response;
+      const item=route(url,options),response=new PassThrough() as any;record.response=response;
       response.statusCode=item.status||200;response.headers={'content-type':item.type||'text/html',...(item.location?{location:item.location}:{})};
       callback(response);if(!response.destroyed)response.end(item.body||'<head><title>Preview</title></head>');
     });return req;
@@ -100,6 +100,11 @@ test('fc:miniapp accepts next-version metadata from generated apps',async()=>{
   const t=transport(()=>({body:`<head><meta name="fc:miniapp" content="${encoded}"/><meta property="og:image" content="https://public.example/ordinary.png"></head>`}));
   const result=await call(embedPreviews({request:t.request,lookup:publicLookup}),url);
   assert.equal(result.status,200);assert.equal(result.body.miniapp.buttonTitle,'Collect Flags');assert.equal(result.body.miniapp.imageUrl,app.imageUrl);assert.equal(result.body.miniapp.url,url);assert.equal(result.body.miniapp.name,'All The Flags Alone');
+});
+test('HTML-only preview mode receives metadata in the head from streaming sites',async()=>{
+  const t=transport((_url,options)=>({body:/Twitterbot/.test(options.headers['User-Agent'])?`<head><title>Live View</title>${miniappTag({...appEmbed,button:{...appEmbed.button,title:'Open Live View'}})}</head>`:'<head><meta name="viewport" content="width=device-width"></head>'}));
+  const result=await call(embedPreviews({request:t.request,lookup:publicLookup}),'https://public.example/live-view?share=42');
+  assert.equal(result.status,200);assert.equal(result.body.title,'Live View');assert.equal(result.body.miniapp.buttonTitle,'Open Live View');assert.ok(t.calls[0].response!.destroyed);
 });
 test('miniapp previews take precedence over OG video, validate destinations and retain safe fallbacks',async()=>{
   const t=transport(url=>({body:`<head><title>Ordinary preview</title><meta property="og:image" content="https://public.example/fallback.png"><meta property="og:video" content="https://public.example/movie.mp4">${miniappTag(url.pathname==='/private'?{...appEmbed,imageUrl:'http://127.0.0.1/private.png'}:appEmbed)}</head>`}));
