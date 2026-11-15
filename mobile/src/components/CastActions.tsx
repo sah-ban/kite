@@ -1,7 +1,7 @@
 import {router} from 'expo-router';
 import {useState} from 'react';
-import {ActivityIndicator,Pressable,Share,Text,View} from 'react-native';
-import {type Cast,type Page,castRoute} from '../lib/model';
+import {ActivityIndicator,Pressable,Text,View} from 'react-native';
+import {type Cast,type Page} from '../lib/model';
 import {reactionKey,useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
 import {useCastClient} from '../lib/use-cast-client';
@@ -41,7 +41,7 @@ export function CastActions({cast,enabled=true}:{cast:Cast;enabled?:boolean}){
           {busy===kind?<ActivityIndicator size="small" color={colors.accent}/>:<Icon name={kind==='likes'?'heart':'repeat'} size={18} color={color}/>}<Text style={{fontSize:12,color}}>{countLabel(count,more)}</Text>
         </Pressable>;
       })}
-      <Pressable accessibilityRole="button" accessibilityLabel="Share cast" accessibilityHint={client.value?`Posted from ${client.value.username?'@'+client.value.username:'client FID '+client.value.fid}`:undefined} onPress={event=>{event.stopPropagation();void Share.share({message:`https://kite.sahban.dev${castRoute(cast)}`}).catch(()=>{});}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}>{client.value?<Avatar key={client.value.avatar||client.value.fid} url={client.value.avatar} size={22}/>:client.loading?<ActivityIndicator size="small" color={colors.muted}/>:<Icon name="grid" size={18} color={colors.muted}/>}</Pressable>
+      <Pressable accessibilityRole="link" accessibilityLabel={client.value?`View client ${client.value.username?'@'+client.value.username:'FID '+client.value.fid}`:client.loading?'Resolving client':'Unknown client'} accessibilityState={{disabled:!client.value}} disabled={!client.value} onPress={event=>{event.stopPropagation();if(client.value)router.push(`/profile/${client.value.fid}`);}} style={{width:40,height:44,alignItems:'flex-end',justifyContent:'center'}}>{client.value?<Avatar key={client.value.avatar||client.value.fid} url={client.value.avatar} size={22}/>:client.loading?<ActivityIndicator size="small" color={colors.muted}/>:<Icon name="grid" size={18} color={colors.muted}/>}</Pressable>
     </View>
     {!!(error||mine.error)&&<View accessibilityRole="alert" style={{gap:4}}><Text style={{fontSize:12,lineHeight:18,color:colors.danger}}>{error||'Could not check your reactions.'}</Text>{!!mine.error&&<Pressable accessibilityRole="button" onPress={event=>{event.stopPropagation();mine.reload();}} style={{minHeight:44,justifyContent:'center'}}><Text style={{fontSize:13,fontWeight:'600',color:colors.accent}}>Retry</Text></Pressable>}</View>}
   </View>;
