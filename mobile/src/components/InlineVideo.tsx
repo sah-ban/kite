@@ -22,7 +22,7 @@ export function InlineVideo({url,contentType,poster,autoPlay=false}:{url:string;
   </Pressable>;
 }
 function Playback({source,retry}:{source:NonNullable<ReturnType<typeof videoSource>>;retry:()=>void}){
-  const player=useVideoPlayer(source,value=>{value.loop=false;value.muted=true;value.staysActiveInBackground=false;value.timeUpdateEventInterval=.25;});
+  const player=useVideoPlayer(source,value=>{value.loop=true;value.muted=true;value.staysActiveInBackground=false;value.timeUpdateEventInterval=.25;});
   const videoView=useRef<ComponentRef<typeof VideoView>>(null),[notice,setNotice]=useState(''),[fullScreen,setFullScreen]=useState(false);
   const {isPlaying}=useEvent(player,'playingChange',{isPlaying:player.playing});
   const time=useEvent(player,'timeUpdate'),loaded=useEvent(player,'sourceLoad');

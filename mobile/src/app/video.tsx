@@ -19,7 +19,7 @@ export default function VideoScreen(){
   </View>;
 }
 function Playback({source,retry}:{source:VideoSource;retry:()=>void}){
-  const player=useVideoPlayer(source,value=>{value.loop=false;value.staysActiveInBackground=false;});
+  const player=useVideoPlayer(source,value=>{value.loop=true;value.staysActiveInBackground=false;});
   const {status}=useEvent(player,'statusChange',{status:player.status});
   const {muted}=useEvent(player,'mutedChange',{muted:player.muted});
   useFocusEffect(useCallback(()=>{player.play();return()=>{player.pause();};},[player]));
