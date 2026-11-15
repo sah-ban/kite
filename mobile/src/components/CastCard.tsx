@@ -29,17 +29,17 @@ export function CastText({cast,limit=Infinity,compact=false}:{cast:Cast;limit?:n
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
   return <Text selectable style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
 }
-function UrlEmbed({url,castUrls,visible}:{url:string;castUrls:string[];visible:boolean}) {
+function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];visible:boolean;height?:number}) {
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
   const [failed,setFailed]=useState(false);
   const normalized=safeLink(url);if(!normalized)return null;
-  if(value?.miniapp&&miniAppLaunchURL(value.miniapp.url)&&safeLink(value.miniapp.imageUrl))return <MiniAppEmbed key={value.miniapp.imageUrl} app={value.miniapp}/>;
+  if(value?.miniapp&&miniAppLaunchURL(value.miniapp.url)&&safeLink(value.miniapp.imageUrl))return <MiniAppEmbed key={value.miniapp.imageUrl} app={value.miniapp} height={height}/>;
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
   const viewImage=value?.kind==='image'&&image;
   const viewVideo=value?.kind==='video'&&safeLink(value.url);
-  if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible}/>;
-  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
-    {image&&!failed?<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>:<View accessibilityRole="image" accessibilityLabel={viewImage?'Image unavailable':`Website preview for ${new URL(normalized).hostname}`} style={{height:200,padding:16,gap:10,alignItems:'center',justifyContent:'center',backgroundColor:colors.soft}}><View style={{width:56,height:56,borderRadius:18,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'}}><Icon name={viewImage?'image':'globe'} size={28} color={colors.accent}/></View><Text numberOfLines={2} style={{fontSize:13,lineHeight:18,fontWeight:'500',color:colors.muted,textAlign:'center'}}>{viewImage?'Image unavailable':value?.site||new URL(normalized).hostname}</Text></View>}
+  if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible} height={height}/>;
+  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{height,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+    {image&&!failed?<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:height?undefined:200,flex:height?1:undefined,minHeight:0}} contentFit="cover" transition={150}/>:<View accessibilityRole="image" accessibilityLabel={viewImage?'Image unavailable':`Website preview for ${new URL(normalized).hostname}`} style={{height:height?undefined:200,flex:height?1:undefined,minHeight:0,padding:16,gap:10,alignItems:'center',justifyContent:'center',backgroundColor:colors.soft}}><View style={{width:56,height:56,borderRadius:18,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'}}><Icon name={viewImage?'image':'globe'} size={28} color={colors.accent}/></View><Text numberOfLines={2} style={{fontSize:13,lineHeight:18,fontWeight:'500',color:colors.muted,textAlign:'center'}}>{viewImage?'Image unavailable':value?.site||new URL(normalized).hostname}</Text></View>}
     {!viewImage&&<View style={{padding:10,gap:2}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
 }
@@ -55,7 +55,7 @@ function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['ca
   return <View style={{gap:6,minWidth:0,marginLeft:-gutter}}>
     {urls.length>0&&<View onLayout={event=>setWidth(event.nativeEvent.layout.width)}>
       {urls.length===1?<View style={{marginLeft:gutter}}><UrlEmbed url={urls[0]} castUrls={urls} visible={visible}/></View>:width>0&&<ScrollView horizontal accessibilityLabel="Cast embeds" showsHorizontalScrollIndicator={false} nestedScrollEnabled directionalLockEnabled decelerationRate="fast" snapToInterval={itemWidth+gap} snapToAlignment="start" scrollEventThrottle={32} onScroll={event=>setOffset(event.nativeEvent.contentOffset.x)} contentContainerStyle={{gap,paddingLeft:gutter,alignItems:'flex-start'}}>
-        {urls.map((url,index)=><View key={`${index}:${url}`} style={{width:itemWidth}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex}/></View>)}
+        {urls.map((url,index)=><View key={`${index}:${url}`} style={{width:itemWidth}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex} height={240}/></View>)}
       </ScrollView>}
     </View>}
     {quotes.map((quote,index)=><View key={`${index}:${quote.fid}:${quote.hash}`} style={{marginLeft:gutter}}><Quote {...quote}/></View>)}
