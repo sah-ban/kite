@@ -6,7 +6,7 @@ import {castTextParts} from '../../../src/lib/mentions';
 import {type Cast,castDate,castKey,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
-import {Avatar,space} from './ui';
+import {Avatar,Icon,space} from './ui';
 import {InlineVideo} from './InlineVideo';
 import {CastActions} from './CastActions';
 import {CastMenu} from './CastMenu';
@@ -39,7 +39,7 @@ function UrlEmbed({url,castUrls,visible}:{url:string;castUrls:string[];visible:b
   const viewVideo=value?.kind==='video'&&safeLink(value.url);
   if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible}/>;
   return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
-    {image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>}
+    {image&&!failed?<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>:<View accessibilityRole="image" accessibilityLabel={viewImage?'Image unavailable':`Website preview for ${new URL(normalized).hostname}`} style={{height:200,padding:16,gap:10,alignItems:'center',justifyContent:'center',backgroundColor:colors.soft}}><View style={{width:56,height:56,borderRadius:18,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'}}><Icon name={viewImage?'image':'globe'} size={28} color={colors.accent}/></View><Text numberOfLines={2} style={{fontSize:13,lineHeight:18,fontWeight:'500',color:colors.muted,textAlign:'center'}}>{viewImage?'Image unavailable':value?.site||new URL(normalized).hostname}</Text></View>}
     {!viewImage&&<View style={{padding:10,gap:2}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
 }
