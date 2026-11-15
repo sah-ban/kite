@@ -15,9 +15,10 @@ import {MiniAppEmbed} from './MiniAppEmbed';
 import {miniAppLaunchURL} from '../lib/miniapp';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
-export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean}) {
+export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
   const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Pressable>;
+  const Container=profileLink?Pressable:View;
+  return <Container {...(profileLink?{onPress:(event:import('react-native').GestureResponderEvent)=>{event.stopPropagation();router.push(`/profile/${fid}`);},accessibilityRole:'link' as const,accessibilityLabel:`View ${value?.name||`FID ${fid}`}`}:{})} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Container>;
 }
 function AuthorAvatar({fid}:{fid:number}){
   const {api}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
@@ -64,7 +65,7 @@ export function Quote({fid,hash}:{fid:number;hash:string}){
   const embeds=attachments.filter(embed=>embed.castId||embed.url&&safeLink(embed.url)).slice(0,4);
   const text=value&&!!(body?.text||body?.mentions?.length)?<CastText cast={value} limit={280} numberOfLines={5} compact/>:null;
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
-    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Person fid={fid} compact usernameOnly/>{value&&<Text style={{fontSize:11,color:colors.muted,flexShrink:0}}>{relativeTime(value.data.timestamp)}</Text>}</View>
+    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Person fid={fid} compact usernameOnly profileLink={false}/>{value&&<Text style={{fontSize:11,color:colors.muted,flexShrink:0}}>{relativeTime(value.data.timestamp)}</Text>}</View>
     {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View><View style={{flex:1,minWidth:0}}>{text}</View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
   </Pressable>;
 }
