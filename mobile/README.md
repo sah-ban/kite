@@ -8,6 +8,8 @@ Sign in through Farcaster approval, keep the approved signer in device secure st
 
 Multiple image, video and link embeds share a horizontal swipe row; quoted casts stay full-width below it. Cast images open in a swipeable viewer. Installed Android builds on Android 10+ save original image files directly to `Internal storage/Download/Kite` using MediaStore Downloads, without a folder picker or storage permission. The local `modules/kite-downloads` Expo module is linked when building the app. Expo Go does not include it, so downloads there use a one-time system folder selection: create or select `Download/Kite`, then grant access. Access is remembered; if the folder is deleted or access is revoked, select it again. Older Android devices also use this fallback. Changes to the native module require a new development or release build; the rest of Kite can still be tested in Expo Go.
 
+Miniapp links render the image and launch-button label from `fc:miniapp` metadata (also JSON miniapp metadata in `fc:frame`). Tapping the card opens the target page in Farcaster. This requires the updated `/api/embed` backend to be deployed; older backends continue to show ordinary link previews. Legacy interactive frames are not executed inside Kite.
+
 ## Development
 
 Use Node.js 22.13 or newer. From this directory:

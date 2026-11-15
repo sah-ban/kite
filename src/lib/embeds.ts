@@ -1,4 +1,4 @@
-export type EmbedInfo = {kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;sourceUrl?:string};
+export type EmbedInfo = {kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;sourceUrl?:string;miniapp?:{imageUrl:string;buttonTitle:string;url:string;name?:string}};
 export type ClassifiedEmbed = {kind:'image'|'video'|'youtube'|'vimeo'|'link';url:string;id?:string};
 export function embedURL(value:string):string|undefined {
   try {

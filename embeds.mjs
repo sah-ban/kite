@@ -93,6 +93,22 @@ export function parseMetadata(html,base) {
   const asset=value=>{if(typeof value!=='string'||!value.trim())return undefined;try{return urlFor(new URL(value,base).href).href;}catch{return undefined;}};
   const video=values.get('og:video:secure_url')||values.get('og:video:url')||values.get('og:video');
   const type=text(values.get('og:video:type'),100);
+  let miniapp;
+  for(const key of ['fc:miniapp','fc:frame']){
+    const raw=values.get(key);if(!raw||raw.length>16384)continue;
+    try{
+      const data=JSON.parse(raw),action=data?.button?.action;
+      if(!data||!(data.version==='1'||key==='fc:frame'&&data.version==='next')||!['launch_miniapp','launch_frame'].includes(action?.type))continue;
+      if(typeof data.button.title!=='string'||!data.button.title.trim()||data.button.title.length>32)continue;
+      const https=value=>{if(typeof value!=='string'||value.length>1024)return;const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)return;return url.href;};
+      const imageUrl=https(data.imageUrl),target=https(action.url===undefined?base:action.url);
+      if(!imageUrl||!target)continue;
+      const launch=new URL(target),declared=new Set(launch.searchParams.keys());
+      if(action.url!==undefined)for(const [key,value] of new URL(base).searchParams)if(!declared.has(key))launch.searchParams.append(key,value);
+      if(launch.href.length>4096)continue;
+      miniapp={imageUrl,buttonTitle:text(data.button.title,32),url:launch.href,...(typeof action.name==='string'&&action.name.trim()?{name:text(action.name,32)}:{})};break;
+    }catch{/* Invalid miniapp metadata falls back to the ordinary link preview. */}
+  }
   return {
     title:text(values.get('og:title')||values.get('twitter:title')||title,200),
     description:text(values.get('og:description')||values.get('twitter:description')||values.get('description'),350),
@@ -100,6 +116,7 @@ export function parseMetadata(html,base) {
     image:asset(values.get('og:image:secure_url')||values.get('og:image')||values.get('twitter:image')),
     video:video&&(mediaKind(type)==='video'||/\.(mp4|webm|mov|m3u8)(?:[?#]|$)/i.test(video))?asset(video):undefined,
     videoType:type,
+    ...(miniapp?{miniapp}:{}),
   };
 }
 
@@ -123,8 +140,12 @@ export function embedPreviews(dependencies={}) {
       const data=await loadDocument(url,dependencies,0,deadline);
       if(data.kind!=='link')return {kind:data.kind,url:data.url,contentType:data.type};
       const meta=parseMetadata(data.body,data.url);
+      if(meta.miniapp){
+        try{await Promise.all([meta.miniapp.imageUrl,meta.miniapp.url].map(url=>publicDestination(url,dependencies.lookup||lookup,deadline)));}
+        catch{delete meta.miniapp;}
+      }
       await Promise.all(['image','video'].map(async key=>{if(meta[key]){try{await publicDestination(meta[key],dependencies.lookup||lookup,deadline);}catch{delete meta[key];}}}));
-      return {kind:meta.video?'video':'link',url:data.url,...meta,...(meta.video?{url:meta.video,poster:meta.image,contentType:meta.videoType}:{}),sourceUrl:data.url};
+      return {kind:meta.video&&!meta.miniapp?'video':'link',url:data.url,...meta,...(meta.video&&!meta.miniapp?{url:meta.video,poster:meta.image,contentType:meta.videoType}:{}),sourceUrl:data.url};
     })().finally(()=>{active--;});
     cache.set(url,{expires:now+5*60_000,value});if(cache.size>500)cache.delete(cache.keys().next().value);
     try{return respond(200,await value);}catch{cache.delete(url);return respond(502,{error:'Preview unavailable.'});}

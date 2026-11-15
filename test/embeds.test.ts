@@ -75,3 +75,30 @@ test('oversized preview documents fail without exposing upstream details',async(
   const t=transport(()=>({body:'x'.repeat(513*1024)}));const middleware=embedPreviews({request:t.request,lookup:publicLookup});
   const result=await call(middleware,'https://public.example/huge');assert.equal(result.status,502);assert.equal(result.body.error,'Preview unavailable.');assert.ok(t.calls[0].response!.destroyed);
 });
+
+const miniappTag=(value:unknown,key='fc:miniapp')=>`<meta name="${key}" content='${JSON.stringify(value).replace(/&/g,'&amp;').replace(/'/g,'&#39;')}'>`;
+const appEmbed={version:'1',imageUrl:'https://public.example/miniapp.png',button:{title:'Play & explore',action:{type:'launch_miniapp',url:'https://public.example/play?id=42',name:'Example App'}}};
+test('miniapp tags decode JSON, preserve target pages and merge referral parameters',()=>{
+  const meta=parseMetadata(miniappTag(appEmbed),'https://public.example/share?ref=alice&id=wrong');
+  assert.deepEqual(meta.miniapp,{imageUrl:appEmbed.imageUrl,buttonTitle:'Play & explore',url:'https://public.example/play?id=42&ref=alice',name:'Example App'});
+  const withoutURL={...appEmbed,button:{...appEmbed.button,action:{type:'launch_miniapp'}}};
+  assert.equal(parseMetadata(miniappTag(withoutURL),'https://public.example/share?ref=alice').miniapp.url,'https://public.example/share?ref=alice');
+  const legacy={...appEmbed,version:'next',button:{...appEmbed.button,action:{...appEmbed.button.action,type:'launch_frame'}}};
+  assert.equal(parseMetadata(miniappTag(legacy,'fc:frame'),'https://public.example').miniapp.buttonTitle,appEmbed.button.title);
+  assert.equal(parseMetadata(miniappTag(appEmbed)+miniappTag(legacy,'fc:frame'),'https://public.example').miniapp.url,appEmbed.button.action.url);
+});
+test('malformed, unsafe and unsupported frame metadata stays a link',()=>{
+  for(const raw of ['not JSON','null','"vNext"',JSON.stringify({...appEmbed,version:'2'}),JSON.stringify({...appEmbed,imageUrl:'javascript:alert(1)'}),JSON.stringify({...appEmbed,button:{title:'x',action:{type:'post',url:'https://public.example'}}}),JSON.stringify({...appEmbed,button:{title:'x',action:{type:'launch_miniapp',url:'https://user:pass@public.example'}}})]){
+    assert.equal(parseMetadata(`<meta property="fc:miniapp" content='${raw}'><title>Fallback</title>`,'https://public.example').miniapp,undefined);
+  }
+  assert.equal(parseMetadata('<meta name="fc:frame" content="vNext"><meta name="fc:frame:image" content="https://public.example/frame.png">','https://public.example').miniapp,undefined);
+});
+test('miniapp previews take precedence over OG video, validate destinations and retain safe fallbacks',async()=>{
+  const t=transport(url=>({body:`<head><title>Ordinary preview</title><meta property="og:image" content="https://public.example/fallback.png"><meta property="og:video" content="https://public.example/movie.mp4">${miniappTag(url.pathname==='/private'?{...appEmbed,imageUrl:'http://127.0.0.1/private.png'}:appEmbed)}</head>`}));
+  const middleware=embedPreviews({request:t.request,lookup:publicLookup});
+  const app=await call(middleware,'https://public.example/share');assert.equal(app.body.kind,'link');assert.equal(app.body.miniapp.buttonTitle,appEmbed.button.title);assert.equal(app.body.url,'https://public.example/share');
+  const fallback=await call(middleware,'https://public.example/private');assert.equal(fallback.body.miniapp,undefined);assert.equal(fallback.body.kind,'video');
+  const privateAsset=transport(()=>({body:miniappTag({...appEmbed,imageUrl:'https://private.example/image.png'})}));
+  const result=await call(embedPreviews({request:privateAsset.request,lookup:async(host:string)=>host==='private.example'?[{address:'10.0.0.1',family:4}]:publicLookup()}),'https://public.example/share');
+  assert.equal(result.body.miniapp,undefined);assert.equal(result.body.kind,'link');
+});
