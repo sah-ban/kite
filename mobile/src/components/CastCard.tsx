@@ -9,6 +9,7 @@ import {useQuery} from '../lib/hooks';
 import {Avatar,Icon,space} from './ui';
 import {InlineVideo} from './InlineVideo';
 import {CastActions} from './CastActions';
+import {QuoteIcon} from './CastActionIcons';
 import {CastMenu} from './CastMenu';
 import {ClientLabel} from './ClientLabel';
 import {MiniAppEmbed} from './MiniAppEmbed';
@@ -53,7 +54,7 @@ function QuoteThumbnail({embed}:{embed:QuoteEmbed}){
   const image=safeLink(value?.miniapp?.imageUrl||(value?.kind==='image'?value.url:value?.image||value?.poster)||'');
   const kind=embed.castId?'quote':value?.kind||'link';
   return <View accessibilityRole="image" accessibilityLabel={kind==='image'?'Quoted cast image':kind==='video'?'Quoted video preview':kind==='quote'?'Nested quoted cast':'Quoted website preview'} style={{width:'100%',height:'100%',borderRadius:10,overflow:'hidden',backgroundColor:colors.soft,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'}}>
-    {image&&failed!==image?<Image source={{uri:image}} onError={()=>setFailed(image)} style={{width:'100%',height:'100%'}} contentFit="cover" transition={150}/>:<Icon name={kind==='image'?'image':kind==='video'?'video':kind==='quote'?'message-square':'globe'} size={22} color={colors.muted}/>}
+    {image&&failed!==image?<Image source={{uri:image}} onError={()=>setFailed(image)} style={{width:'100%',height:'100%'}} contentFit="cover" transition={150}/>:kind==='quote'?<QuoteIcon size={22} color={colors.muted}/>:<Icon name={kind==='image'?'image':kind==='video'?'video':'globe'} size={22} color={colors.muted}/>}
     {kind==='video'&&image&&failed!==image&&<View style={{position:'absolute',width:28,height:28,borderRadius:14,backgroundColor:'#00000088',alignItems:'center',justifyContent:'center'}}><Icon name="play" size={15} color="#fff"/></View>}
     {kind==='link'&&image&&failed!==image&&<View pointerEvents="none" style={{position:'absolute',right:4,bottom:4,width:22,height:22,borderRadius:11,backgroundColor:'#000000aa',alignItems:'center',justifyContent:'center'}}><Icon name="globe" size={13} color="#fff"/></View>}
   </View>;
