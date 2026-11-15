@@ -6,7 +6,7 @@ import {castTextParts} from '../../../src/lib/mentions';
 import {type Cast,castDate,castKey,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
-import {Avatar,space} from './ui';
+import {Avatar,Icon,space} from './ui';
 import {CastActions} from './CastActions';
 import {CastMenu} from './CastMenu';
 import {ClientLabel} from './ClientLabel';
@@ -32,8 +32,9 @@ function UrlEmbed({url,castUrls}:{url:string;castUrls:string[]}) {
   const normalized=safeLink(url);if(!normalized)return null;
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
   const viewImage=value?.kind==='image'&&image;
-  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
-    {image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>}
+  const viewVideo=value?.kind==='video'&&safeLink(value.url);
+  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else if(viewVideo)router.push({pathname:'/video',params:{url:viewVideo,...(value?.contentType?{contentType:value.contentType}:{})}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':viewVideo?'Play video':value?.title||`Open ${new URL(normalized).hostname}`} style={{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+    {viewVideo?<View style={{height:200,backgroundColor:'#000',justifyContent:'center',alignItems:'center'}}>{image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{position:'absolute',width:'100%',height:'100%'}} contentFit="cover" transition={150}/>}<View pointerEvents="none" style={{width:54,height:54,borderRadius:27,backgroundColor:'#00000099',alignItems:'center',justifyContent:'center'}}><Icon name="play" size={25} color="#fff"/></View></View>:image&&!failed&&<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:200}} contentFit="cover" transition={150}/>}
     {value?.kind!=='image'&&<View style={{padding:12,gap:4}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{value?.kind==='video'?'▶ Video · ':''}{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
 }
