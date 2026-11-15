@@ -10,6 +10,8 @@ Multiple image, video and link embeds share a horizontal swipe row; quoted casts
 
 Miniapp links render the image and launch-button label from `fc:miniapp` metadata (also JSON miniapp metadata in `fc:frame`). Tapping the card opens the target page in Farcaster. This requires the updated `/api/embed` backend to be deployed; older backends continue to show ordinary link previews. Legacy interactive frames are not executed inside Kite.
 
+Your own cast menus include **Post on X**. It opens an X draft with linked X mentions, ordinary links, and quoted-cast links, using the same draft builder as the web client. Image and video embed URLs are omitted, including extensionless media; attach those files manually on X. Mentions without a linked X handle use `@.username (on Farcaster)`.
+
 ## Development
 
 Use Node.js 22.13 or newer. From this directory:

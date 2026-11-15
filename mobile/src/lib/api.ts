@@ -3,6 +3,7 @@ import {MAX_IMAGE_BYTES,imageMime} from './composer';
 import {imageEmbeds} from '../../../cast.mjs';
 import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 import {createAttribution} from './attribution';
+import {xHandle} from '../../../src/lib/x-handle';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
@@ -62,7 +63,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
         if (body && typeof body.value === 'string') fields.set(body.type,body.value);
       }
       const field = (type:string,id:number) => fields.get(`USER_DATA_TYPE_${type}`)||fields.get(id)||'';
-      return {fid,name:field('DISPLAY',2)||field('USERNAME',6)||`FID ${fid}`,username:field('USERNAME',6),avatar:field('PFP',1),bio:field('BIO',3),banner:field('BANNER',10),website:field('URL',5)};
+      return {fid,name:field('DISPLAY',2)||field('USERNAME',6)||`FID ${fid}`,username:field('USERNAME',6),avatar:field('PFP',1),bio:field('BIO',3),banner:field('BANNER',10),website:field('URL',5),twitterUsername:xHandle(field('TWITTER',8))};
     }).catch(error=>{profiles.delete(fid);throw error;});
     profiles.set(fid,pending);
     if (profiles.size > 250) profiles.delete(profiles.keys().next().value!);

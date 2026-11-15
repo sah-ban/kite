@@ -1,15 +1,15 @@
 import type { Cast, Profile } from './hub';
 import { castTextParts } from './mentions';
-import { classifyEmbed, embedPreview, embedURL } from './embeds';
+import { classifyEmbed, embedPreview, embedURL, type EmbedInfo } from './embeds';
 import { xHandle } from './x-handle';
-// @ts-expect-error Shared text link detection.
+// @ts-ignore The web build needs this JS import suppressed; Expo infers its types with allowJs.
 import { textLinks } from '../../link-embeds.mjs';
 
-export async function twitterMediaUrls(cast:Cast):Promise<Set<string>> {
+export async function twitterMediaUrls(cast:Cast,preview:(url:string)=>Promise<Pick<EmbedInfo,'kind'>>=embedPreview):Promise<Set<string>> {
   const body=cast.data.castAddBody;
   const urls=[...new Set([...(body.embeds||[]).flatMap(embed=>embed.url?[embed.url]:[]),...(body.embedsDeprecated||[])].map(embedURL).filter((url):url is string=>url!==undefined&&classifyEmbed(url)?.kind==='link'))];
   const media=await Promise.all(urls.map(async url=>{
-    try{const preview=await embedPreview(url);return preview.kind==='image'||preview.kind==='video'?url:undefined;}
+    try{const info=await preview(url);return info.kind==='image'||info.kind==='video'?url:undefined;}
     catch{return undefined;}
   }));
   return new Set(media.filter((url):url is string=>Boolean(url)));

@@ -8,7 +8,7 @@ export type Cast = {
     embedsDeprecated?: string[];
   }};
 };
-export type Profile = {fid: number; name: string; username: string; avatar: string; bio: string; banner: string; website: string};
+export type Profile = {fid: number; name: string; username: string; avatar: string; bio: string; banner: string; website: string;twitterUsername?:string};
 export type Page<T> = {items: T[]; next: string};
 export const isFid = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0;
 export const isHash = (value: unknown): boolean => typeof value === 'string' && /^0x[0-9a-f]{40}$/i.test(value);

@@ -6,6 +6,9 @@ import {type Cast,castRoute} from '../lib/model';
 import {useApp} from '../lib/state';
 import {Icon} from './ui';
 import {FarcasterIcon} from './FarcasterIcon';
+import {XIcon} from './XIcon';
+import {useQuery} from '../lib/hooks';
+import {postOnXIntent} from '../lib/post-on-x';
 
 
 export function CastMenu({cast}:{cast:Cast}){
@@ -20,17 +23,19 @@ export function CastMenu({cast}:{cast:Cast}){
 }
 
 export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,onDelete}:{cast:Cast;own:boolean;accountBusy?:boolean;onClose:()=>void;onCopied:()=>void;onDelete:()=>Promise<void>}){
-  const {colors}=useApp(),insets=useSafeAreaInsets();
+  const {api,colors}=useApp(),insets=useSafeAreaInsets();
+  const xDraft=useQuery(()=>own?postOnXIntent(cast,api):Promise.resolve(undefined),[api,own,cast.data.fid,cast.hash]);
   const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const lock=useRef(false);
   const link=`https://kite.sahban.dev${castRoute(cast)}`;
   const close=()=>{if(!busy)onClose();};
-  async function run(action:'copy'|'share'|'farcaster'|'delete'){
+  async function run(action:'copy'|'share'|'farcaster'|'delete'|'x'){
     if(lock.current)return;lock.current=true;setBusy(true);setError('');
     try{
       if(action==='copy'){const copied=await Clipboard.setStringAsync(link);if(!copied)throw new Error('Couldn’t copy the link. Please try again.');onCopied();}
       if(action==='share'){await Share.share({message:link});onClose();}
       if(action==='farcaster'){await Linking.openURL(`https://farcaster.xyz/~/conversations/${cast.hash}`);onClose();}
+      if(action==='x'){if(!own||!xDraft.value)throw new Error('Could not prepare the X draft. Please try again.');await Linking.openURL(xDraft.value);onClose();}
       if(action==='delete'){if(!own||!confirm)throw new Error('You can only delete your own casts.');await onDelete();onClose();}
     }catch(error){setError(error instanceof Error?error.message:'Could not complete this action. Please try again.');}
     finally{lock.current=false;setBusy(false);}
@@ -46,6 +51,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
           {confirm?<><Text style={{fontSize:15,lineHeight:22,color:colors.muted,paddingHorizontal:18,paddingBottom:12}}>This permanently deletes your cast. It can’t be undone.</Text><MenuItem label={busy?'Deleting…':'Delete cast'} icon="trash-2" disabled={busy||accountBusy} danger onPress={()=>void run('delete')}/><MenuItem label="Cancel" icon="x" disabled={busy} onPress={()=>{setConfirm(false);setError('');}}/></>:<>
             <MenuItem label="Copy link" icon="link" disabled={busy} onPress={()=>void run('copy')}/>
             <MenuItem label="Share cast" icon="share" disabled={busy} onPress={()=>void run('share')}/>
+            {own&&<MenuItem label={xDraft.loading?'Post on X…':xDraft.error?'Retry Post on X':'Post on X'} icon="brand-x" disabled={busy||xDraft.loading} onPress={()=>xDraft.error?xDraft.reload():void run('x')}/>}
             <Pressable accessibilityRole="button" accessibilityLabel="Open in Farcaster" disabled={busy} onPress={()=>void run('farcaster')} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',alignItems:'center',gap:14,borderRadius:12,backgroundColor:pressed?colors.soft:'transparent',opacity:busy?.45:1})}><FarcasterIcon/><Text style={{fontSize:16,fontWeight:'500',color:colors.ink}}>Open in Farcaster</Text></Pressable>
             {own&&<MenuItem label="Delete cast" icon="trash-2" disabled={busy||accountBusy} danger onPress={()=>{setConfirm(true);setError('');}}/>}
             <MenuItem label="Cancel" icon="x" disabled={busy} onPress={close}/>
@@ -58,7 +64,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
   </Modal>;
 }
 
-function MenuItem({label,icon,onPress,disabled,danger=false}:{label:string;icon:ComponentProps<typeof Icon>['name'];onPress:()=>void;disabled:boolean;danger?:boolean}){
+function MenuItem({label,icon,onPress,disabled,danger=false}:{label:string;icon:ComponentProps<typeof Icon>['name']|'brand-x';onPress:()=>void;disabled:boolean;danger?:boolean}){
   const {colors}=useApp();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} accessibilityState={{disabled}} onPress={onPress} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',gap:14,alignItems:'center',borderRadius:12,opacity:disabled?.45:1,backgroundColor:pressed?colors.soft:'transparent'})}><Icon name={icon} size={20} color={danger?colors.danger:colors.ink}/><Text style={{color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:danger?'600':'500'}}>{label}</Text></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} accessibilityState={{disabled}} onPress={onPress} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',gap:14,alignItems:'center',borderRadius:12,opacity:disabled?.45:1,backgroundColor:pressed?colors.soft:'transparent'})}>{icon==='brand-x'?<XIcon/>:<Icon name={icon} size={20} color={danger?colors.danger:colors.ink}/>}<Text style={{color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:danger?'600':'500'}}>{label}</Text></Pressable>;
 }
