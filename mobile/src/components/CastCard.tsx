@@ -26,11 +26,11 @@ function AuthorAvatar({fid}:{fid:number}){
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={{width:40,alignSelf:'flex-start'}}><Avatar url={value?.avatar} size={40}/></Pressable>;
 }
 function Mention({fid}:{fid:number}){const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
-export function CastText({cast,limit=Infinity,compact=false,numberOfLines}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number}) {
+export function CastText({cast,limit=Infinity,compact=false,numberOfLines,expansion}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number;expansion?:{expanded:boolean;onPress:()=>void}}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
   // Keep clamped previews non-selectable so Android can draw the trailing ellipsis.
-  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
+  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
 }
 function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];visible:boolean;height?:number}) {
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
@@ -90,13 +90,13 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
   if(deletedCasts.has(castKey(cast)))return null;
   const route=()=>router.push(castRoute(cast));
   const embeds=body.embeds?.length?body.embeds:(body.embedsDeprecated||[]).map(url=>({url}));
+  const canExpand=!expanded&&Array.from(body.text).length>500;
   const Container=expanded?View:Pressable;
   return <Container accessible={false} focusable={false} {...(expanded?{}:{onPress:route})} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:14,paddingTop:expanded?10:8,paddingBottom:2,flexDirection:'column',backgroundColor:colors.surface}}>
     {!expanded&&<View style={{position:'absolute',left:14,top:8,width:40,height:40,zIndex:1}}><AuthorAvatar fid={cast.data.fid}/></View>}
     <View style={{minWidth:0,paddingLeft:expanded?0:48,gap:expanded?4:2}}>
     <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
-    {!!(body.text||body.mentions?.length)&&(expanded?<CastText cast={cast} compact/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact/></Pressable>)}
-    {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
+    {!!(body.text||body.mentions?.length)&&(expanded?<CastText cast={cast} compact/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact expansion={canExpand?{expanded:textExpanded,onPress:()=>setTextExpanded(value=>!value)}:undefined}/></Pressable>)}
     {embeds.length>0&&<CastEmbeds embeds={embeds} visible={loadActivity} gutter={expanded?0:48}/>}
     {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:8,rowGap:2,marginTop:2}}>
       <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
