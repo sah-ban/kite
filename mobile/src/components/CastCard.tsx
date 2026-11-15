@@ -76,7 +76,7 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
       <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
       <View style={{marginLeft:'auto',maxWidth:'100%'}}><ClientLabel fid={cast.data.fid} signer={cast.signer}/></View>
     </View>}
-    <CastActions cast={cast} enabled={loadActivity}/>
+    <CastActions cast={cast} enabled={loadActivity} conversation={expanded}/>
     </View>
   </Container>;
 });

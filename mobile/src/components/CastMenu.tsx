@@ -2,12 +2,11 @@ import * as Clipboard from 'expo-clipboard';
 import {useEffect,useRef,useState,type ComponentProps} from 'react';
 import {ActivityIndicator,Linking,Modal,Pressable,ScrollView,Share,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg,{Path} from 'react-native-svg';
 import {type Cast,castRoute} from '../lib/model';
 import {useApp} from '../lib/state';
 import {Icon} from './ui';
+import {FarcasterIcon} from './FarcasterIcon';
 
-function FarcasterIcon(){const {colors}=useApp();return <Svg width={20} height={20} viewBox="0 0 675 592"><Path fill={colors.ink} d="M675 0V79.9376H594.971V159.807H619.49V159.834H675V592H540.947L540.865 591.605L472.463 268.309C465.941 237.491 448.874 209.607 424.41 189.777C399.944 169.947 369.127 159.031 337.637 159.031H337.369C305.88 159.031 275.062 169.947 250.597 189.777C226.133 209.607 209.065 237.501 202.544 268.309L134.063 592H0V159.824H55.5103V159.807H80.026V79.9376H0V0H675Z"/></Svg>;}
 
 export function CastMenu({cast}:{cast:Cast}){
   const {colors,account,accountBusy,deleteCast}=useApp();
