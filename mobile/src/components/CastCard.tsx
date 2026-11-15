@@ -27,7 +27,8 @@ function Mention({fid}:{fid:number}){const {api,colors}=useApp(),{value}=useQuer
 export function CastText({cast,limit=Infinity,compact=false,numberOfLines}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
-  return <Text selectable numberOfLines={numberOfLines} style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
+  // Keep clamped previews non-selectable so Android can draw the trailing ellipsis.
+  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}</Text>;
 }
 function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];visible:boolean;height?:number}) {
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
