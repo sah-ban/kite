@@ -65,14 +65,14 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
   const route=()=>router.push(castRoute(cast));
   const embeds=body.embeds?.length?body.embeds:(body.embedsDeprecated||[]).map(url=>({url}));
   const Container=expanded?View:Pressable;
-  return <Container accessible={false} focusable={false} {...(expanded?{}:{onPress:route})} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:expanded?18:14,paddingTop:expanded?14:8,paddingBottom:expanded?14:2,flexDirection:'column',backgroundColor:colors.surface}}>
+  return <Container accessible={false} focusable={false} {...(expanded?{}:{onPress:route})} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:14,paddingTop:expanded?10:8,paddingBottom:2,flexDirection:'column',backgroundColor:colors.surface}}>
     {!expanded&&<View style={{position:'absolute',left:14,top:8,width:40,height:40,zIndex:1}}><AuthorAvatar fid={cast.data.fid}/></View>}
-    <View style={{minWidth:0,paddingLeft:expanded?0:48,gap:expanded?8:2}}>
-    <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense={!expanded} showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
-    {expanded?<CastText cast={cast}/>:!!(body.text||body.mentions?.length)&&<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact/></Pressable>}
+    <View style={{minWidth:0,paddingLeft:expanded?0:48,gap:expanded?4:2}}>
+    <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
+    {!!(body.text||body.mentions?.length)&&(expanded?<CastText cast={cast} compact/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact/></Pressable>)}
     {!expanded&&Array.from(body.text).length>500&&<Pressable onPress={event=>{event.stopPropagation();setTextExpanded(value=>!value);}} accessibilityRole="button" accessibilityLabel={textExpanded?'Collapse cast text':'Read full cast'} aria-expanded={textExpanded} style={{minHeight:44,justifyContent:'center',alignSelf:'flex-start'}}><Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{textExpanded?'Show less':'Read more'}</Text></Pressable>}
     {embeds.length>0&&<CastEmbeds embeds={embeds} visible={loadActivity} gutter={expanded?0:48}/>}
-    {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:12,rowGap:4,marginTop:4}}>
+    {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:8,rowGap:2,marginTop:2}}>
       <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
       <View style={{marginLeft:'auto',maxWidth:'100%'}}><ClientLabel fid={cast.data.fid} signer={cast.signer}/></View>
     </View>}
