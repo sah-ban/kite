@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useEffect,useRef,useState} from 'react';
 import {type Draft,emptyDraft,makeDraftStore} from './composer';
 
-export function useSavedDraft(key:string){
-  const [store]=useState(()=>makeDraftStore(AsyncStorage,key));
+export function useSavedDraft(key:string,initial:Draft=emptyDraft()){
+  const [store]=useState(()=>makeDraftStore(AsyncStorage,key,initial));
   const [draft,setDraft]=useState<Draft>(emptyDraft),[ready,setReady]=useState(false),[error,setError]=useState('');
   const latest=useRef<Draft>(emptyDraft()),loaded=useRef(false);
   useEffect(()=>{

@@ -28,6 +28,7 @@ export function CastActions({cast,enabled=true}:{cast:Cast;enabled?:boolean}){
   return <View>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Reply to cast" onPress={event=>{event.stopPropagation();if(!session)router.push('/sign-in');else router.push({pathname:'/compose',params:{replyFid:String(cast.data.fid),replyHash:cast.hash}});}} style={{width:40,height:44,alignItems:'flex-start',justifyContent:'center'}}><Icon name="message-circle" size={18} color={colors.muted}/></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Quote cast" onPress={event=>{event.stopPropagation();if(!session)router.push('/sign-in');else router.push({pathname:'/compose',params:{quoteFid:String(cast.data.fid),quoteHash:cast.hash}});}} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="edit-3" size={18} color={colors.muted}/></Pressable>
       {(['recasts','likes'] as const).map(kind=>{
         const override=session?reactions.get(reactionKey(session.fid,cast,kind)):undefined;
         const active=override?.active??mine.value?.[kind],page=value?.[kind];

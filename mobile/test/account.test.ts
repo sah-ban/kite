@@ -68,6 +68,17 @@ test('long casting checks current Pro, rejects invalid drafts before submission 
   await assert.rejects(account.cast({...input,text:'a'.repeat(10001)}),/10,000/);assert.equal(h.submitted.length,1);
   h.failPost(true);await assert.rejects(account.cast({...input,text:'retry this draft'}),/Node unavailable/);assert.equal(account.snapshot().session?.fid,545039);assert.equal(h.submitted.length,1);
 });
+test('quote-only posts sign a cast embed rather than a reply or URL',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
+  const quote={fid:target.data.fid,hash:target.hash};
+  const receipt=await account.cast({text:'',mentions:[],mentionsPositions:[],images:[],links:[],quote});
+  const {castSdk}=await import('../src/lib/cast-sdk'),sdk=await castSdk();
+  const message=sdk.Message.decode(h.submitted[0]),data=sdk.MessageData.decode(message.dataBytes!);
+  const body=data.castAddBody!;assert.equal(body.parentCastId,undefined);assert.equal(body.embeds.length,1);
+  assert.equal(body.embeds[0].castId?.fid,quote.fid);assert.equal('0x'+bytesToHex(body.embeds[0].castId!.hash),quote.hash);
+  assert.deepEqual(receipt.data.castAddBody.embeds,[{castId:quote}]);
+  assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
+});
 
 test('cast deletion signs only the active account’s full cast hash and does not poll after submission',async()=>{
   const h=harness(),account=h.create();await account.restore();

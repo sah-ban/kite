@@ -6,7 +6,7 @@ import {ActivityIndicator,Keyboard,KeyboardAvoidingView,Platform,Pressable,Scrol
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
-import {type CastRef,MAX_IMAGE_BYTES,addImage,addLink,castInput,draftKey,draftLinks,usage} from '../lib/composer';
+import {type CastRef,MAX_IMAGE_BYTES,addImage,addLink,castInput,draftKey,emptyDraft,usage} from '../lib/composer';
 import {useSavedDraft} from '../lib/use-draft';
 import {Button,Field,Icon,Loading,space} from './ui';
 import {CastText,Person} from './CastCard';
@@ -14,16 +14,16 @@ import {ComposerMentionInput} from './ComposerMentionInput';
 import {ComposeAttachments} from './ComposeAttachments';
 import {GifPicker} from './GifPicker';
 
-export function CastComposer({fid,parent}:{fid:number;parent?:CastRef}){
+export function CastComposer({fid,parent,quote}:{fid:number;parent?:CastRef;quote?:CastRef}){
   const {api,colors,publish,publishing,accountBusy}=useApp(),insets=useSafeAreaInsets();
-  const saved=useSavedDraft(draftKey(fid,api.origin,parent));
+  const saved=useSavedDraft(draftKey(fid,api.origin,parent,quote),{...emptyDraft(),...(quote?{quote}:{})});
   const [error,setError]=useState(''),[uploading,setUploading]=useState(false),[gifOpen,setGifOpen]=useState(false),[linkOpen,setLinkOpen]=useState(false),[link,setLink]=useState('');
   const [clock,setClock]=useState(Date.now);
   const upload=useRef<AbortController|null>(null),sending=useRef(false);
   const pro=useQuery(signal=>api.proExpiry(fid,signal),[api,fid]);
   const reference=useQuery(signal=>parent?api.resolveCast(String(parent.fid),parent.hash,signal):Promise.resolve(undefined),[api,parent?.fid,parent?.hash]);
   const expiry=pro.value||0,maxBytes=expiry>clock/1000?10000:1024;
-  const state=usage(saved.draft,maxBytes),links=draftLinks(saved.draft);
+  const state=usage(saved.draft,maxBytes);
   const disabled=publishing||uploading||accountBusy||!saved.ready;
   useEffect(()=>()=>upload.current?.abort(),[]);
   useEffect(()=>{
@@ -54,7 +54,7 @@ export function CastComposer({fid,parent}:{fid:number;parent?:CastRef}){
   }
   function attach(){try{saved.update(value=>addLink(value,link));setLink('');setLinkOpen(false);setError('');}catch(error){setError(error instanceof Error?error.message:'Check your link.');}}
   return <KeyboardAvoidingView style={{flex:1,backgroundColor:colors.surface}} behavior={Platform.OS==='ios'?'padding':undefined}>
-    <Stack.Screen options={{title:parent?'Reply':'New cast',headerRight:()=> <Pressable accessibilityRole="button" accessibilityLabel="Publish cast" accessibilityState={{disabled:disabled||!!state.error,busy:publishing}} disabled={disabled||!!state.error} onPress={()=>void send()} style={{minWidth:72,minHeight:44,marginRight:10,justifyContent:'center',alignItems:'center',opacity:disabled||state.error?.45:1}}><Text style={{color:colors.accent,fontSize:15,fontWeight:'700'}}>{publishing?'Publishing…':'Cast'}</Text></Pressable>}}/>
+    <Stack.Screen options={{title:parent?'Reply':saved.draft.quote?'Quote cast':'New cast',headerRight:()=> <Pressable accessibilityRole="button" accessibilityLabel="Publish cast" accessibilityState={{disabled:disabled||!!state.error,busy:publishing}} disabled={disabled||!!state.error} onPress={()=>void send()} style={{minWidth:72,minHeight:44,marginRight:10,justifyContent:'center',alignItems:'center',opacity:disabled||state.error?.45:1}}><Text style={{color:colors.accent,fontSize:15,fontWeight:'700'}}>{publishing?'Publishing…':'Cast'}</Text></Pressable>}}/>
     <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{padding:18,gap:16,flexGrow:1}}>
       {parent&&<View style={{padding:12,borderRadius:14,backgroundColor:colors.soft,gap:8}}><Text style={{fontSize:12,color:colors.muted}}>Replying to</Text><Person fid={parent.fid} compact/>{reference.value&&<CastText cast={reference.value} limit={180}/>}</View>}
       <View style={space.row}><Person fid={fid}/></View>
@@ -69,7 +69,7 @@ export function CastComposer({fid,parent}:{fid:number;parent?:CastRef}){
       <Pressable accessibilityRole="button" accessibilityLabel="Add image" disabled={disabled||state.embeds>=4} onPress={()=>void photos()} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:disabled||state.embeds>=4?.4:1}}><Icon name="image" size={21} color={colors.accent}/></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Choose a GIF" disabled={disabled||state.embeds>=4} onPress={()=>{Keyboard.dismiss();setGifOpen(true);}} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:disabled||state.embeds>=4?.4:1}}><Text style={{fontSize:12,fontWeight:'800',color:colors.accent}}>GIF</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Attach link" disabled={disabled||state.embeds>=4} onPress={()=>setLinkOpen(value=>!value)} style={{width:44,height:44,alignItems:'center',justifyContent:'center',opacity:disabled||state.embeds>=4?.4:1}}><Icon name="link" size={20} color={colors.accent}/></Pressable>
-      <View style={{flex:1,alignItems:'flex-end',paddingRight:6,gap:3}}><Text accessibilityLabel={`${state.bytes} of ${maxBytes} text bytes`} style={{fontSize:11,color:state.bytes>maxBytes?colors.danger:colors.muted}}>{state.bytes.toLocaleString()}/{maxBytes.toLocaleString()} bytes</Text><Text style={{fontSize:11,color:colors.muted}}>{saved.draft.images.length+links.urls.length}/4 embeds</Text></View>
+      <View style={{flex:1,alignItems:'flex-end',paddingRight:6,gap:3}}><Text accessibilityLabel={`${state.bytes} of ${maxBytes} text bytes`} style={{fontSize:11,color:state.bytes>maxBytes?colors.danger:colors.muted}}>{state.bytes.toLocaleString()}/{maxBytes.toLocaleString()} bytes</Text><Text style={{fontSize:11,color:colors.muted}}>{state.embeds}/4 embeds</Text></View>
     </View>
     {gifOpen&&<GifPicker onClose={()=>setGifOpen(false)} onSelect={url=>{try{saved.update(value=>addImage(value,url));setGifOpen(false);setError('');}catch(error){setError(error instanceof Error?error.message:'Could not attach this GIF.');}}}/>}
   </KeyboardAvoidingView>;

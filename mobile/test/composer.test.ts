@@ -24,6 +24,28 @@ test('text limits count protocol UTF-8 bytes and replies keep a full parent refe
   assert.equal(usage({...emptyDraft(),text:'🌱'.repeat(256)},1024).error,'');assert.match(usage({...emptyDraft(),text:'🌱'.repeat(257)},1024).error,/1,024/);
   const parent={fid:37,hash:'0x'+'22'.repeat(20)};assert.deepEqual(castInput({...emptyDraft(),text:'reply'},parent).parent,parent);assert.throws(()=>castInput(emptyDraft()),/Write some text/);
 });
+test('quotes use cast references, reserve an embed slot and allow quote-only posts',()=>{
+  const quote={fid:37,hash:'0x'+'44'.repeat(20)};
+  let draft={...emptyDraft(),quote};
+  const body=newCastBody(castInput(draft));assert.deepEqual(body.embeds,[{castId:quote}]);assert.equal(body.parentCastId,undefined);
+  assert.equal(usage(draft,1024).error,'');assert.equal(usage(draft,1024).embeds,1);
+  draft=addImage(draft,'https://i.ibb.co/a/image.png') as typeof draft;
+  draft={...draft,text:'https://example.com/1 https://example.com/2 https://example.com/3'};
+  assert.equal(draftLinks(draft).urls.length,2);assert.equal(draftLinks(draft).overflow,1);assert.equal(newCastBody(castInput(draft)).embeds.length,4);
+  assert.throws(()=>addImage(draft,'https://i.ibb.co/b/image.png'),/Remove an embed/);
+  assert.throws(()=>addLink(draft,'https://example.com/4'),/Remove an embed/);
+  assert.throws(()=>castInput({...draft,quote:{fid:37,hash:'0x123'}}),/Invalid quote/);
+});
+test('quote drafts are isolated and retain attachment removal after reopening',async()=>{
+  const quote={fid:37,hash:'0x'+'44'.repeat(20)},initial={...emptyDraft(),quote};
+  const data=new Map<string,string>(),storage={getItem:async(key:string)=>data.get(key)??null,setItem:async(key:string,value:string)=>{data.set(key,value);},removeItem:async(key:string)=>{data.delete(key);}};
+  const key=draftKey(545039,'https://kite.example',undefined,quote);
+  assert.notEqual(key,draftKey(545039,'https://kite.example'));assert.notEqual(key,draftKey(545039,'https://kite.example',quote));
+  const store=makeDraftStore(storage,key,initial);assert.deepEqual(await store.load(),initial);
+  await store.save({...initial,text:'My comment'});assert.deepEqual((await makeDraftStore(storage,key,initial).load()).quote,quote);
+  await store.save({...emptyDraft(),text:'Removed quote'});assert.equal((await makeDraftStore(storage,key,initial).load()).quote,undefined);
+  await store.clear();assert.deepEqual(await store.load(),emptyDraft());
+});
 test('draft persistence is account/context scoped, serialized and cannot restore a successfully cleared draft',async()=>{
   const data=new Map<string,string>();const storage={getItem:async(key:string)=>data.get(key)||null,setItem:async(key:string,value:string)=>{await new Promise(resolve=>setTimeout(resolve,2));data.set(key,value);},removeItem:async(key:string)=>{data.delete(key);}};
   const key=draftKey(545039,'https://kite.example'),store=makeDraftStore(storage,key),draft={...emptyDraft(),text:'Keep this draft'};

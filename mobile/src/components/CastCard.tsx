@@ -40,7 +40,7 @@ function UrlEmbed({url,castUrls,visible}:{url:string;castUrls:string[];visible:b
     {!viewImage&&<View style={{padding:12,gap:4}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
 }
-function Quote({fid,hash}:{fid:number;hash:string}){
+export function Quote({fid,hash}:{fid:number;hash:string}){
   const {api,colors}=useApp(),{value,error}=useQuery(signal=>api.resolveCast(String(fid),hash,signal),[api,fid,hash]);
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:12,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:8}}><Person fid={fid} compact/>{value?<CastText cast={value} limit={280}/>:<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>}</Pressable>;
 }
