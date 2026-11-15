@@ -63,7 +63,7 @@ export function Quote({fid,hash}:{fid:number;hash:string}){
   const embeds=attachments.filter(embed=>embed.castId||embed.url&&safeLink(embed.url)).slice(0,4);
   const text=value&&!!(body?.text||body?.mentions?.length)?<CastText cast={value} limit={280} numberOfLines={5} compact/>:null;
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
-    <Person fid={fid} compact usernameOnly/>
+    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Person fid={fid} compact usernameOnly/>{value&&<Text style={{fontSize:11,color:colors.muted,flexShrink:0}}>{relativeTime(value.data.timestamp)}</Text>}</View>
     {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View><View style={{flex:1,minWidth:0}}>{text}</View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
   </Pressable>;
 }
