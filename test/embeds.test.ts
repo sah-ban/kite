@@ -93,6 +93,14 @@ test('malformed, unsafe and unsupported frame metadata stays a link',()=>{
   }
   assert.equal(parseMetadata('<meta name="fc:frame" content="vNext"><meta name="fc:frame:image" content="https://public.example/frame.png">','https://public.example').miniapp,undefined);
 });
+test('fc:miniapp accepts next-version metadata from generated apps',async()=>{
+  const url='https://public.example/?token=114&name=Poland&share=true&personalize=true';
+  const app={version:'next',imageUrl:'https://public.example/api/share/image/farcaster?token=114&name=Poland',button:{title:'Collect Flags',action:{type:'launch_miniapp',name:'All The Flags Alone',url}}};
+  const encoded=JSON.stringify(app).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const t=transport(()=>({body:`<head><meta name="fc:miniapp" content="${encoded}"/><meta property="og:image" content="https://public.example/ordinary.png"></head>`}));
+  const result=await call(embedPreviews({request:t.request,lookup:publicLookup}),url);
+  assert.equal(result.status,200);assert.equal(result.body.miniapp.buttonTitle,'Collect Flags');assert.equal(result.body.miniapp.imageUrl,app.imageUrl);assert.equal(result.body.miniapp.url,url);assert.equal(result.body.miniapp.name,'All The Flags Alone');
+});
 test('miniapp previews take precedence over OG video, validate destinations and retain safe fallbacks',async()=>{
   const t=transport(url=>({body:`<head><title>Ordinary preview</title><meta property="og:image" content="https://public.example/fallback.png"><meta property="og:video" content="https://public.example/movie.mp4">${miniappTag(url.pathname==='/private'?{...appEmbed,imageUrl:'http://127.0.0.1/private.png'}:appEmbed)}</head>`}));
   const middleware=embedPreviews({request:t.request,lookup:publicLookup});

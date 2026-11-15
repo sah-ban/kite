@@ -98,7 +98,7 @@ export function parseMetadata(html,base) {
     const raw=values.get(key);if(!raw||raw.length>16384)continue;
     try{
       const data=JSON.parse(raw),action=data?.button?.action;
-      if(!data||!(data.version==='1'||key==='fc:frame'&&data.version==='next')||!['launch_miniapp','launch_frame'].includes(action?.type))continue;
+      if(!data||!['1','next'].includes(data.version)||!['launch_miniapp','launch_frame'].includes(action?.type))continue;
       if(typeof data.button.title!=='string'||!data.button.title.trim()||data.button.title.length>32)continue;
       const https=value=>{if(typeof value!=='string'||value.length>1024)return;const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)return;return url.href;};
       const imageUrl=https(data.imageUrl),target=https(action.url===undefined?base:action.url);
