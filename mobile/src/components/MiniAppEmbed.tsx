@@ -17,7 +17,7 @@ export function MiniAppEmbed({app}:{app:MiniApp}){
         {!failed?<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:'100%'}} contentFit="contain" transition={150}/>:<Icon name="grid" size={32} color={colors.muted}/>}
       </View>
       <View style={{minHeight:44,paddingHorizontal:12,paddingVertical:8,gap:8,flexDirection:'row',alignItems:'center',borderTopWidth:1,borderColor:colors.line,backgroundColor:colors.surface}}>
-        <FarcasterIcon/><Text numberOfLines={1} style={{flex:1,fontSize:14,fontWeight:'600',color:colors.ink}}>{app.buttonTitle}</Text><Icon name="arrow-up-right" size={16} color={colors.muted}/>
+        <Text numberOfLines={1} style={{flex:1,fontSize:14,fontWeight:'600',color:colors.ink}}>{app.buttonTitle}</Text><FarcasterIcon/><Icon name="arrow-up-right" size={16} color={colors.muted}/>
       </View>
     </Pressable>
     {!!error&&<Text accessibilityRole="alert" style={{fontSize:12,color:colors.danger}}>{error}</Text>}
