@@ -15,9 +15,11 @@ import {ProfileBio} from '../../components/ProfileBio';
 export default function ProfileScreen(){
   const params=useLocalSearchParams<{fid:string}>(),insets=useSafeAreaInsets(),{colors}=useApp();const fid=Number(params.fid);
   return <View style={{flex:1,paddingTop:insets.top,backgroundColor:colors.background}}>
-    {isFid(fid)?<Profile key={fid} fid={fid}/>:<Notice title="Profile not found">This link has an invalid FID.</Notice>}
-    <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/')} style={({pressed})=>({position:'absolute',top:insets.top+8,left:14,width:40,height:40,borderRadius:20,backgroundColor:pressed?'#00000099':'#00000066',alignItems:'center',justifyContent:'center',zIndex:10})}><Icon name="arrow-left" size={21} color="#fff"/></Pressable>
+    {isFid(fid)?<Profile key={fid} fid={fid}/>:<><ProfileBackButton/><Notice title="Profile not found">This link has an invalid FID.</Notice></>}
   </View>;
+}
+function ProfileBackButton(){
+  return <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/')} style={({pressed})=>({position:'absolute',top:8,left:14,width:40,height:40,borderRadius:20,backgroundColor:pressed?'#00000099':'#00000066',alignItems:'center',justifyContent:'center',zIndex:10})}><Icon name="arrow-left" size={21} color="#fff"/></Pressable>;
 }
 function Profile({fid}:{fid:number}){
   const {api,colors,published,profileRevision}=useApp();const [tab,setTab]=useState<'posts'|'replies'>('posts');
@@ -26,7 +28,7 @@ function Profile({fid}:{fid:number}){
   const selected={...page,items:mergeCasts(published.filter(cast=>cast.data.fid===fid),page.items).filter(cast=>!!cast.data.castAddBody.parentCastId===(tab==='replies')).sort((a,b)=>b.data.timestamp-a.data.timestamp)};
   const p=profile.value;
   return <CastList page={selected} empty={tab==='posts'?'No posts on this page':'No replies on this page'} header={<View>
-    {p?.banner&&safeLink(p.banner)?<Image source={{uri:p.banner}} contentFit="cover" style={{width:'100%',height:120}}/>:<View style={{height:80,backgroundColor:colors.accentSoft}}/>}
+    <View>{p?.banner&&safeLink(p.banner)?<Image source={{uri:p.banner}} contentFit="cover" style={{width:'100%',height:120}}/>:<View style={{height:80,backgroundColor:colors.accentSoft}}/>}<ProfileBackButton/></View>
     <View style={{padding:20,gap:10}}>{profile.loading?<Loading/>:profile.error?<Notice title="Couldn’t load profile" retry={profile.reload}>{profile.error}</Notice>:<><View style={[space.row,{justifyContent:'space-between',marginTop:-42}]}><View style={{padding:4,borderRadius:50,backgroundColor:colors.background}}><Avatar url={p?.avatar} size={72}/></View><View style={{flex:1,minWidth:0,alignItems:'flex-end',paddingTop:30,gap:6}}><ProfileAction fid={fid}/><Text style={{color:colors.muted,fontSize:12}}>FID {fid}</Text></View></View><Text style={[space.title,{color:colors.ink}]}>{p?.name}</Text>{!!p?.username&&<Text style={{color:colors.muted,fontSize:15}}>@{p.username}</Text>}{!!p?.bio&&<ProfileBio text={p.bio}/>}<View style={{flexDirection:'row',alignItems:'center',gap:12,minWidth:0}}>
       {counts.value&&<View style={{flexDirection:'row',alignItems:'center',gap:10,flexShrink:1,minWidth:0}}><Text numberOfLines={1} style={{color:colors.ink,fontSize:13,fontWeight:'600',flexShrink:1}}>{counts.value.followingCount?.toLocaleString()??'—'} <Text style={{color:colors.muted,fontWeight:'400'}}>following</Text></Text><Text numberOfLines={1} style={{color:colors.ink,fontSize:13,fontWeight:'600',flexShrink:1}}>{counts.value.followerCount?.toLocaleString()??'—'} <Text style={{color:colors.muted,fontWeight:'400'}}>followers</Text></Text></View>}
       {p?.website&&safeLink(p.website)&&<Pressable accessibilityRole="link" accessibilityLabel={p.website} onPress={()=>void openLink(p.website)} style={{marginLeft:'auto',flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:4,minHeight:44,minWidth:0,maxWidth:140,flexShrink:1}}><Icon name="link" size={13} color={colors.accent}/><Text numberOfLines={1} ellipsizeMode="tail" style={{color:colors.accent,fontSize:13,flexShrink:1}}>{new URL(p.website).hostname.replace(/^www\./,'')}</Text></Pressable>}
