@@ -10,11 +10,11 @@ import {mobileClaim} from '../../mobile-proof.mjs';
 const origin='https://kite.example',address='0x'+'11'.repeat(20),now=1700000000000;
 const target={hash:'0x'+'22'.repeat(20),signer:'public',data:{fid:37,timestamp:1,castAddBody:{text:'Fixture'}}};
 function harness(){
-  let saved:string|null=null,counter=1,approved=false,failSave=false,failPost=false,pro=false;
+  let saved:string|null=null,counter=1,approved=false,failSave=false,failPost=false;
   let seedCount=0,approvalCalls=0,providerPolls=0;
   const submitted:Uint8Array[]=[],claims:unknown[]=[];
   const storage:AccountStorage={get:async()=>saved,set:async(value)=>{if(failSave)throw Error('Storage unavailable');saved=value;},remove:async()=>{saved=null;}};
-  const api={origin,proStatus:async()=>pro,accountPost:async<T>(purpose:'approval'|'verify'|'feed'|'push',body:unknown):Promise<T>=>{
+  const api={origin,accountPost:async<T>(purpose:'approval'|'verify'|'feed'|'push',body:unknown):Promise<T>=>{
     const claim=body as {key:string;signature:string;issuedAt:number;nonce:string;fid?:number;registration?:{installationId:string;token:string;enabled:boolean}};claims.push(body);
     assert.ok(!('privateKey' in claim));assert.ok(saved,'key must be saved before the approval request');
     assert.ok(ed25519.verify(hexToBytes(claim.signature.slice(2)),purpose==='push'?pushClaim(origin,claim.key,claim.issuedAt,claim.nonce,claim.fid,claim.registration):mobileClaim(origin,purpose==='approval'?'approve':purpose,claim.key,claim.issuedAt,claim.nonce,claim.fid||0),hexToBytes(claim.key.slice(2))));
@@ -25,7 +25,7 @@ function harness(){
   },approvalStatus:async()=>{providerPolls++;return approved?{state:'completed',userFid:545039}:{state:'pending_approval',userFid:undefined};},submit:async(bytes:Uint8Array)=>{if(failPost)throw Error('Node unavailable');submitted.push(bytes);}};
   const random=async(size:number)=>{if(size===32)seedCount++;return new Uint8Array(size).fill(counter++);};
   const create=()=>createAccount(api,storage,random,()=>now);
-  return {create,storage,api,submitted,claims,get saved(){return saved;},get seedCount(){return seedCount;},get approvalCalls(){return approvalCalls;},get providerPolls(){return providerPolls;},approve:()=>{approved=true;},setPro:(value:boolean)=>{pro=value;},failSave:(value:boolean)=>{failSave=value;},failPost:(value:boolean)=>{failPost=value;},tamper:(value:string)=>{saved=value;}};
+  return {create,storage,api,submitted,claims,get saved(){return saved;},get seedCount(){return seedCount;},get approvalCalls(){return approvalCalls;},get providerPolls(){return providerPolls;},approve:()=>{approved=true;},failSave:(value:boolean)=>{failSave=value;},failPost:(value:boolean)=>{failPost=value;},tamper:(value:string)=>{saved=value;}};
 }
 test('mobile approval saves a device key first, coalesces starts and exposes no secret in public state',async()=>{
   const h=harness(),account=h.create();await account.restore();
@@ -64,12 +64,15 @@ test('casting signs mentions, replies and four embeds using the approved device 
   assert.equal(data.fid,545039);assert.deepEqual(data.castAddBody?.mentions,[925685]);assert.deepEqual(data.castAddBody?.mentionsPositions,[6]);assert.equal(data.castAddBody?.embeds.length,4);assert.equal(data.castAddBody?.parentCastId?.fid,37);assert.equal('0x'+bytesToHex(data.castAddBody!.parentCastId!.hash),target.hash);
   assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());assert.equal(cast.hash,'0x'+bytesToHex(message.hash));
 });
-test('long casting checks current Pro, rejects invalid drafts before submission and retains the account on failure',async()=>{
+test('long casts reach submission without a local Pro check and invalid or failed submissions retain the account',async()=>{
   const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
   const input={text:'a'.repeat(1025),mentions:[],mentionsPositions:[],images:[],links:[]};
-  await assert.rejects(account.cast(input),/Pro/);assert.equal(h.submitted.length,0);h.setPro(true);const cast=await account.cast(input);assert.equal(cast.data.castAddBody.text.length,1025);
+  const cast=await account.cast(input);assert.equal(cast.data.castAddBody.text.length,1025);assert.equal(h.submitted.length,1);
+  const {castSdk}=await import('../src/lib/cast-sdk'),sdk=await castSdk();
+  const message=sdk.Message.decode(h.submitted[0]),data=sdk.MessageData.decode(message.dataBytes!);
+  assert.equal(data.castAddBody?.type,sdk.CastType.TEN_K_CAST);assert.ok((await sdk.validations.validateMessage({...message,data})).isOk());
   await assert.rejects(account.cast({...input,text:'a'.repeat(10001)}),/10,000/);assert.equal(h.submitted.length,1);
-  h.failPost(true);await assert.rejects(account.cast({...input,text:'retry this draft'}),/Node unavailable/);assert.equal(account.snapshot().session?.fid,545039);assert.equal(h.submitted.length,1);
+  h.failPost(true);await assert.rejects(account.cast(input),/Node unavailable/);assert.equal(account.snapshot().session?.fid,545039);assert.equal(h.submitted.length,1);
 });
 test('quote-only posts sign a cast embed rather than a reply or URL',async()=>{
   const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
@@ -111,7 +114,9 @@ test('replacement preparation signs without submitting, preserves all embeds and
   const validated=await account.validatePreparedCast(prepared);assert.deepEqual(validated.data.castAddBody.embeds,embeds);assert.equal(validated.data.castAddBody.parentUrl,input.parentUrl);
   await assert.rejects(account.validatePreparedCast({...prepared,bytes:'0x00'}));assert.equal(h.submitted.length,0);
   const receipt=await account.submitPreparedCast(prepared);assert.equal(receipt.hash,prepared.cast.hash);assert.equal(h.submitted.length,1);
-  h.setPro(false);await assert.rejects(account.prepareReplacement(original,{...input,text:'x'.repeat(1025)}),/Pro/);assert.equal(h.submitted.length,1);
+  const long=await account.prepareReplacement(original,{...input,text:'x'.repeat(1025)});
+  assert.equal(long.cast.data.castAddBody.text.length,1025);assert.equal(h.submitted.length,1);
+  assert.equal((await account.validatePreparedCast(long)).data.castAddBody.text.length,1025);
 });
 
 test('notification enrollment signs a dedicated claim for the active account without exposing its key',async()=>{

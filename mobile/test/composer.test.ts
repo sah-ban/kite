@@ -21,14 +21,14 @@ test('images, GIFs and links share the same embed budget and unsafe URLs cannot 
   assert.throws(()=>addImage(emptyDraft(),'https://evil.example/private.png'));
 });
 test('text limits count protocol UTF-8 bytes and replies keep a full parent reference',()=>{
-  assert.equal(usage({...emptyDraft(),text:'🌱'.repeat(256)},1024).error,'');assert.match(usage({...emptyDraft(),text:'🌱'.repeat(257)},1024).error,/1,024/);
+  assert.equal(usage({...emptyDraft(),text:'🌱'.repeat(257)},10000).error,'');assert.equal(usage({...emptyDraft(),text:'🌱'.repeat(2500)},10000).error,'');assert.match(usage({...emptyDraft(),text:'🌱'.repeat(2501)},10000).error,/10,000/);
   const parent={fid:37,hash:'0x'+'22'.repeat(20)};assert.deepEqual(castInput({...emptyDraft(),text:'reply'},parent).parent,parent);assert.throws(()=>castInput(emptyDraft()),/Write some text/);
 });
 test('quotes use cast references, reserve an embed slot and allow quote-only posts',()=>{
   const quote={fid:37,hash:'0x'+'44'.repeat(20)};
   let draft={...emptyDraft(),quote};
   const body=newCastBody(castInput(draft));assert.deepEqual(body.embeds,[{castId:quote}]);assert.equal(body.parentCastId,undefined);
-  assert.equal(usage(draft,1024).error,'');assert.equal(usage(draft,1024).embeds,1);
+  assert.equal(usage(draft,10000).error,'');assert.equal(usage(draft,10000).embeds,1);
   draft=addImage(draft,'https://i.ibb.co/a/image.png') as typeof draft;
   draft={...draft,text:'https://example.com/1 https://example.com/2 https://example.com/3'};
   assert.equal(draftLinks(draft).urls.length,2);assert.equal(draftLinks(draft).overflow,1);assert.equal(newCastBody(castInput(draft)).embeds.length,4);

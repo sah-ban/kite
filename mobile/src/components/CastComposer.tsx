@@ -27,12 +27,9 @@ export function CastComposer({fid,parent,quote,edit,storageKey}:{fid:number;stor
   const [key]=useState(()=>storageKey||draftKey(fid,api.origin,parent,quote)+(edit?`:edit:${edit.cast.hash}`:`:draft:${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`));
   const saved=useSavedDraft(key,edit?.initial||{...emptyDraft(),...(quote?{quote}:{})},!!edit?.attempt);
   const [error,setError]=useState(''),[uploading,setUploading]=useState(false),[gifOpen,setGifOpen]=useState(false),[linkOpen,setLinkOpen]=useState(false),[link,setLink]=useState('');
-  const [clock,setClock]=useState(Date.now);
   const upload=useRef<AbortController|null>(null),sending=useRef(false),closing=useRef(false);
-  const pro=useQuery(signal=>api.proExpiry(fid,signal),[api,fid]);
   const reference=useQuery(signal=>parent?api.resolveCast(String(parent.fid),parent.hash,signal):Promise.resolve(undefined),[api,parent?.fid,parent?.hash]);
-  const expiry=pro.value||0,maxBytes=expiry>clock/1000?10000:1024;
-  const state=usage(saved.draft,maxBytes);
+  const maxBytes=10000,state=usage(saved.draft,maxBytes);
   const [frozen,setFrozen]=useState(!!edit?.attempt),[progress,setProgress]=useState('');
   const originalDeleted=!!edit&&(!!edit.attempt?.deleted||deletedCasts.has(castKey(edit.cast)));
   const [allowLeave,setAllowLeave]=useState(false),[closeRequest,setCloseRequest]=useState<(()=>void)|null>(null),[closeBusy,setCloseBusy]=useState(false),[closeError,setCloseError]=useState('');
@@ -48,18 +45,12 @@ export function CastComposer({fid,parent,quote,edit,storageKey}:{fid:number;stor
   }
   const disabled=publishing||uploading||accountBusy||!saved.ready||!!closeRequest,locked=disabled||frozen;
   const publishDisabled=locked||!!state.error,attachmentsDisabled=locked||state.embeds>=4;
-  const usageColor=state.bytes>maxBytes?colors.danger:state.bytes>=maxBytes*.9?colors.accent:colors.muted;
   useEffect(()=>()=>upload.current?.abort(),[]);
   useEffect(()=>{
     const show=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillShow':'keyboardDidShow',()=>setKeyboardVisible(true));
     const hide=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillHide':'keyboardDidHide',()=>setKeyboardVisible(false));
     return()=>{show.remove();hide.remove();};
   },[]);
-  useEffect(()=>{
-    if(!expiry||expiry*1000<=clock)return;
-    const timer=setTimeout(()=>setClock(Date.now()),Math.max(1,Math.min(expiry*1000-Date.now()+1,2147483647)));
-    return()=>clearTimeout(timer);
-  },[expiry,clock]);
   async function send(){
     if(disabled||!frozen&&state.error||sending.current)return;sending.current=true;setError('');Keyboard.dismiss();
     try{const input=castInput(saved.draft,parent);const cast=edit?await replaceCast(edit.cast,input,setProgress,()=>setFrozen(true)):await publish(input);await saved.clear().catch(()=>{});setAllowLeave(true);disableClosePrevention();if(edit)router.replace(castRoute(cast));else if(router.canGoBack())router.back();else router.replace('/');}
@@ -102,11 +93,10 @@ export function CastComposer({fid,parent,quote,edit,storageKey}:{fid:number;stor
         <ComposerTool label="Choose a GIF" disabled={attachmentsDisabled} onPress={()=>{Keyboard.dismiss();setGifOpen(true);}}/>
         <ComposerTool label="Attach link" icon="link" selected={linkOpen} disabled={attachmentsDisabled} onPress={()=>setLinkOpen(value=>!value)}/>
         <View style={{flex:1,alignItems:'flex-end',gap:5}}>
-          <Text accessibilityLabel={`${state.bytes} of ${maxBytes} text bytes`} style={{fontSize:12,fontVariant:['tabular-nums'],color:usageColor}}>{state.bytes.toLocaleString()} / {maxBytes.toLocaleString()} bytes</Text>
-          <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-            <Text accessibilityLabel={`${state.embeds} of 4 embeds used`} style={{fontSize:11,color:state.embeds>=4?colors.accent:colors.muted}}>{state.embeds}/4 embeds</Text>
-            <View style={{width:40,height:3,borderRadius:2,backgroundColor:colors.line,overflow:'hidden'}}><View style={{width:`${Math.min(100,state.bytes/maxBytes*100)}%`,height:3,borderRadius:2,backgroundColor:usageColor}}/></View>
+          <View accessible accessibilityRole="progressbar" accessibilityLabel="Cast text limit" accessibilityValue={{min:0,max:maxBytes,now:Math.min(state.bytes,maxBytes),text:`${state.bytes.toLocaleString()} of ${maxBytes.toLocaleString()} text bytes`}} style={{width:96,height:4,borderRadius:2,backgroundColor:colors.line,overflow:'hidden'}}>
+            <View style={{width:`${Math.min(100,state.bytes/maxBytes*100)}%`,height:4,borderRadius:2,backgroundColor:state.bytes>=maxBytes*.9?colors.danger:colors.accent}}/>
           </View>
+          <Text accessibilityLabel={`${state.embeds} of 4 embeds used`} style={{fontSize:11,color:state.embeds>=4?colors.accent:colors.muted}}>{state.embeds}/4 embeds</Text>
         </View>
       </View>
     </View>

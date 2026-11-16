@@ -9,7 +9,7 @@ const session={fid:source.data.fid,key:source.signer,address:'0x'+'55'.repeat(20
 test('edit drafts round-trip mentions, every embed and channel context without duplicating body links',()=>{
   const draft=restoreEditDraft(source,{37:'alice'}),input=castInput(draft),body=castBody(input);
   assert.equal(draft.text,'Hi @alice 🌱');assert.deepEqual(body.embeds,source.data.castAddBody.embeds);assert.equal(body.text,source.data.castAddBody.text);assert.deepEqual(body.mentions,[37]);assert.deepEqual(body.mentionsPositions,[3]);assert.equal(body.parentUrl,source.data.castAddBody.parentUrl);
-  assert.equal(usage(draft,1024).embeds,4);assert.throws(()=>addImage(draft,'https://i.ibb.co/x/image.png'),/Remove an embed/);
+  assert.equal(usage(draft,10000).embeds,4);assert.throws(()=>addImage(draft,'https://i.ibb.co/x/image.png'),/Remove an embed/);
   assert.deepEqual(restoreDraft(JSON.stringify(draft)),draft);
   const linked={...draft,text:draft.text+' https://example.com/article'};assert.deepEqual(draftLinks(linked).urls,[]);
   const reply={...source,data:{...source.data,castAddBody:{...source.data.castAddBody,parentUrl:undefined,parentCastId:{fid:37,hash:source.hash}}}};

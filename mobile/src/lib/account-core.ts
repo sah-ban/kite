@@ -21,7 +21,7 @@ function validApprovalLink(value:unknown):value is string{
   if(typeof value!=='string')return false;
   try{const url=new URL(value);return !url.username&&!url.password&&(['farcaster:','warpcast:'].includes(url.protocol)||url.protocol==='https:'&&['farcaster.xyz','www.farcaster.xyz','warpcast.com','www.warpcast.com'].includes(url.hostname));}catch{return false;}
 }
-export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatus'|'submit'|'proStatus'>,storage:AccountStorage,random:(size:number)=>Promise<Uint8Array>,now=Date.now){
+export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatus'|'submit'>,storage:AccountStorage,random:(size:number)=>Promise<Uint8Array>,now=Date.now){
   let saved:Stored|null=null,restored=false,tail:Promise<unknown>=Promise.resolve();
   function exclusive<T>(run:()=>Promise<T>):Promise<T>{const value=tail.then(run);tail=value.catch(()=>{});return value;}
   function snapshot():AccountSnapshot{return {session:saved?.phase==='active'?{fid:saved.fid!,key:saved.key,address:saved.address!}:null,pending:saved?.phase==='pending'?{deepLinkUrl:saved.deepLinkUrl!,appFid:saved.appFid!,expiresAt:saved.expiresAt!}:null,hasSavedKey:!!saved||!restored,...(saved?.push?{pushEnabled:!!saved.push.enabled&&!!saved.pushConfirmed}:{})};}
@@ -43,7 +43,6 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
   async function prepareCast(input:CastInput,minimumTimestamp?:number):Promise<PreparedCast>{
       if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
       const record=saved,body=castBody(input);
-      if(body.type===2&&!await api.proStatus(record.fid!))throw new Error('Active Farcaster Pro is required for text over 1,024 bytes.');
       const sdk=await castSdk(),secret=hexToBytes(record.privateKey.slice(2));
       const now=sdk.getFarcasterTime()._unsafeUnwrap();
       if(minimumTimestamp!==undefined&&(!Number.isSafeInteger(minimumTimestamp)||minimumTimestamp<1||minimumTimestamp>now+301)){secret.fill(0);throw new Error('Invalid original cast timestamp.');}

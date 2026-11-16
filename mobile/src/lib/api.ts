@@ -1,7 +1,6 @@
 import {type Cast, type Profile, type Page, isCast, isFid, isHash, mergeCasts} from './model';
 import {MAX_IMAGE_BYTES,imageMime} from './composer';
 import {imageEmbeds} from '../../../cast.mjs';
-import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 import {createAttribution} from './attribution';
 import {xHandle} from '../../../src/lib/x-handle';
 import {articleChain,assembleArticle} from './articles';
@@ -141,8 +140,6 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     },
     origin:server,request,profile,resolveProfile,resolveCast,reactions,activity,accountPost,signerRequester,
     rememberCast:(cast:Cast)=>{if(!isCast(cast))throw new Error('Invalid published cast.');published.set(`${cast.data.fid}:${cast.hash.toLowerCase()}`,{cast,expires:Date.now()+120000});if(published.size>100)published.delete(published.keys().next().value!);},
-    proExpiry:async(fid:number,signal?:AbortSignal)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid},signal)),
-    proStatus:async(fid:number)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid}))>Date.now()/1000,
     uploadImage:async(bytes:Uint8Array,signal?:AbortSignal)=>{
       if(!bytes.length||bytes.length>MAX_IMAGE_BYTES)throw new Error('Images must be 10 MB or smaller.');
       const type=imageMime(bytes);
