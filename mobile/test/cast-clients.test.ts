@@ -15,7 +15,7 @@ function harness(clientFid:number,authorFid=37){
   });return {api,calls};
 }
 test('known clients use saved identities without fetching their profiles',async()=>{
-  for(const [fid,username,logo] of [[9152,'warpcast','warpcast'],[16823,'fireflyapp','firefly'],[925685,'kiteapp','kite']] as const){
+  for(const [fid,username,logo] of [[6131,'neynar','neynar'],[9152,'warpcast','warpcast'],[16823,'fireflyapp','firefly'],[925685,'kiteapp','kite']] as const){
     const h=harness(fid),client=await resolveCastClient(h.api,37,key);
     assert.equal(client?.fid,fid);assert.equal(client?.username,username);assert.equal(client?.logo,logo);
     assert.equal(h.calls.filter(url=>url.pathname.endsWith('userDataByFid')).length,0);

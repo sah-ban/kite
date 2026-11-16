@@ -1,8 +1,9 @@
 import type {Api} from './api';
 
-export type ClientLogo='warpcast'|'firefly'|'kite';
+export type ClientLogo='warpcast'|'firefly'|'kite'|'neynar';
 export type CastClient={fid:number;name?:string;username?:string;avatar?:string;logo?:ClientLogo};
 const knownClients:Readonly<Record<number,CastClient>>={
+  6131:{fid:6131,name:'Neynar',username:'neynar',logo:'neynar'},
   9152:{fid:9152,name:'Warpcast',username:'warpcast',logo:'warpcast'},
   16823:{fid:16823,name:'Firefly App',username:'fireflyapp',logo:'firefly'},
   925685:{fid:925685,name:'Kite',username:'kiteapp',logo:'kite'},
