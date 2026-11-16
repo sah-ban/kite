@@ -7,11 +7,16 @@
 !/cast-body.mjs
 !/link-embeds.mjs
 !/pro-subscription.mjs
+!/x-post-url.mjs
 !/src
 /src/*
 !/src/lib
 /src/lib/*
 !/src/lib/mentions.ts
+!/src/lib/x-handle.ts
+!/src/lib/twitter.ts
+!/src/lib/embeds.ts
+!/src/lib/hub.ts
 mobile/node_modules/
 mobile/.expo/
 mobile/dist/
