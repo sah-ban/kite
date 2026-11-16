@@ -64,3 +64,17 @@ Opening `kite://cast/FID/FULL_HASH` and `kite://profile/FID` uses Expo Router. H
 ## Release status
 
 This is an Android test build, not a Play Store release. Before submission, complete device testing, remaining account actions, accessibility checks, the privacy policy, Play Data Safety disclosures and applicable user-generated-content requirements. Push notification delivery requires its own backend integration; it is separate from the existing indexed notification history.
+
+## Push notifications
+
+In an installed Android build, sign in and open **Settings → Push notifications → Enable notifications**. Kite requests Android permission, registers this installation using a claim signed by the account key, and sends mentions, replies, likes, recasts and follows through Expo Push Service. Tapping an alert opens its cast or profile. The browser preview and Expo Go do not offer remote push. Disable alerts in Kite Settings or Android settings; the app reconciles permission and token changes whenever it returns to the foreground. Sign-out first unregisters this phone and requires a network connection while alerts are enabled. Lock-screen text describes the activity without including cast contents.
+
+Android build setup:
+
+1. In Firebase, register the Android packages you build: `dev.sahban.kite` and, for the development variant, `dev.sahban.kite.dev`. Download the matching Firebase client configuration. Supply it as `mobile/google-services.json`, or set the `GOOGLE_SERVICES_JSON` EAS file environment variable. The config uses that variable when present; do not commit service-account private keys.
+2. Upload the Firebase **FCM V1 service account key** to the linked Expo project's Android push credentials with `npx eas-cli@latest credentials --platform android`. Use credentials from the same Firebase project as the client configuration. [Expo FCM setup](https://docs.expo.dev/push-notifications/fcm-credentials/).
+3. Rebuild using `npx eas-cli@latest build --platform android --profile development` (or `preview` / `production`). Adding `expo-notifications` requires a native rebuild; restarting Metro or publishing an OTA update cannot add this module to an existing build.
+4. Deploy the API and `feed/worker.mjs` together. The worker migrates the push device and durable queue tables at startup. `DATABASE_URL` is required. When enhanced push security is enabled in Expo, set `EXPO_ACCESS_TOKEN` on the worker only.
+5. On a device or Google Play Android emulator, enable alerts, background the app, and create activity from a different Farcaster account. Test a tap from both a backgrounded and fully closed app, denied permission, token renewal, disabled alerts, and sign-out. [Expo push testing](https://docs.expo.dev/push-notifications/push-notifications-setup/).
+
+The worker queues only new activity for registered devices, retries transient send failures with bounded backoff, checks Expo delivery receipts, and disables unregistered tokens. Push delivery is at least once: a crash or ambiguous network failure after provider acceptance can produce a duplicate alert. Provider acceptance does not guarantee delivery to a phone. No historical activity is pushed when a phone first enables notifications. An alert already handed to FCM before disabling/sign-out can still arrive; notification taps are validated against the currently signed-in recipient.

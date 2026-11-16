@@ -4,6 +4,7 @@ import {ed25519} from '@noble/curves/ed25519';
 import {bytesToHex,hexToBytes} from '@noble/hashes/utils';
 import {Message,validations} from '@farcaster/core';
 import {createAccount,type AccountStorage} from '../src/lib/account-core';
+import {pushClaim} from '../../push-proof.mjs';
 import {mobileClaim} from '../../mobile-proof.mjs';
 
 const origin='https://kite.example',address='0x'+'11'.repeat(20),now=1700000000000;
@@ -13,11 +14,13 @@ function harness(){
   let seedCount=0,approvalCalls=0,providerPolls=0;
   const submitted:Uint8Array[]=[],claims:unknown[]=[];
   const storage:AccountStorage={get:async()=>saved,set:async(value)=>{if(failSave)throw Error('Storage unavailable');saved=value;},remove:async()=>{saved=null;}};
-  const api={origin,proStatus:async()=>pro,accountPost:async<T>(purpose:'approval'|'verify',body:unknown):Promise<T>=>{
-    const claim=body as {key:string;signature:string;issuedAt:number;nonce:string;fid?:number};claims.push(body);
+  const api={origin,proStatus:async()=>pro,accountPost:async<T>(purpose:'approval'|'verify'|'feed'|'push',body:unknown):Promise<T>=>{
+    const claim=body as {key:string;signature:string;issuedAt:number;nonce:string;fid?:number;registration?:{installationId:string;token:string;enabled:boolean}};claims.push(body);
     assert.ok(!('privateKey' in claim));assert.ok(saved,'key must be saved before the approval request');
-    assert.ok(ed25519.verify(hexToBytes(claim.signature.slice(2)),mobileClaim(origin,purpose==='approval'?'approve':'verify',claim.key,claim.issuedAt,claim.nonce,claim.fid||0),hexToBytes(claim.key.slice(2))));
+    assert.ok(ed25519.verify(hexToBytes(claim.signature.slice(2)),purpose==='push'?pushClaim(origin,claim.key,claim.issuedAt,claim.nonce,claim.fid,claim.registration):mobileClaim(origin,purpose==='approval'?'approve':purpose,claim.key,claim.issuedAt,claim.nonce,claim.fid||0),hexToBytes(claim.key.slice(2))));
     if(purpose==='approval'){approvalCalls++;return {key:claim.key,token:'fixture-token',deepLinkUrl:'farcaster://signed-key-request?token=fixture-token',appFid:925685,expiresAt:now+900000} as T;}
+    if(purpose==='push'){if(failPost)throw Error('Push gateway unavailable');return {registered:claim.registration!.enabled,fid:claim.fid} as T;}
+    if(purpose==='feed')return {enrolled:true,fid:claim.fid} as T;
     return {state:'active',key:claim.key,fid:545039,address} as T;
   },approvalStatus:async()=>{providerPolls++;return approved?{state:'completed',userFid:545039}:{state:'pending_approval',userFid:undefined};},submit:async(bytes:Uint8Array)=>{if(failPost)throw Error('Node unavailable');submitted.push(bytes);}};
   const random=async(size:number)=>{if(size===32)seedCount++;return new Uint8Array(size).fill(counter++);};
@@ -109,4 +112,27 @@ test('replacement preparation signs without submitting, preserves all embeds and
   await assert.rejects(account.validatePreparedCast({...prepared,bytes:'0x00'}));assert.equal(h.submitted.length,0);
   const receipt=await account.submitPreparedCast(prepared);assert.equal(receipt.hash,prepared.cast.hash);assert.equal(h.submitted.length,1);
   h.setPro(false);await assert.rejects(account.prepareReplacement(original,{...input,text:'x'.repeat(1025)}),/Pro/);assert.equal(h.submitted.length,1);
+});
+
+test('notification enrollment signs a dedicated claim for the active account without exposing its key',async()=>{
+  const h=harness(),account=h.create();await account.restore();await assert.rejects(account.enrollNotifications(),/Sign in/);
+  await account.begin();h.approve();await account.check();const before=h.providerPolls;await account.enrollNotifications();
+  assert.equal(h.providerPolls,before);assert.equal((h.claims.at(-1) as {fid:number}).fid,545039);
+});
+
+test('push registration binds the token, installation and enabled state to the device key, survives restore and unregisters before sign-out',async()=>{
+  const h=harness(),account=h.create();await account.restore();await assert.rejects(account.setPush({installationId:'a'.repeat(32),token:'ExpoPushToken[fixture_token_123]',enabled:true}),/Sign in/);
+  await account.begin();h.approve();await account.check();
+  const registration={installationId:'a'.repeat(32),token:'ExpoPushToken[fixture_token_123]',enabled:true};
+  await account.setPush(registration);assert.equal(account.snapshot().pushEnabled,true);
+  const restarted=h.create();assert.equal((await restarted.restore()).pushEnabled,true);assert.deepEqual(await restarted.getPush(),registration);
+  await restarted.signOut();assert.equal(h.saved,null);
+  assert.equal((h.claims.at(-1) as {registration:{enabled:boolean}}).registration.enabled,false);
+});
+test('failed push enable retains a registration that can be revoked and offline sign-out keeps the key for retry',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();h.failPost(true);
+  await assert.rejects(account.setPush({installationId:'a'.repeat(32),token:'ExpoPushToken[fixture_token_123]',enabled:true}),/Push gateway/);
+  assert.equal(account.snapshot().pushEnabled,false);
+  await assert.rejects(account.signOut(),/Push gateway/);assert.ok(h.saved);assert.ok(account.snapshot().session);
+  h.failPost(false);await account.signOut();assert.equal(h.saved,null);
 });

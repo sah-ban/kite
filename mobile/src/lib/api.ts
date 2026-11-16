@@ -118,7 +118,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     activityCache.set(key,entry);if(activityCache.size>200)activityCache.delete(activityCache.keys().next().value!);
     return entry.value;
   }
-  async function accountPost<T>(path:'approval'|'verify',body:unknown):Promise<T>{
+  async function accountPost<T>(path:'approval'|'verify'|'feed'|'push',body:unknown):Promise<T>{
     const response=await fetcher(`${server}/api/mobile/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
     const value=await response.json().catch(()=>null);
     if(!response.ok)throw new ApiError(response.status,typeof value?.error==='string'?value.error:'Could not connect your account. Please try again.');

@@ -322,3 +322,9 @@ Eligible author jobs rotate by their last attempt time. Healthy refreshes cannot
 During a rolling deployment, a replacement worker waits up to about one minute for the previous worker to release its database lock. It does not process feeds or notifications while waiting. A separately running worker that never releases the lock still prevents startup, preserving the one-worker-per-database rule.
 
 Run the regular suite with `npm test`. Set `KITE_TEST_DATABASE_URL` to run PostgreSQL integration tests as well; they create and remove an isolated temporary schema rather than modifying feed tables.
+
+### Mobile push delivery
+
+The feed worker also delivers mobile push notifications using Expo Push Service. Mobile registrations require a dedicated signed device claim at `POST /api/mobile/push`; tokens are never accepted through the public read APIs. Registration enrolls the account for live activity. Device registration, token rotation, opt-out, and account switching invalidate pending jobs from an older device generation. The notification stream writes push jobs in the same transaction as its checkpoint; sending and receipt polling run separately. Removals suppress unsent alerts, old activity is not imported into the push queue, and undeliverable device tokens are disabled.
+
+Deploy the web API and worker together and restart the worker to run migrations. Optionally supply `EXPO_ACCESS_TOKEN` to the worker when Expo enhanced push security is enabled. The provided deployment Compose file passes this variable to the worker. Keep it server-side. Android Firebase credentials and a new native build are also required; see [mobile push setup](mobile/README.md#push-notifications).

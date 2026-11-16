@@ -78,11 +78,13 @@ function QuoteThumbnail({embed}:{embed:QuoteEmbed}){
     {kind==='link'&&image&&failed!==image&&<View pointerEvents="none" style={{position:'absolute',right:4,bottom:4,width:22,height:22,borderRadius:11,backgroundColor:'#000000aa',alignItems:'center',justifyContent:'center'}}><Icon name="globe" size={13} color="#fff"/></View>}
   </View>;
 }
-export function Quote({fid,hash}:{fid:number;hash:string}){
-  const {api,colors}=useApp(),{value,error}=useQuery(async signal=>{
-    const cast=await api.resolveCast(String(fid),hash,signal),root=isArticle(cast)?articleChain(cast)?.root:undefined;
+export function Quote({fid,hash,initialCast}:{fid:number;hash:string;initialCast?:Cast}){
+  const {api,colors}=useApp(),{value:loaded,error}=useQuery(async signal=>{
+    const cast=initialCast||await api.resolveCast(String(fid),hash,signal),root=isArticle(cast)?articleChain(cast)?.root:undefined;
     return root?api.resolveCast(String(root.fid),root.hash,signal):cast;
-  },[api,fid,hash]);
+  },[api,fid,hash,initialCast]);
+  // Notification payloads already include the cast; render them without a loading-height flash.
+  const value=loaded||initialCast;
   const article=value&&isArticle(value);
   const body=value?.data.castAddBody;
   const attachments:QuoteEmbed[]=body?.embeds?.length?body.embeds:(body?.embedsDeprecated||[]).map(url=>({url}));

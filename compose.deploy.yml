@@ -45,6 +45,7 @@ services:
     command: ['node', 'feed/worker.mjs']
     environment:
       <<: *feed-environment
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
       KITE_FEED_GRPC_URL: ${KITE_FEED_GRPC_URL:?Set KITE_FEED_GRPC_URL to your node gRPC API}
     stop_grace_period: 45s
 

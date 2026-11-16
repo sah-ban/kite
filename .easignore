@@ -2,6 +2,7 @@
 /*
 !/mobile
 !/mobile-proof.mjs
+!/push-proof.mjs
 !/cast.mjs
 !/cast-body.mjs
 !/link-embeds.mjs

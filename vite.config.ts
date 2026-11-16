@@ -33,7 +33,7 @@ export default defineConfig(({mode})=>{
       server.middlewares.use(gifSearch());
       server.middlewares.use(imageUploads(config));
       server.middlewares.use(approval(config,{enrollFeed:feedMiddleware.enroll}));
-      server.middlewares.use(mobileApproval(config));
+      server.middlewares.use(mobileApproval(config,{enrollFeed:feedMiddleware.enroll,registerPush:feedMiddleware.registerPush}));
       server.middlewares.use(embedPreviews());
       server.middlewares.use(gateway(config));
     }}],

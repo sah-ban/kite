@@ -22,10 +22,14 @@ export async function indexNotification(db,message,viewers,removed=false){
     if(target&&(!validFid(target.fid)||!hash(targetHash)))return;
     // Serialize cross-shard target removals with reactions arriving at the same time.
     if(target)await db.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))',[String(target.fid),targetHash]);
-    await db.query(`INSERT INTO kite_notifications(viewer_fid,identity,source_hash,actor_fid,kind,timestamp,target_fid,target_hash,payload)
+    await db.query(`WITH inserted AS (INSERT INTO kite_notifications(viewer_fid,identity,source_hash,actor_fid,kind,timestamp,target_fid,target_hash,payload)
       SELECT $1,$2,$3,$4,$5,$6::bigint,$7,$8,$9 WHERE EXISTS(SELECT 1 FROM kite_feed_users WHERE fid=$1 AND $6::bigint>=ceil(extract(epoch FROM notifications_started_at))-1609459200) AND NOT EXISTS(SELECT 1 FROM kite_notification_deleted_casts WHERE fid=$7 AND hash=$8)
       ON CONFLICT(viewer_fid,identity) DO UPDATE SET source_hash=EXCLUDED.source_hash,kind=EXCLUDED.kind,timestamp=EXCLUDED.timestamp,payload=EXCLUDED.payload,received_at=clock_timestamp(),id=EXCLUDED.id
-      WHERE kite_notifications.timestamp<EXCLUDED.timestamp`,[viewer,identity,source,actor,kind,time,target?.fid||null,targetHash,payload?JSON.stringify(payload):null]);
+      WHERE kite_notifications.timestamp<EXCLUDED.timestamp RETURNING id,viewer_fid,timestamp)
+      INSERT INTO kite_push_jobs(notification_id,installation_id,generation)
+      SELECT n.id,d.installation_id,d.generation FROM inserted n JOIN kite_push_devices d ON d.viewer_fid=n.viewer_fid AND d.enabled
+      WHERE n.timestamp+1609459200>=floor(extract(epoch FROM d.enabled_at)) AND n.timestamp+1609459200>=extract(epoch FROM now()-interval '1 hour')
+      ON CONFLICT(notification_id,installation_id) DO NOTHING`,[viewer,identity,source,actor,kind,time,target?.fid||null,targetHash,payload?JSON.stringify(payload):null]);
   };
   if(cast){
     const parent=Number(cast.parentCastId?.fid),targets=new Set((cast.mentions||[]).map(Number));

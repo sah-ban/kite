@@ -1,3 +1,4 @@
+import {NotificationProvider,useNotifications} from '../../lib/notification-state';
 import {Tabs} from 'expo-router';
 import {Image} from 'expo-image';
 import {Text,View} from 'react-native';
@@ -6,10 +7,15 @@ import {Icon} from '../../components/ui';
 import {AccountButton} from '../../components/AccountButton';
 
 export default function TabLayout(){
-  const {colors}=useApp();
+  const {account,api}=useApp();
+  return <NotificationProvider key={`${api.origin}:${account.session?.fid||0}`}><TabNavigator/></NotificationProvider>;
+}
+function TabNavigator(){
+  const {colors}=useApp(),{unread}=useNotifications();
   return <Tabs screenOptions={{headerStyle:{backgroundColor:colors.surface},headerShadowVisible:false,headerTintColor:colors.ink,headerRight:()=> <AccountButton/>,tabBarActiveTintColor:colors.accent,tabBarInactiveTintColor:colors.muted,tabBarStyle:{backgroundColor:colors.surface,borderTopColor:colors.line},tabBarLabelStyle:{fontSize:11,fontWeight:'500'},sceneStyle:{backgroundColor:colors.background},headerTitle:()=> <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Image source={require('../../../assets/kite-mark.png')} style={{width:25,height:25}} contentFit="contain"/><Text style={{color:colors.ink,fontSize:22,fontWeight:'700',letterSpacing:-.6}}>Kite</Text></View>}}>
     <Tabs.Screen name="index" options={{title:'Home',tabBarIcon:({focused})=><Icon name="home" color={focused?colors.accent:colors.muted}/>}}/>
     <Tabs.Screen name="search" options={{title:'Search',tabBarIcon:({focused})=><Icon name="search" color={focused?colors.accent:colors.muted}/>}}/>
+    <Tabs.Screen name="notifications" options={{title:'Notifications',tabBarBadge:unread?unread>99?'99+':unread:undefined,tabBarBadgeStyle:{backgroundColor:colors.accent,color:colors.background},tabBarIcon:({focused})=><Icon name="bell" color={focused?colors.accent:colors.muted}/>}}/>
     <Tabs.Screen name="settings" options={{title:'Settings',tabBarIcon:({focused})=><Icon name="sliders" color={focused?colors.accent:colors.muted}/>}}/>
   </Tabs>;
 }

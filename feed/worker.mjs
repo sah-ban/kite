@@ -3,6 +3,7 @@ import {Client,credentials} from '@grpc/grpc-js';
 import {createPool,migrate,replaceFollows,enrollViewer,saveCast,deleteCast,validFid,pendingAuthors} from './store.mjs';
 import {castOf,dataOf,hex,requesterOf,subscriptionRequest,decodeEvent} from './protocol.mjs';
 import {feedFids} from './api.mjs';
+import {createPushDelivery} from './push.mjs';
 import {indexNotification} from './notifications.mjs';
 import {pathToFileURL} from 'node:url';
 import {NodeReadError,workerError,workerDiagnostics} from './diagnostics.mjs';
@@ -191,6 +192,12 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
   // Subscribe first, then historical import. Unknown authors added by the graph sync are backfilled.
   const subscriptions=shards.map(subscribe);
   const heartbeat=setInterval(()=>{void pool.query('INSERT INTO kite_feed_health(id,heartbeat,connected_shards) VALUES(1,now(),$1) ON CONFLICT(id) DO UPDATE SET heartbeat=now(),connected_shards=EXCLUDED.connected_shards',[[...connected]]).then(()=>diagnostics.recovered('heartbeat','Feed heartbeat recovered')).catch(error=>{if(!stopped)diagnostics.failure('heartbeat','Feed heartbeat failed',error);});},10000);
+  const deliverPush=createPushDelivery(pool,{fetcher,accessToken:config.EXPO_ACCESS_TOKEN||'',signal:stopController.signal,log});
+  const pushJobs=(async()=>{while(!stopped){
+    try{await deliverPush();diagnostics.recovered('push','Push delivery recovered');}
+    catch(error){if(!stopped)diagnostics.failure('push','Push delivery retrying',error);}
+    await pause(2000);
+  }})();
   const jobs=(async()=>{while(!stopped){
     try{
       if(Date.now()-lastGraph>2000)await syncGraph();
@@ -202,7 +209,7 @@ export async function startWorker(config,{pool=createPool(config.DATABASE_URL),f
     }catch(error){if(!stopped)diagnostics.failure('jobs','Feed sync retrying',error);await pause(5000);}
   }})();
   log(`Feed worker started for ${viewers.size} viewer(s), ${shards.length} shards`);
-  return async()=>{stopped=true;stopController.abort();clearInterval(heartbeat);for(const stream of streams)stream.cancel();for(const client of clients)client.close();await Promise.allSettled([jobs,...subscriptions]);await lock.query('SELECT pg_advisory_unlock(hashtext(current_schema()),268438)');lock.release();await pool.end();};
+  return async()=>{stopped=true;stopController.abort();clearInterval(heartbeat);for(const stream of streams)stream.cancel();for(const client of clients)client.close();await Promise.allSettled([jobs,pushJobs,...subscriptions]);await lock.query('SELECT pg_advisory_unlock(hashtext(current_schema()),268438)');lock.release();await pool.end();};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   try{process.loadEnvFile('.env');}catch(error){if(error.code!=='ENOENT')throw error;}

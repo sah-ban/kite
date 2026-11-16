@@ -6,7 +6,7 @@ import {createApi, type Api} from './api';
 import {castKey,normalizeServer} from './model';
 import type {Cast} from './model';
 import {deviceAccount} from './account';
-import type {AccountSnapshot} from './account-core';
+import type {AccountSnapshot,PushRegistration} from './account-core';
 import type {CastInput} from './composer';
 import {runCastEdit} from './cast-edit';
 
@@ -18,7 +18,7 @@ const palettes = {
 export type Colors = typeof palettes.light;
 type ReactionOverride={active:boolean;count:number|null;more:boolean};
 type State = {api:Api;theme:ThemeMode;dark:boolean;colors:Colors;ready:boolean;setTheme:(value:ThemeMode)=>Promise<void>;
-  account:AccountSnapshot;accountBusy:boolean;accountError:string;beginSignIn:()=>Promise<AccountSnapshot>;checkSignIn:()=>Promise<AccountSnapshot>;signOut:()=>Promise<AccountSnapshot>;
+  setPush:(registration:PushRegistration)=>Promise<void>;getPush:()=>Promise<PushRegistration|undefined>;enrollNotifications:()=>Promise<void>;account:AccountSnapshot;accountBusy:boolean;accountError:string;beginSignIn:()=>Promise<AccountSnapshot>;checkSignIn:()=>Promise<AccountSnapshot>;signOut:()=>Promise<AccountSnapshot>;
   reactions:Map<string,ReactionOverride>;react:(cast:Cast,kind:'likes'|'recasts',active:boolean,count:number|null,more:boolean)=>Promise<void>;
   publish:(input:CastInput)=>Promise<Cast>;publishing:boolean;published:Cast[];publishNotice:Cast|null;dismissPublishNotice:()=>void;
   deletedCasts:Set<string>;deleteCast:(cast:Cast)=>Promise<void>;
@@ -54,6 +54,7 @@ export function AppProvider({children}:{children:ReactNode}) {
     catch(error){setAccountError(error instanceof Error?error.message:'Could not connect your account. Please try again.');throw error;}
     finally{setAccountBusy(false);}
   },[device]);
+  const setPush=useCallback(async(registration:PushRegistration)=>{setAccount(await device.setPush(registration));},[device]);
   const beginSignIn=useCallback(()=>runAccount('begin'),[runAccount]);
   const checkSignIn=useCallback(()=>runAccount('check'),[runAccount]);
   const signOut=useCallback(()=>runAccount('signOut'),[runAccount]);
@@ -89,6 +90,6 @@ export function AppProvider({children}:{children:ReactNode}) {
   }
   const dark=theme==='dark'||(theme==='system'&&system==='dark');
   async function setTheme(value:ThemeMode){await AsyncStorage.setItem(SETTINGS,JSON.stringify({theme:value}));changeTheme(value);}
-  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast,replaceCast}}>{children}</Context.Provider>;
+  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,setPush,getPush:device.getPush,enrollNotifications:device.enrollNotifications,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast,replaceCast}}>{children}</Context.Provider>;
 }
 export function useApp(){const state=useContext(Context);if(!state)throw new Error('AppProvider is missing.');return state;}

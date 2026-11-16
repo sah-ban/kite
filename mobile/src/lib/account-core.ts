@@ -2,6 +2,7 @@ import {ed25519} from '@noble/curves/ed25519';
 import {bytesToHex,hexToBytes} from '@noble/hashes/utils';
 import {FarcasterNetwork,Message,NobleEd25519Signer,ReactionType,makeCastRemove,makeReactionAdd,makeReactionRemove} from '@farcaster/core';
 // Public ownership claim shared with the Node gateway.
+import {pushClaim,validPushRegistration} from '../../../push-proof.mjs';
 import {mobileClaim} from '../../../mobile-proof.mjs';
 import type {Api} from './api';
 import {type Cast,isFid,isHash} from './model';
@@ -11,9 +12,10 @@ import {type CastInput,castBody,publishedCast} from './composer';
 export type PreparedCast={bytes:string;cast:Cast};
 export type AccountSession={fid:number;key:string;address:string};
 export type PendingAccount={deepLinkUrl:string;appFid:number;expiresAt:number};
-export type AccountSnapshot={session:AccountSession|null;pending:PendingAccount|null;hasSavedKey:boolean};
+export type PushRegistration={installationId:string;token:string;enabled:boolean};
+export type AccountSnapshot={session:AccountSession|null;pending:PendingAccount|null;hasSavedKey:boolean;pushEnabled?:boolean};
 export type AccountStorage={get:()=>Promise<string|null>;set:(value:string)=>Promise<void>;remove:()=>Promise<void>};
-type Stored={version:1;server:string;privateKey:string;key:string;phase:'preparing'|'pending'|'active';fid?:number;address?:string;token?:string;deepLinkUrl?:string;appFid?:number;expiresAt?:number};
+type Stored={version:1;server:string;privateKey:string;key:string;phase:'preparing'|'pending'|'active';fid?:number;address?:string;token?:string;deepLinkUrl?:string;appFid?:number;expiresAt?:number;push?:PushRegistration;pushConfirmed?:boolean};
 const keyPattern=/^0x[a-f0-9]{64}$/;
 function validApprovalLink(value:unknown):value is string{
   if(typeof value!=='string')return false;
@@ -22,13 +24,21 @@ function validApprovalLink(value:unknown):value is string{
 export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatus'|'submit'|'proStatus'>,storage:AccountStorage,random:(size:number)=>Promise<Uint8Array>,now=Date.now){
   let saved:Stored|null=null,restored=false,tail:Promise<unknown>=Promise.resolve();
   function exclusive<T>(run:()=>Promise<T>):Promise<T>{const value=tail.then(run);tail=value.catch(()=>{});return value;}
-  function snapshot():AccountSnapshot{return {session:saved?.phase==='active'?{fid:saved.fid!,key:saved.key,address:saved.address!}:null,pending:saved?.phase==='pending'?{deepLinkUrl:saved.deepLinkUrl!,appFid:saved.appFid!,expiresAt:saved.expiresAt!}:null,hasSavedKey:!!saved||!restored};}
+  function snapshot():AccountSnapshot{return {session:saved?.phase==='active'?{fid:saved.fid!,key:saved.key,address:saved.address!}:null,pending:saved?.phase==='pending'?{deepLinkUrl:saved.deepLinkUrl!,appFid:saved.appFid!,expiresAt:saved.expiresAt!}:null,hasSavedKey:!!saved||!restored,...(saved?.push?{pushEnabled:!!saved.push.enabled&&!!saved.pushConfirmed}:{})};}
   async function persist(value:Stored){await storage.set(JSON.stringify(value));saved=value;}
-  async function proof(record:Stored,purpose:'approve'|'verify',fid=0){
+  async function proof(record:Stored,purpose:'approve'|'verify'|'feed',fid=0){
     const issuedAt=Math.floor(now()/1000),nonce=bytesToHex(await random(16));
     const secret=hexToBytes(record.privateKey.slice(2));
-    try{return {key:record.key,issuedAt,nonce,signature:'0x'+bytesToHex(ed25519.sign(mobileClaim(api.origin,purpose,record.key,issuedAt,nonce,fid),secret)),...(purpose==='verify'?{fid}:{})};}
+    try{return {key:record.key,issuedAt,nonce,signature:'0x'+bytesToHex(ed25519.sign(mobileClaim(api.origin,purpose,record.key,issuedAt,nonce,fid),secret)),...(purpose!=='approve'?{fid}:{})};}
     finally{secret.fill(0);}
+  }
+  async function sendPush(record:Stored,registration:PushRegistration){
+    const issuedAt=Math.floor(now()/1000),nonce=bytesToHex(await random(16)),secret=hexToBytes(record.privateKey.slice(2));
+    try{
+      const signature='0x'+bytesToHex(ed25519.sign(pushClaim(api.origin,record.key,issuedAt,nonce,record.fid!,registration),secret));
+      const result=await api.accountPost<{registered:boolean;fid:number}>('push',{key:record.key,issuedAt,nonce,fid:record.fid,signature,registration});
+      if(result.fid!==record.fid||result.registered!==registration.enabled)throw new Error('Could not update push notifications. Please try again.');
+    }finally{secret.fill(0);}
   }
   async function prepareCast(input:CastInput,minimumTimestamp?:number):Promise<PreparedCast>{
       if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
@@ -65,6 +75,7 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
         record=JSON.parse(raw);
         if(record.version!==1||record.server!==api.origin||!keyPattern.test(record.privateKey)||!keyPattern.test(record.key)||!['preparing','pending','active'].includes(record.phase))throw Error();
         const secret=hexToBytes(record.privateKey.slice(2));try{if('0x'+bytesToHex(ed25519.getPublicKey(secret))!==record.key)throw Error();}finally{secret.fill(0);}
+        if(record.push&&!validPushRegistration(record.push))throw Error();
         if(record.phase==='active'&&(!isFid(record.fid)||!/^0x[a-f0-9]{40}$/i.test(record.address||'')))throw Error();
         if(record.phase==='pending'&&(!validApprovalLink(record.deepLinkUrl)||typeof record.token!=='string'||!record.token||record.token.length>500||!isFid(record.appFid)||!Number.isSafeInteger(record.expiresAt)))throw Error();
       }catch{throw new Error('Could not unlock your saved account. Sign out to reset this connection.');}
@@ -92,7 +103,26 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
       if(verified.state!=='active'||verified.fid!==result.userFid||verified.key!==record.key||!/^0x[a-f0-9]{40}$/i.test(verified.address||''))throw new Error('Could not confirm your account connection.');
       await persist({version:1,server:record.server,privateKey:record.privateKey,key:record.key,phase:'active',fid:verified.fid,address:verified.address});return snapshot();
     }),
-    signOut:()=>exclusive(async()=>{await storage.remove();saved=null;restored=true;return snapshot();}),
+    enrollNotifications:()=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      const result=await api.accountPost<{enrolled:boolean;fid:number}>('feed',await proof(saved,'feed',saved.fid!));
+      if(!result.enrolled||result.fid!==saved.fid)throw new Error('Could not prepare your notifications. Please try again.');
+    }),
+    getPush:()=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      return saved.push;
+    }),
+    setPush:(registration:PushRegistration)=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      if(!validPushRegistration(registration))throw new Error('Invalid push registration.');
+      // Persist before enabling remotely so even a failed response can be disabled at sign-out.
+      if(registration.enabled)await persist({...saved,push:registration,pushConfirmed:false});
+      await sendPush(saved,registration);
+      await persist({...saved,push:registration,pushConfirmed:true});return snapshot();
+    }),
+    signOut:()=>exclusive(async()=>{
+      if(saved?.phase==='active'&&saved.push?.enabled)await sendPush(saved,{...saved.push,enabled:false});
+      await storage.remove();saved=null;restored=true;return snapshot();}),
     cast:(input:CastInput)=>exclusive(async()=>{const prepared=await prepareCast(input);await api.submit(hexToBytes(prepared.bytes.slice(2)));return prepared.cast;}),
     prepareReplacement:(cast:Cast,input:CastInput)=>exclusive(async()=>{
       if(saved?.phase!=='active'||cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only edit your own casts.');

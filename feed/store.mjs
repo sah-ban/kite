@@ -16,6 +16,11 @@ export async function migrate(pool) {
     CREATE INDEX IF NOT EXISTS kite_notifications_unread ON kite_notifications(viewer_fid,received_at);
     CREATE INDEX IF NOT EXISTS kite_notifications_source ON kite_notifications(source_hash);
     CREATE INDEX IF NOT EXISTS kite_notifications_target ON kite_notifications(target_fid,target_hash);
+    CREATE SEQUENCE IF NOT EXISTS kite_push_generation;
+    CREATE TABLE IF NOT EXISTS kite_push_devices(installation_id text PRIMARY KEY,token text UNIQUE NOT NULL,viewer_fid bigint NOT NULL REFERENCES kite_feed_users(fid),signer_key text NOT NULL,enabled boolean NOT NULL DEFAULT true,generation bigint NOT NULL DEFAULT nextval('kite_push_generation'),enabled_at timestamptz NOT NULL DEFAULT clock_timestamp(),updated_at timestamptz NOT NULL DEFAULT clock_timestamp());
+    CREATE INDEX IF NOT EXISTS kite_push_viewer ON kite_push_devices(viewer_fid) WHERE enabled;
+    CREATE TABLE IF NOT EXISTS kite_push_jobs(id bigserial PRIMARY KEY,notification_id bigint NOT NULL,installation_id text NOT NULL REFERENCES kite_push_devices(installation_id) ON DELETE CASCADE,generation bigint NOT NULL,attempts integer NOT NULL DEFAULT 0,next_attempt_at timestamptz NOT NULL DEFAULT now(),ticket text,sent_at timestamptz,finished_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(notification_id,installation_id));
+    CREATE INDEX IF NOT EXISTS kite_push_pending ON kite_push_jobs(next_attempt_at) WHERE finished_at IS NULL;
     CREATE TABLE IF NOT EXISTS kite_notification_deleted_casts(fid bigint NOT NULL,hash text NOT NULL,deleted_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(fid,hash));
     CREATE TABLE IF NOT EXISTS kite_feed_follows(viewer_fid bigint REFERENCES kite_feed_users(fid),author_fid bigint NOT NULL,PRIMARY KEY(viewer_fid,author_fid));
     CREATE INDEX IF NOT EXISTS kite_feed_follow_author ON kite_feed_follows(author_fid);

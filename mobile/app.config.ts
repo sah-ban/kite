@@ -1,3 +1,4 @@
+import {existsSync} from 'node:fs';
 import type { ExpoConfig } from 'expo/config';
 
 const development = process.env.APP_VARIANT === 'development';
@@ -14,10 +15,11 @@ const config: ExpoConfig = {
   android: {
     package: development ? 'dev.sahban.kite.dev' : 'dev.sahban.kite',
     versionCode: 1,
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON || (existsSync('./google-services.json')?'./google-services.json':undefined),
     adaptiveIcon: {foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#ffffff'},
     blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_IMAGES', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VISUAL_USER_SELECTED', 'android.permission.SYSTEM_ALERT_WINDOW'],
   },
-  plugins: ['expo-router', 'expo-status-bar', 'expo-image', 'expo-font', ['expo-secure-store',{configureAndroidBackup:true}], ['expo-image-picker',{cameraPermission:false,microphonePermission:false}], ['expo-video',{supportsBackgroundPlayback:false,supportsPictureInPicture:false}]],
+  plugins: [['expo-notifications',{defaultChannel:'activity',color:'#326d49'}], 'expo-router', 'expo-status-bar', 'expo-image', 'expo-font', ['expo-secure-store',{configureAndroidBackup:true}], ['expo-image-picker',{cameraPermission:false,microphonePermission:false}], ['expo-video',{supportsBackgroundPlayback:false,supportsPictureInPicture:false}]],
   experiments: {typedRoutes: true},
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://kite.sahban.dev',

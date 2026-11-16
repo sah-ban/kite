@@ -4,6 +4,7 @@ import {ScrollView,Text,View} from 'react-native';
 import {useApp,type ThemeMode} from '../../lib/state';
 import {Button,space} from '../../components/ui';
 import {openLink,Person} from '../../components/CastCard';
+import {PushSettings} from '../../components/PushSettings';
 import {PendingCastEdits} from '../../components/PendingCastEdits';
 
 export default function Settings(){
@@ -18,6 +19,7 @@ export default function Settings(){
       <PendingCastEdits key={account.session?`${account.session.fid}:${account.session.key}`:'signed-out'}/>
     </View>
     <View style={{height:1,backgroundColor:colors.line,marginVertical:4}}/>
+    <PushSettings/>
     <View style={{gap:12}}>
       <Text style={[space.heading,{color:colors.ink}]}>Appearance</Text>
       <View style={[space.row,{flexWrap:'wrap'}]}>

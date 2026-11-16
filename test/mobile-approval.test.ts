@@ -6,6 +6,8 @@ import {mnemonicToAccount} from 'viem/accounts';
 // @ts-expect-error Server-only JavaScript middleware.
 import {mobileApproval} from '../mobile-approval.mjs';
 // @ts-expect-error Shared JavaScript public proof.
+import {pushClaim} from '../push-proof.mjs';
+// @ts-expect-error Shared JavaScript public proof.
 import {mobileClaim} from '../mobile-proof.mjs';
 // @ts-expect-error Shared registration state error.
 import {RegistrationPending} from '../approval.mjs';
@@ -15,7 +17,7 @@ const secret=new Uint8Array(32).fill(42),key=bytesToHex(ed25519.getPublicKey(sec
 const origin='https://kite.example',time=1700000000000;
 function proof(purpose='approve',fid=0,nonce='ab'.repeat(16)){
   const issuedAt=Math.floor(time/1000);
-  return {key,issuedAt,nonce,signature:bytesToHex(ed25519.sign(mobileClaim(origin,purpose,key,issuedAt,nonce,fid),secret)),...(purpose==='verify'?{fid}:{})};
+  return {key,issuedAt,nonce,signature:bytesToHex(ed25519.sign(mobileClaim(origin,purpose,key,issuedAt,nonce,fid),secret)),...(purpose!=='approve'?{fid}:{})};
 }
 async function call(middleware:ReturnType<typeof mobileApproval>,path='/api/mobile/approval',body:unknown=proof(),headers:Record<string,string>={},method='POST'){
   const req={url:path,method,headers:{host:'kite.example',...headers},socket:{remoteAddress:'192.0.2.1'},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify(body));}};
@@ -54,4 +56,28 @@ test('mobile errors do not expose server credentials or internal network diagnos
   const middleware=mobileApproval({KITE_PUBLIC_URL:origin},{now:()=>time,identity:async()=>{throw new Error('private server credential');}});
   const result=await call(middleware);assert.equal(result.status,503);assert.ok(!JSON.stringify(result.body).includes('private'));
   const h=harness();h.failVerification(new Error('https://private-node.example with secret-token'));const verify=await call(h.middleware,'/api/mobile/verify',proof('verify',37));assert.equal(verify.status,503);assert.ok(!JSON.stringify(verify.body).includes('private-node'));assert.ok(!JSON.stringify(verify.body).includes('secret-token'));
+});
+
+test('mobile notification enrollment requires a dedicated signed claim and verified registration',async()=>{
+  const enrolled:number[]=[];
+  let registered=true;
+  const middleware=mobileApproval({KITE_PUBLIC_URL:origin},{now:()=>time,check:async()=>{if(!registered)throw new RegistrationPending();return '0x'+'11'.repeat(20);},enrollFeed:async(fid:number)=>{enrolled.push(fid);return {enrolled:true,fid};}});
+  assert.equal((await call(middleware,'/api/mobile/feed',proof('verify',37))).status,403);
+  assert.equal((await call(middleware,'/api/mobile/feed',{...proof('feed',37),fid:38})).status,403);
+  assert.equal((await call(middleware,'/api/mobile/feed',proof('feed',37))).status,200);
+  assert.deepEqual(enrolled,[37]);
+  registered=false;await call(middleware,'/api/mobile/feed',proof('feed',38));assert.deepEqual(enrolled,[37]);
+});
+
+test('push registration authenticates every token field and permits revoked keys to disable only their own registration',async()=>{
+ const requests:any[]=[];let registered=true;
+ const registration={installationId:'a'.repeat(32),token:'ExpoPushToken[fixture_token_123]',enabled:true};
+ const signed=(value=registration)=>{const base=proof('push',37);return {...base,registration:value,signature:bytesToHex(ed25519.sign(pushClaim(origin,key,base.issuedAt,base.nonce,37,value),secret))};};
+ const middleware=mobileApproval({KITE_PUBLIC_URL:origin},{now:()=>time,check:async()=>{if(!registered)throw Object.assign(Error('inactive'),{status:403});return '0x'+'11'.repeat(20);},enrollFeed:async()=>({enrolled:true,fid:37}),registerPush:async(fid:number,signer:string,value:unknown)=>{requests.push({fid,signer,value});return {registered:(value as any).enabled,fid};}});
+ assert.equal((await call(middleware,'/api/mobile/push',signed())).status,200);assert.equal(requests.length,1);
+ for(const changed of [{...registration,token:'ExpoPushToken[other_token_123]'}, {...registration,enabled:false}, {...registration,installationId:'b'.repeat(32)}])assert.equal((await call(middleware,'/api/mobile/push',{...signed(),registration:changed})).status,403);
+ assert.equal((await call(middleware,'/api/mobile/push',signed({...registration,token:'https://attacker.example'}))).status,400);
+ registered=false;assert.equal((await call(middleware,'/api/mobile/push',signed())).status,403);
+ assert.equal((await call(middleware,'/api/mobile/push',signed({...registration,enabled:false}))).status,200);
+ assert.equal(requests.at(-1).value.enabled,false);
 });

@@ -48,3 +48,6 @@ artifacts/
 credentials.json
 .env
 !.env.example
+
+# Firebase client config is supplied locally or through an EAS file variable.
+google-services.json

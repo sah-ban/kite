@@ -1,5 +1,6 @@
 import {createPool,enrollViewer,parseFeedQuery,queryFeed,validFid} from './store.mjs';
 import {localFeedEnrollment} from './enrollment.mjs';
+import {registerPush} from './push.mjs';
 import {queryNotifications} from './notifications.mjs';
 export const feedFids=config=>(config.KITE_FEED_FIDS||'').split(',').filter(validFid).map(Number);
 export function indexedFeed(config,{pool,...dependencies}={}) {
@@ -35,5 +36,5 @@ export function indexedFeed(config,{pool,...dependencies}={}) {
       return send(503,{error:'The indexed feed is temporarily unavailable. Please retry.'});
     }
   };
-  middleware.enroll=enroll;return middleware;
+  middleware.enroll=enroll;middleware.registerPush=(fid,key,registration)=>registerPush(pool,fid,key,registration);return middleware;
 }
