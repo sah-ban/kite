@@ -1,5 +1,5 @@
 import {useCallback,useState,type ReactElement} from 'react';
-import {FlatList,RefreshControl,Text,View} from 'react-native';
+import {FlatList,RefreshControl,Text,View,type NativeSyntheticEvent,type NativeScrollEvent} from 'react-native';
 import type {Cast} from '../lib/model';
 import {useApp} from '../lib/state';
 import type {useCastPage} from '../lib/hooks';
@@ -18,11 +18,11 @@ function FeedSkeleton(){
   </View>;
 }
 
-export function CastList({page,header,empty='No casts yet',autoLoadMore=false}:{page:ReturnType<typeof useCastPage>;header?:ReactElement;empty?:string;autoLoadMore?:boolean}){
+export function CastList({page,header,empty='No casts yet',autoLoadMore=false,onScroll}:{page:ReturnType<typeof useCastPage>;header?:ReactElement;empty?:string;autoLoadMore?:boolean;onScroll?:(event:NativeSyntheticEvent<NativeScrollEvent>)=>void}){
   const {colors}=useApp();
   const [visible,setVisible]=useState<Set<string>>(()=>new Set());
   const onViewableItemsChanged=useCallback(({viewableItems}:{viewableItems:{isViewable:boolean;item:Cast}[]})=>setVisible(new Set(viewableItems.filter(item=>item.isViewable).map(({item})=>`${item.data.fid}:${item.hash}`))),[]);
-  return <FlatList style={{flex:1,backgroundColor:colors.background}} data={page.items} extraData={visible} onViewableItemsChanged={onViewableItemsChanged} keyExtractor={cast=>`${cast.data.fid}:${cast.hash}`} renderItem={({item})=><CastCard cast={item} loadActivity={visible.has(`${item.data.fid}:${item.hash}`)}/>} ListHeaderComponent={<View>{header}{!!page.error&&page.items.length>0&&<View accessibilityRole="alert" style={[space.row,{padding:16,backgroundColor:colors.accentSoft}]}><Icon name="wifi-off" size={18} color={colors.muted}/><Text style={{flex:1,color:colors.ink,fontSize:13,lineHeight:19}}>Couldn’t update the feed. Your loaded casts are still here.</Text><Button label="Retry" quiet onPress={page.retry}/></View>}</View>} keyboardShouldPersistTaps="handled" initialNumToRender={6} maxToRenderPerBatch={6} windowSize={7} onEndReached={autoLoadMore&&!page.error?page.more:undefined} onEndReachedThreshold={.4} refreshControl={<RefreshControl refreshing={page.refreshing} onRefresh={page.refresh} tintColor={colors.accent} colors={[colors.accent]}/>}
+  return <FlatList style={{flex:1,backgroundColor:colors.background}} onScroll={onScroll} scrollEventThrottle={onScroll?32:undefined} data={page.items} extraData={visible} onViewableItemsChanged={onViewableItemsChanged} keyExtractor={cast=>`${cast.data.fid}:${cast.hash}`} renderItem={({item})=><CastCard cast={item} loadActivity={visible.has(`${item.data.fid}:${item.hash}`)}/>} ListHeaderComponent={<View>{header}{!!page.error&&page.items.length>0&&<View accessibilityRole="alert" style={[space.row,{padding:16,backgroundColor:colors.accentSoft}]}><Icon name="wifi-off" size={18} color={colors.muted}/><Text style={{flex:1,color:colors.ink,fontSize:13,lineHeight:19}}>Couldn’t update the feed. Your loaded casts are still here.</Text><Button label="Retry" quiet onPress={page.retry}/></View>}</View>} keyboardShouldPersistTaps="handled" initialNumToRender={6} maxToRenderPerBatch={6} windowSize={7} onEndReached={autoLoadMore&&!page.error?page.more:undefined} onEndReachedThreshold={.4} refreshControl={<RefreshControl refreshing={page.refreshing} onRefresh={page.refresh} tintColor={colors.accent} colors={[colors.accent]}/>}
     ListEmptyComponent={page.loading?<FeedSkeleton/>:!page.error?<Notice title={empty} icon="message-circle">Pull down to refresh.</Notice>:undefined}
     ListFooterComponent={<View style={{paddingBottom:24}}>{!!page.error&&page.items.length===0&&<Notice title="Couldn’t load casts" retry={page.retry}>{page.error}</Notice>}{page.loading?(page.items.length>0&&!page.refreshing?<Loading/>:null):page.next?<View style={{padding:18}}><Button label="Load more" quiet onPress={page.more}/></View>:page.items.length>0?<Text style={{color:colors.muted,textAlign:'center',padding:24,fontSize:12}}>You’re all caught up</Text>:null}</View>}
   />;
