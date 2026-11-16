@@ -31,7 +31,6 @@ export default function Settings(){
     <View style={{height:1,backgroundColor:colors.line,marginVertical:4}}/>
     <View style={{gap:12}}>
       <Text style={[space.heading,{color:colors.ink}]}>About Kite</Text>
-      <Text style={[space.small,{color:colors.muted}]}>Version 0.1.0</Text>
       <Button label="Kite on Farcaster" quiet icon="at-sign" onPress={()=>void openLink('https://kite.sahban.dev/profile/925685')}/>
       <Button label="Source on GitHub" quiet icon="github" onPress={()=>void openLink('https://github.com/sah-ban/kite')}/>
     </View>

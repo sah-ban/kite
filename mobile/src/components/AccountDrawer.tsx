@@ -1,4 +1,5 @@
 import {router,type Href} from 'expo-router';
+import Constants from 'expo-constants';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
 import {Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Switch,Text,View,useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -51,6 +52,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
             <View style={{minHeight:50,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:14}}><Icon name={dark?'moon':'sun'} size={21}/><Text style={{flex:1,color:colors.ink,fontSize:16,fontWeight:'500'}}>Dark theme</Text><Switch accessibilityLabel="Dark theme" value={dark} disabled={changingTheme||signingOut} onTouchStart={()=>{themeTouch.current=true;}} onTouchEnd={()=>{themeTouch.current=false;}} onTouchCancel={()=>{themeTouch.current=false;}} onValueChange={value=>void changeTheme(value)} trackColor={{false:colors.line,true:colors.accent}}/></View>
             <DrawerItem label="GitHub" icon="github" external onPress={()=>external('https://github.com/sah-ban/kite')}/>
             {!!fid&&<DrawerItem label={signingOut?'Signing out…':'Sign out'} icon="log-out" danger disabled={signingOut||accountBusy||changingTheme} onPress={()=>void disconnect()}/>}
+            <Text style={{paddingTop:14,textAlign:'center',fontSize:11,color:colors.muted}}>Version {Constants.expoConfig?.version??'—'}</Text>
           </View>
         </ScrollView>
       </Animated.View>
