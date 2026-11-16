@@ -34,17 +34,24 @@ export function CastText({cast,limit=Infinity,compact=false,numberOfLines,expans
   // Keep clamped previews non-selectable so Android can draw the trailing ellipsis.
   return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
 }
-function UrlEmbed({url,castUrls,visible,height}:{url:string;castUrls:string[];visible:boolean;height?:number}) {
+function UrlEmbed({url,castUrls,visible,height,width}:{url:string;castUrls:string[];visible:boolean;height?:number;width?:number}) {
   const {api,colors}=useApp(),{value}=useQuery(signal=>api.embed(url,signal),[api,url]);
   const [failed,setFailed]=useState(false);
+  const [imageRatio,setImageRatio]=useState(1);
   const normalized=safeLink(url);if(!normalized)return null;
-  if(value?.tweet&&xPostLink(value.tweet.url))return <TweetEmbed key={value.tweet.url} post={value.tweet} height={height}/>;
-  if(value?.miniapp&&miniAppLaunchURL(value.miniapp.url)&&safeLink(value.miniapp.imageUrl))return <MiniAppEmbed key={value.miniapp.imageUrl} app={value.miniapp} height={height}/>;
+  if(value?.tweet&&xPostLink(value.tweet.url))return <View style={{width}}><TweetEmbed key={value.tweet.url} post={value.tweet} height={height}/></View>;
+  if(value?.miniapp&&miniAppLaunchURL(value.miniapp.url)&&safeLink(value.miniapp.imageUrl))return <View style={{width}}><MiniAppEmbed key={value.miniapp.imageUrl} app={value.miniapp} height={height}/></View>;
   const image=value?.kind==='image'?safeLink(value.url):value?.image?safeLink(value.image):value?.poster?safeLink(value.poster):undefined;
   const viewImage=value?.kind==='image'&&image;
   const viewVideo=value?.kind==='video'&&safeLink(value.url);
-  if(viewVideo)return <InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible} height={height}/>;
-  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{height,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+  if(viewVideo)return <View style={{width}}><InlineVideo key={`${viewVideo}:${visible}`} url={viewVideo} contentType={value?.contentType} poster={image} autoPlay={visible} height={height}/></View>;
+  if(viewImage&&!failed){
+    const imageWidth=Math.min(width||300,((height||200)-2)*imageRatio+2);
+    return <Pressable onPress={event=>{event.stopPropagation();router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});}} accessibilityRole="link" accessibilityLabel="View image" style={{width:imageWidth,height:(imageWidth-2)/imageRatio+2,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+      <Image source={{uri:viewImage}} onLoad={({source})=>{if(source.width>0&&source.height>0)setImageRatio(source.width/source.height);}} onError={()=>setFailed(true)} style={{width:'100%',height:'100%'}} contentFit="contain" transition={150}/>
+    </Pressable>;
+  }
+  return <Pressable onPress={event=>{event.stopPropagation();if(viewImage)router.push({pathname:'/image',params:{url:viewImage,source:normalized,embeds:JSON.stringify(castUrls)}});else void openLink(normalized);}} accessibilityRole="link" accessibilityLabel={viewImage?'View image':value?.title||`Open ${new URL(normalized).hostname}`} style={{width,height,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
     {image&&!failed?<Image source={{uri:image}} onError={()=>setFailed(true)} style={{width:'100%',height:height?undefined:viewImage?200:undefined,aspectRatio:!height&&!viewImage?1.91:undefined,flex:height?1:undefined,minHeight:0}} contentFit="contain" transition={150}/>:<View accessibilityRole="image" accessibilityLabel={viewImage?'Image unavailable':`Website preview for ${new URL(normalized).hostname}`} style={{height:height?undefined:viewImage?200:150,flex:height?1:undefined,minHeight:0,padding:16,gap:10,alignItems:'center',justifyContent:'center',backgroundColor:colors.soft}}><View style={{width:56,height:56,borderRadius:18,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'}}><Icon name={viewImage?'image':'globe'} size={28} color={colors.accent}/></View><Text numberOfLines={2} style={{fontSize:13,lineHeight:18,fontWeight:'500',color:colors.muted,textAlign:'center'}}>{viewImage?'Image unavailable':value?.site||new URL(normalized).hostname}</Text></View>}
     {!viewImage&&<View style={{padding:10,gap:2}}><Text numberOfLines={1} style={{color:colors.muted,fontSize:12}}>{new URL(normalized).hostname}</Text><Text numberOfLines={2} style={{color:colors.ink,fontSize:14,fontWeight:'500'}}>{value?.title||normalized}</Text></View>}
   </Pressable>;
@@ -75,15 +82,17 @@ export function Quote({fid,hash}:{fid:number;hash:string}){
 }
 function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
   const [width,setWidth]=useState(0),[offset,setOffset]=useState(0);
+  const [itemWidths,setItemWidths]=useState<Record<string,number>>({});
   const items=embeds.slice(0,4);
   const urls=items.flatMap(embed=>!embed.castId&&embed.url&&!xPostLink(embed.url)?[embed.url]:[]);
   const previews=items.filter(embed=>embed.castId||embed.url&&xPostLink(embed.url));
   const itemWidth=Math.max(160,(width-gutter)*.88),gap=8;
-  const activeIndex=Math.max(0,Math.min(urls.length-1,Math.round(offset/(itemWidth+gap))));
+  const offsets=urls.map((_,index)=>urls.slice(0,index).reduce((total,url)=>total+(itemWidths[url]||itemWidth)+gap,0));
+  const activeIndex=offsets.reduce((nearest,start,index)=>Math.abs(start-offset)<Math.abs(offsets[nearest]-offset)?index:nearest,0);
   return <View style={{gap:6,minWidth:0,marginLeft:-gutter}}>
     {urls.length>0&&<View onLayout={event=>setWidth(event.nativeEvent.layout.width)}>
-      {urls.length===1?<View style={{marginLeft:gutter}}><UrlEmbed url={urls[0]} castUrls={urls} visible={visible}/></View>:width>0&&<ScrollView horizontal accessibilityLabel="Cast embeds" showsHorizontalScrollIndicator={false} nestedScrollEnabled directionalLockEnabled decelerationRate="fast" snapToInterval={itemWidth+gap} snapToAlignment="start" scrollEventThrottle={32} onScroll={event=>setOffset(event.nativeEvent.contentOffset.x)} contentContainerStyle={{gap,paddingLeft:gutter,alignItems:'flex-start'}}>
-        {urls.map((url,index)=><View key={`${index}:${url}`} style={{width:itemWidth}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex} height={210}/></View>)}
+      {urls.length===1?<View style={{marginLeft:gutter}}><UrlEmbed key={urls[0]} url={urls[0]} castUrls={urls} visible={visible} width={width>gutter?width-gutter:undefined}/></View>:width>0&&<ScrollView horizontal accessibilityLabel="Cast embeds" showsHorizontalScrollIndicator={false} nestedScrollEnabled directionalLockEnabled decelerationRate="fast" snapToOffsets={offsets} snapToAlignment="start" scrollEventThrottle={32} onScroll={event=>setOffset(event.nativeEvent.contentOffset.x)} contentContainerStyle={{gap,paddingLeft:gutter,alignItems:'flex-start'}}>
+        {urls.map((url,index)=><View key={`${index}:${url}`} onLayout={event=>{const measured=event.nativeEvent.layout.width;setItemWidths(previous=>previous[url]===measured?previous:{...previous,[url]:measured});}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex} height={210} width={itemWidth}/></View>)}
       </ScrollView>}
     </View>}
     {previews.map((embed,index)=><View key={`${index}:${embed.castId?.hash||embed.url}`} style={{marginLeft:gutter}}>{embed.castId?<Quote {...embed.castId}/>:embed.url?<UrlEmbed url={embed.url} castUrls={urls} visible={visible}/>:null}</View>)}
