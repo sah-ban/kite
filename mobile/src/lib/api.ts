@@ -191,6 +191,30 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     status: (signal?:AbortSignal)=>request<{available:boolean;syncDelaySeconds:number|null}>('/api/node/status',{},signal),
     publicFeed:async(cursor='',signal?:AbortSignal)=>page(await request<NodePage>('/api/feed/public',{order:'newest',...(cursor?{cursor}:{})},signal)),
     profileCasts:async(fid:number,cursor='',signal?:AbortSignal)=>page(await hub<NodePage>('castsByFid',{fid,pageSize:30,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal)),
+    profileLikes:async(fid:number,cursor='',signal?:AbortSignal):Promise<Page<Cast>>=>{
+      if(!isFid(fid))throw new Error('Invalid profile FID.');
+      const result=await hub<NodePage>('reactionsByFid',{fid,reaction_type:'Like',pageSize:30,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal);
+      if(!Array.isArray(result.messages))throw new Error('Could not load likes. Please try again.');
+      const targets=new Map<string,{fid:number;hash:string}>();
+      for(const raw of result.messages){
+        const data=(raw as {data?:{fid?:number;type?:number|string;reactionBody?:{type?:number|string;targetCastId?:{fid:number;hash:string}}}}|null)?.data,body=data?.reactionBody,target=body?.targetCastId;
+        if(data?.fid!==fid||![3,'MESSAGE_TYPE_REACTION_ADD'].includes(data.type??'')||![1,'REACTION_TYPE_LIKE'].includes(body?.type??'')||!target||!isFid(target.fid)||!isHash(target.hash))continue;
+        targets.set(`${target.fid}:${target.hash.toLowerCase()}`,target);
+      }
+      const refs=[...targets.values()],items:Cast[]=[];
+      // Bound concurrent cast lookups and retain the node's newest-like order.
+      for(let index=0;index<refs.length;index+=5){
+        signal?.throwIfAborted();
+        const casts=await Promise.all(refs.slice(index,index+5).map(async target=>{
+          try{
+            const cast=await hub<Cast>('castById',target,signal);
+            return isCast(cast)&&cast.data.fid===target.fid&&cast.hash.toLowerCase()===target.hash.toLowerCase()?cast:undefined;
+          }catch(error){if(error instanceof ApiError&&error.notFound)return;throw error;}
+        }));
+        items.push(...casts.filter((cast):cast is Cast=>!!cast));
+      }
+      return {items,next:typeof result.nextPageToken==='string'?result.nextPageToken:''};
+    },
     replies:async(cast:Cast,cursor='',signal?:AbortSignal)=>{
       const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize:30,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
       return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
