@@ -16,7 +16,7 @@ import {MiniAppEmbed} from './MiniAppEmbed';
 import {miniAppLaunchURL} from '../lib/miniapp';
 import {TweetEmbed} from './TweetEmbed';
 import {xPostLink} from '../lib/x-post';
-import {isArticle} from '../lib/articles';
+import {articleChain,isArticle} from '../lib/articles';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
@@ -79,14 +79,21 @@ function QuoteThumbnail({embed}:{embed:QuoteEmbed}){
   </View>;
 }
 export function Quote({fid,hash}:{fid:number;hash:string}){
-  const {api,colors}=useApp(),{value,error}=useQuery(signal=>api.resolveCast(String(fid),hash,signal),[api,fid,hash]);
+  const {api,colors}=useApp(),{value,error}=useQuery(async signal=>{
+    const cast=await api.resolveCast(String(fid),hash,signal),root=isArticle(cast)?articleChain(cast)?.root:undefined;
+    return root?api.resolveCast(String(root.fid),root.hash,signal):cast;
+  },[api,fid,hash]);
+  const article=value&&isArticle(value);
   const body=value?.data.castAddBody;
   const attachments:QuoteEmbed[]=body?.embeds?.length?body.embeds:(body?.embedsDeprecated||[]).map(url=>({url}));
   const embeds=attachments.filter(embed=>embed.castId||embed.url&&safeLink(embed.url)).slice(0,4);
   const text=value&&!!(body?.text||body?.mentions?.length)?<CastText cast={value} limit={280} numberOfLines={5} compact/>:null;
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${fid}/${hash}`);}} accessibilityRole="link" accessibilityLabel="Open quoted cast" style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
+  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${value?.data.fid||fid}/${value?.hash||hash}`);}} accessibilityRole="link" accessibilityLabel={article?'Read quoted article':'Open quoted cast'} style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Person fid={fid} compact usernameOnly profileLink={false}/>{value&&<Text style={{fontSize:11,color:colors.muted,flexShrink:0}}>{relativeTime(value.data.timestamp)}</Text>}</View>
-    {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View><View style={{flex:1,minWidth:0}}>{text}</View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
+    {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:article?<View style={{flexDirection:'row',alignItems:'flex-start',gap:10}}>
+      {!!embeds[0]&&<View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View>}
+      <View style={{flex:1,minWidth:0,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:4}}><Icon name="book-open" size={12} color={colors.muted}/><Text style={{fontSize:11,color:colors.muted}}>Article</Text></View><Text numberOfLines={3} ellipsizeMode="tail" style={{fontSize:16,lineHeight:21,fontWeight:'600',color:colors.ink}}>{body!.text.split('\n')[0]}</Text><Text style={{fontSize:12,color:colors.accent}}>Read article →</Text></View>
+    </View>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View><View style={{flex:1,minWidth:0}}>{text}</View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
   </Pressable>;
 }
 export function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
