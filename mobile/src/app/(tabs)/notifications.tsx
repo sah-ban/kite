@@ -1,5 +1,6 @@
-import {router,useFocusEffect} from 'expo-router';
-import {memo,useCallback,useMemo,useRef,useState} from 'react';
+import {router,Tabs,useFocusEffect} from 'expo-router';
+import {memo,useCallback,useMemo,useRef,useState,type ReactNode} from 'react';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {AppState,FlatList,Pressable,RefreshControl,ScrollView,Text,View} from 'react-native';
 import {useApp} from '../../lib/state';
 import {useNotifications} from '../../lib/notification-state';
@@ -7,6 +8,9 @@ import {hasMoreNotifications,indexedNotifications,mergeNotifications,readNotific
 import {relativeTime} from '../../lib/model';
 import {CastText,Person,Quote} from '../../components/CastCard';
 import {Button,Icon,Loading,Notice,space} from '../../components/ui';
+import {ScrollHeader} from '../../components/ScrollHeader';
+import {useScrollHeader} from '../../lib/use-scroll-header';
+import {SCROLL_HEADER_HEIGHT} from '../../lib/scroll-header';
 
 const filters=[['all','All'],['mention','Mentions'],['reply','Replies'],['like','Likes'],['recast','Recasts'],['follow','Follows']] as const;
 const labels={mention:'mentioned you',reply:'replied to your cast',like:'liked your cast',recast:'recast your cast',follow:'followed you'};
@@ -23,11 +27,12 @@ const NotificationRow=memo(function NotificationRow({item}:{item:NotificationIte
 const renderNotification=({item}:{item:NotificationItem})=><NotificationRow item={item}/>;
 const notificationKey=(item:NotificationItem)=>item.id;
 export default function Notifications(){
-  const {account}=useApp();
-  return <NotificationFeed key={account.session?.fid||0}/>;
+  const {account,colors}=useApp(),insets=useSafeAreaInsets();
+  return <View style={{flex:1,paddingTop:insets.top,backgroundColor:colors.surface}}><Tabs.Screen options={{headerShown:false}}/><NotificationFeed key={account.session?.fid||0}/></View>;
 }
 function NotificationFeed(){
   const {api,account,colors}=useApp(),fid=account.session?.fid;
+  const motion=useScrollHeader();
   const {mode,error:setupError,retry:retrySetup,since,markSeen}=useNotifications();
   const [filter,setFilter]=useState<NotificationKind|'all'>('all'),[items,setItems]=useState<NotificationItem[]>([]),[live,setLive]=useState<IndexedNotificationPage>(),[legacy,setLegacy]=useState<NotificationPage>(),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[updates,setUpdates]=useState(false),[revision,setRevision]=useState(0);
   const activeRequest=useRef<AbortController|null>(null),currentPage=useRef<IndexedNotificationPage|undefined>(undefined),pending=useRef(false);
@@ -83,18 +88,17 @@ function NotificationFeed(){
     finally{if(!controller.signal.aborted){pending.current=false;setBusy(false);}}
   }
   const filtered=useMemo(()=>mode==='legacy'?items.filter(item=>filter==='all'||item.kind===filter):items,[mode,items,filter]);
-  if(!fid)return <View style={{flex:1,justifyContent:'center'}}><Notice title="Your activity, in one place." icon="bell">Sign in to see mentions, replies, likes, recasts and follows.</Notice><View style={{paddingHorizontal:28}}><Button label="Sign in" onPress={()=>router.push('/sign-in')}/></View></View>;
-  if(mode==='loading')return <Loading/>;
-  if(mode==='error')return <Notice title="Couldn’t prepare notifications" icon="bell" retry={retrySetup}>{setupError}</Notice>;
-  return <View style={{flex:1}}>
-    <View style={[space.row,{paddingHorizontal:18,minHeight:56,backgroundColor:colors.surface}]}><Text style={{flex:1,fontSize:21,fontWeight:'700',color:colors.ink}}>Notifications</Text><Pressable accessibilityRole="button" accessibilityLabel="Refresh notifications" disabled={busy} onPress={refresh} style={{padding:12}}><Icon name="refresh-cw" size={18} color={colors.muted}/></Pressable></View>
-    <View style={{backgroundColor:colors.surface,borderBottomWidth:1,borderColor:colors.line}}><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:14,paddingBottom:12,gap:8}}>{filters.map(([kind,label])=><Pressable key={kind} accessibilityRole="button" accessibilityState={{selected:filter===kind}} onPress={()=>setFilter(kind)} style={{paddingHorizontal:14,paddingVertical:10,borderRadius:20,backgroundColor:filter===kind?colors.accent:colors.soft}}><Text style={{fontSize:13,fontWeight:'600',color:filter===kind?colors.background:colors.muted}}>{label}</Text></Pressable>)}</ScrollView></View>
-    <FlatList data={filtered} keyExtractor={notificationKey} renderItem={renderNotification} initialNumToRender={8} maxToRenderPerBatch={4} windowSize={5} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]}/>} ListHeaderComponent={<View>
+  const canScroll=!!fid&&(mode==='indexed'||mode==='legacy');
+  const frame=(content:ReactNode)=><View style={{flex:1,overflow:'hidden'}}>{content}<ScrollHeader title="Notifications" hidden={canScroll&&motion.hidden} headerY={canScroll?motion.headerY:0} refreshing={refreshing} disabled={!canScroll||busy} onRefresh={refresh} refreshLabel="Refresh notifications" testID="notifications-header"/></View>;
+  if(!fid)return frame(<View style={{flex:1,paddingTop:SCROLL_HEADER_HEIGHT,justifyContent:'center'}}><Notice title="Your activity, in one place." icon="bell">Sign in to see mentions, replies, likes, recasts and follows.</Notice><View style={{paddingHorizontal:28}}><Button label="Sign in" onPress={()=>router.push('/sign-in')}/></View></View>);
+  if(mode==='loading')return frame(<View style={{paddingTop:SCROLL_HEADER_HEIGHT}}><Loading/></View>);
+  if(mode==='error')return frame(<View style={{paddingTop:SCROLL_HEADER_HEIGHT}}><Notice title="Couldn’t prepare notifications" icon="bell" retry={retrySetup}>{setupError}</Notice></View>);
+  return frame(<FlatList data={filtered} onScroll={motion.onScroll} scrollEventThrottle={32} contentContainerStyle={{paddingTop:SCROLL_HEADER_HEIGHT}} keyExtractor={notificationKey} renderItem={renderNotification} initialNumToRender={8} maxToRenderPerBatch={4} windowSize={5} refreshControl={<RefreshControl progressViewOffset={SCROLL_HEADER_HEIGHT} refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]}/>} ListHeaderComponent={<View>
+      <View style={{backgroundColor:colors.surface,borderBottomWidth:1,borderColor:colors.line}}><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:14,paddingVertical:10,gap:8}}>{filters.map(([kind,label])=><Pressable key={kind} accessibilityRole="button" accessibilityState={{selected:filter===kind}} onPress={()=>setFilter(kind)} style={{paddingHorizontal:14,paddingVertical:10,borderRadius:20,backgroundColor:filter===kind?colors.accent:colors.soft}}><Text style={{fontSize:13,fontWeight:'600',color:filter===kind?colors.background:colors.muted}}>{label}</Text></Pressable>)}</ScrollView></View>
       {!!error&&<View accessibilityRole="alert" style={{padding:16,gap:10}}><Text style={{color:colors.danger}}>{error}</Text><Button label="Retry" quiet disabled={busy} onPress={()=>items.length&&(live?.nextPageToken||legacy&&hasMoreNotifications(legacy.cursor))?void more():refresh()}/></View>}
       {!!legacy?.errors.length&&<View style={{padding:16,gap:10}}><Text style={{color:colors.danger}}>Some activity could not load: {legacy.errors.join(', ')}.</Text><Button label="Retry" quiet disabled={busy} onPress={()=>void more()}/></View>}
       {live&&(!live.workerOnline||!live.startedAt)&&<Text accessibilityRole="text" style={{padding:16,color:colors.muted}}>{!live.startedAt?'Waiting for notification indexing to start…':'Updates are reconnecting. Saved activity is shown below.'}</Text>}
       {updates&&<Button label="Activity has changed · Refresh" quiet onPress={refresh}/>}
     </View>} ListEmptyComponent={busy?<Loading/>:<Notice title={error?'Notifications are unavailable':filter==='all'?'You’re all caught up':`No ${filters.find(([kind])=>kind===filter)?.[1].toLowerCase()} yet`} icon="bell">{error?'Retry to check again.':mode==='indexed'?'New activity will appear here automatically.':'Refresh or load older activity to check for more.'}</Notice>}
-    ListFooterComponent={<View style={{padding:18,gap:16,paddingBottom:32}}>{busy&&items.length>0?<Loading/>:(live?.nextPageToken||legacy&&hasMoreNotifications(legacy.cursor))?<Button label="Load more activity" quiet onPress={()=>void more()}/>:null}{live&&<Text style={{color:colors.muted,fontSize:12,lineHeight:18,textAlign:'center'}}>New activity{live.startedAt?` since ${new Date(live.startedAt).toLocaleString()}`:' after setup'} · Kept for {live.historyDays} days. Earlier activity is not imported.</Text>}{legacy&&<Text style={{color:colors.muted,fontSize:12,lineHeight:18,textAlign:'center'}}>Replies, likes and recasts checked on {legacy.cursor.scanned} of your recent casts. Mentions and follows load separately.</Text>}</View>}/>
-  </View>;
+    ListFooterComponent={<View style={{padding:18,gap:16,paddingBottom:32}}>{busy&&items.length>0?<Loading/>:(live?.nextPageToken||legacy&&hasMoreNotifications(legacy.cursor))?<Button label="Load more activity" quiet onPress={()=>void more()}/>:null}{live&&<Text style={{color:colors.muted,fontSize:12,lineHeight:18,textAlign:'center'}}>New activity{live.startedAt?` since ${new Date(live.startedAt).toLocaleString()}`:' after setup'} · Kept for {live.historyDays} days. Earlier activity is not imported.</Text>}{legacy&&<Text style={{color:colors.muted,fontSize:12,lineHeight:18,textAlign:'center'}}>Replies, likes and recasts checked on {legacy.cursor.scanned} of your recent casts. Mentions and follows load separately.</Text>}</View>}/>);
 }
