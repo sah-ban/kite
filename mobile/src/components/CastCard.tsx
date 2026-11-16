@@ -75,7 +75,9 @@ export function Quote({fid,hash}:{fid:number;hash:string}){
 }
 function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
   const [width,setWidth]=useState(0),[offset,setOffset]=useState(0);
-  const items=embeds.slice(0,4),urls=items.flatMap(embed=>!embed.castId&&embed.url?[embed.url]:[]),quotes=items.flatMap(embed=>embed.castId?[embed.castId]:[]);
+  const items=embeds.slice(0,4);
+  const urls=items.flatMap(embed=>!embed.castId&&embed.url&&!xPostLink(embed.url)?[embed.url]:[]);
+  const previews=items.filter(embed=>embed.castId||embed.url&&xPostLink(embed.url));
   const itemWidth=Math.max(160,(width-gutter)*.88),gap=8;
   const activeIndex=Math.max(0,Math.min(urls.length-1,Math.round(offset/(itemWidth+gap))));
   return <View style={{gap:6,minWidth:0,marginLeft:-gutter}}>
@@ -84,7 +86,7 @@ function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['ca
         {urls.map((url,index)=><View key={`${index}:${url}`} style={{width:itemWidth}}><UrlEmbed url={url} castUrls={urls} visible={visible&&index===activeIndex} height={240}/></View>)}
       </ScrollView>}
     </View>}
-    {quotes.map((quote,index)=><View key={`${index}:${quote.fid}:${quote.hash}`} style={{marginLeft:gutter}}><Quote {...quote}/></View>)}
+    {previews.map((embed,index)=><View key={`${index}:${embed.castId?.hash||embed.url}`} style={{marginLeft:gutter}}>{embed.castId?<Quote {...embed.castId}/>:embed.url?<UrlEmbed url={embed.url} castUrls={urls} visible={visible}/>:null}</View>)}
   </View>;
 }
 export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=true}:{cast:Cast;expanded?:boolean;loadActivity?:boolean}){
