@@ -5,8 +5,8 @@ import {useQuery} from '../lib/hooks';
 import {Avatar} from './ui';
 
 export function AccountButton(){
-  const {api,account,colors}=useApp(),fid=account.session?.fid;
-  const {value}=useQuery(()=>fid?api.profile(fid):Promise.resolve(undefined),[api,fid]);
+  const {api,account,colors,profileRevision}=useApp(),fid=account.session?.fid;
+  const {value}=useQuery(()=>fid?api.profile(fid):Promise.resolve(undefined),[api,fid,profileRevision]);
   return <Pressable accessibilityRole="button" accessibilityLabel={fid?'Open your profile':'Sign in'} onPress={()=>fid?router.push(`/profile/${fid}`):router.push('/sign-in')} style={{minWidth:44,minHeight:44,justifyContent:'center',alignItems:'center',marginRight:12}}>
     {fid?<Avatar url={value?.avatar} size={32}/>:<Text style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>Sign in</Text>}
   </Pressable>;

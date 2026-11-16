@@ -9,6 +9,34 @@ import {mobileClaim} from '../../mobile-proof.mjs';
 
 const origin='https://kite.example',address='0x'+'11'.repeat(20),now=1700000000000;
 const target={hash:'0x'+'22'.repeat(20),signer:'public',data:{fid:37,timestamp:1,castAddBody:{text:'Fixture'}}};
+
+test('follow and unfollow sign the target link with the connected account and reject self-follow',async()=>{
+  const h=harness(),account=h.create();await account.restore();await assert.rejects(account.follow(37,false),/Sign in/);
+  await account.begin();h.approve();await account.check();
+  await account.follow(37,false);await account.follow(37,true);
+  const {castSdk}=await import('../src/lib/cast-sdk'),sdk=await castSdk();
+  for(const [index,type] of [sdk.MessageType.LINK_ADD,sdk.MessageType.LINK_REMOVE].entries()){
+    const message=sdk.Message.decode(h.submitted[index]);assert.equal(message.data?.fid,545039);assert.equal(message.data?.type,type);assert.equal(message.data?.linkBody?.targetFid,37);assert.equal(message.data?.linkBody?.type,'follow');assert.ok((await sdk.validations.validateMessage(message)).isOk());
+  }
+  assert.ok(sdk.Message.decode(h.submitted[1]).data!.timestamp>sdk.Message.decode(h.submitted[0]).data!.timestamp);
+  await assert.rejects(account.follow(545039,false),/Invalid/);assert.equal(h.submitted.length,2);
+});
+test('profile edits validate every field before submission and report only accepted changes',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();
+  await assert.rejects(account.updateProfile({name:'A valid name',bio:'🌱'.repeat(65)}),/256/);assert.equal(h.submitted.length,0);
+  await assert.rejects(account.updateProfile({website:'javascript:alert(1)'}),/URL/);
+  const accepted:unknown[]=[];await account.updateProfile({name:'Kite tester',bio:'Updated bio',avatar:'https://example.com/avatar.gif'},value=>accepted.push(value));
+  const {castSdk}=await import('../src/lib/cast-sdk'),sdk=await castSdk();
+  assert.equal(JSON.stringify(accepted),JSON.stringify([{name:'Kite tester'},{bio:'Updated bio'},{avatar:'https://example.com/avatar.gif'}]));
+  for(const message of h.submitted.map(bytes=>sdk.Message.decode(bytes))){assert.equal(message.data?.type,sdk.MessageType.USER_DATA_ADD);assert.equal(message.data?.fid,545039);assert.ok((await sdk.validations.validateMessage(message)).isOk());}
+  h.failPost(true);await assert.rejects(account.updateProfile({name:'Not accepted'},value=>accepted.push(value)),/Node unavailable/);assert.equal(accepted.length,3);
+});
+test('a partial profile save reports accepted fields and stops at the first failure',async()=>{
+  const h=harness(),account=h.create();await account.restore();await account.begin();h.approve();await account.check();let requests=0;
+  h.api.submit=async bytes=>{if(++requests===2)throw new Error('Second field failed');h.submitted.push(bytes);};
+  const accepted:unknown[]=[];await assert.rejects(account.updateProfile({name:'Accepted',bio:'Not saved',website:'https://example.com'},value=>accepted.push(value)),/Second field/);
+  assert.deepEqual(accepted,[{name:'Accepted'}]);assert.equal(h.submitted.length,1);assert.equal(requests,2);
+});
 function harness(){
   let saved:string|null=null,counter=1,approved=false,failSave=false,failPost=false;
   let seedCount=0,approvalCalls=0,providerPolls=0;

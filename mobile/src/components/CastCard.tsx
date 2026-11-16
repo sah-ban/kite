@@ -20,15 +20,15 @@ import {articleChain,isArticle} from '../lib/articles';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
-  const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
+  const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);
   const Container=profileLink?Pressable:View;
   return <Container {...(profileLink?{onPress:(event:import('react-native').GestureResponderEvent)=>{event.stopPropagation();router.push(`/profile/${fid}`);},accessibilityRole:'link' as const,accessibilityLabel:`View ${value?.name||`FID ${fid}`}`}:{})} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Container>;
 }
 function AuthorAvatar({fid}:{fid:number}){
-  const {api}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);
+  const {api,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);
   return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={{width:40,alignSelf:'flex-start'}}><Avatar url={value?.avatar} size={40}/></Pressable>;
 }
-function Mention({fid}:{fid:number}){const {api,colors}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
+function Mention({fid}:{fid:number}){const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
 export function CastText({cast,limit=Infinity,compact=false,numberOfLines,expansion}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number;expansion?:{expanded:boolean;onPress:()=>void}}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);

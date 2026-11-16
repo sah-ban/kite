@@ -4,6 +4,8 @@ import {imageEmbeds} from '../../../cast.mjs';
 import {createAttribution} from './attribution';
 import {xHandle} from '../../../src/lib/x-handle';
 import {articleChain,assembleArticle} from './articles';
+import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
+import type {ProfileChanges} from './profile-edit';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
@@ -13,6 +15,7 @@ export class ApiError extends Error {
 }
 export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profiles = new Map<number, Promise<Profile>>();
+  const profileOverrides=new Map<number,ProfileChanges>();
   const published=new Map<string,{cast:Cast;expires:number}>();
   const activityCache = new Map<string,{expires:number;value:Promise<{likes:Page<number>|null;recasts:Page<number>|null}>}>();
   let activeActivity = 0;
@@ -54,7 +57,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   };
   async function profile(fid:number):Promise<Profile> {
     if (!isFid(fid)) throw new Error('Invalid profile FID.');
-    const cached = profiles.get(fid); if (cached) return cached;
+    const cached = profiles.get(fid); if (cached) return {...await cached,...profileOverrides.get(fid)};
     const pending = hub<NodePage>('userDataByFid',{fid}).then(value => {
       if (!Array.isArray(value.messages)) throw new Error('Profile data is unavailable.');
       const fields = new Map<string|number,string>();
@@ -67,7 +70,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     }).catch(error=>{profiles.delete(fid);throw error;});
     profiles.set(fid,pending);
     if (profiles.size > 250) profiles.delete(profiles.keys().next().value!);
-    return pending;
+    return {...await pending,...profileOverrides.get(fid)};
   }
   async function resolveProfile(value:string,signal?:AbortSignal):Promise<number> {
     if (/^\d+$/.test(value) && isFid(Number(value))) return Number(value);
@@ -139,6 +142,16 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       return {...assembleArticle(root,candidates),searchLimited:!!cursor};
     },
     origin:server,request,profile,resolveProfile,resolveCast,reactions,activity,accountPost,signerRequester,
+    rememberProfile:(fid:number,changes:ProfileChanges)=>{profileOverrides.set(fid,{...profileOverrides.get(fid),...changes});if(profileOverrides.size>250)profileOverrides.delete(profileOverrides.keys().next().value!);},
+    proExpiry:async(fid:number,signal?:AbortSignal)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid},signal)),
+    isFollowing:async(fid:number,target:number,signal?:AbortSignal)=>{
+      if(!isFid(fid)||!isFid(target))throw new Error('Invalid follow target.');
+      try{
+        const result=await hub<{data?:{fid:number;type:number|string;linkBody?:{type:string;targetFid:number}}}>('linkById',{fid,target_fid:target,link_type:'follow'},signal);
+        if(result.data?.fid!==fid||![5,'MESSAGE_TYPE_LINK_ADD'].includes(result.data.type)||result.data.linkBody?.type!=='follow'||result.data.linkBody.targetFid!==target)throw new Error('Could not check follow status.');
+        return true;
+      }catch(error){if(error instanceof ApiError&&error.notFound)return false;throw error;}
+    },
     rememberCast:(cast:Cast)=>{if(!isCast(cast))throw new Error('Invalid published cast.');published.set(`${cast.data.fid}:${cast.hash.toLowerCase()}`,{cast,expires:Date.now()+120000});if(published.size>100)published.delete(published.keys().next().value!);},
     uploadImage:async(bytes:Uint8Array,signal?:AbortSignal)=>{
       if(!bytes.length||bytes.length>MAX_IMAGE_BYTES)throw new Error('Images must be 10 MB or smaller.');

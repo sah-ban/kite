@@ -9,6 +9,7 @@ import {deviceAccount} from './account';
 import type {AccountSnapshot,PushRegistration} from './account-core';
 import type {CastInput} from './composer';
 import {runCastEdit} from './cast-edit';
+import type {ProfileChanges} from './profile-edit';
 
 export type ThemeMode = 'system'|'light'|'dark';
 const palettes = {
@@ -18,6 +19,7 @@ const palettes = {
 export type Colors = typeof palettes.light;
 type ReactionOverride={active:boolean;count:number|null;more:boolean};
 type State = {api:Api;theme:ThemeMode;dark:boolean;colors:Colors;ready:boolean;setTheme:(value:ThemeMode)=>Promise<void>;
+  profileRevision:number;followOverrides:Map<string,boolean>;follow:(fid:number,remove:boolean)=>Promise<void>;saveProfile:(changes:ProfileChanges,onSaved?:(changes:ProfileChanges)=>void)=>Promise<void>;
   setPush:(registration:PushRegistration)=>Promise<void>;getPush:()=>Promise<PushRegistration|undefined>;enrollNotifications:()=>Promise<void>;account:AccountSnapshot;accountBusy:boolean;accountError:string;beginSignIn:()=>Promise<AccountSnapshot>;checkSignIn:()=>Promise<AccountSnapshot>;signOut:()=>Promise<AccountSnapshot>;
   reactions:Map<string,ReactionOverride>;react:(cast:Cast,kind:'likes'|'recasts',active:boolean,count:number|null,more:boolean)=>Promise<void>;
   publish:(input:CastInput)=>Promise<Cast>;publishing:boolean;published:Cast[];publishNotice:Cast|null;dismissPublishNotice:()=>void;
@@ -37,6 +39,15 @@ export function AppProvider({children}:{children:ReactNode}) {
   const [publishing,setPublishing]=useState(false),[published,setPublished]=useState<Cast[]>([]),[publishNotice,setPublishNotice]=useState<Cast|null>(null);
   const publishLock=useRef(false);
   const [deletedCasts,setDeletedCasts]=useState<Set<string>>(()=>new Set());
+  const [profileRevision,setProfileRevision]=useState(0),[followOverrides,setFollowOverrides]=useState<Map<string,boolean>>(()=>new Map());
+  async function follow(fid:number,remove:boolean){
+    const viewer=account.session?.fid;if(!viewer)throw new Error('Sign in to Kite first.');
+    await device.follow(fid,remove);setFollowOverrides(previous=>new Map(previous).set(`${viewer}:${fid}`,!remove));
+  }
+  async function saveProfile(changes:ProfileChanges,onSaved?:(changes:ProfileChanges)=>void){
+    const fid=account.session?.fid;if(!fid)throw new Error('Sign in to Kite first.');
+    await device.updateProfile(changes,accepted=>{api.rememberProfile(fid,accepted);setProfileRevision(value=>value+1);onSaved?.(accepted);});
+  }
   useEffect(()=>{
     let active=true;
     const preferences=AsyncStorage.getItem(SETTINGS).then(value=>{
@@ -90,6 +101,6 @@ export function AppProvider({children}:{children:ReactNode}) {
   }
   const dark=theme==='dark'||(theme==='system'&&system==='dark');
   async function setTheme(value:ThemeMode){await AsyncStorage.setItem(SETTINGS,JSON.stringify({theme:value}));changeTheme(value);}
-  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,setPush,getPush:device.getPush,enrollNotifications:device.enrollNotifications,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast,replaceCast}}>{children}</Context.Provider>;
+  return <Context.Provider value={{api,theme,dark,colors:palettes[dark?'dark':'light'],ready,setTheme,profileRevision,followOverrides,follow,saveProfile,setPush,getPush:device.getPush,enrollNotifications:device.enrollNotifications,account,accountBusy,accountError,beginSignIn,checkSignIn,signOut,reactions,react,publish,publishing,published,publishNotice,dismissPublishNotice:()=>setPublishNotice(null),deletedCasts,deleteCast,replaceCast}}>{children}</Context.Provider>;
 }
 export function useApp(){const state=useContext(Context);if(!state)throw new Error('AppProvider is missing.');return state;}

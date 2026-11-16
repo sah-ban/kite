@@ -7,6 +7,17 @@ const hash='0x572549b948717ab9302a492c197121b0b844e7c8';
 const cast:Cast={hash,signer:'public-key',data:{fid:1059075,timestamp:100,castAddBody:{text:'Hello Kite',mentions:[],mentionsPositions:[],embeds:[]}}};
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
 
+test('follow status distinguishes missing links from unavailable or malformed data',async()=>{
+  const api=createApi('https://kite.example',async()=>json({data:{type:'MESSAGE_TYPE_LINK_ADD',fid:1,linkBody:{type:'follow',targetFid:37}}}));assert.equal(await api.isFollowing(1,37),true);
+  const missing=createApi('https://kite.example',async()=>json({error_detail:'status: NotFound, link not found'},400));assert.equal(await missing.isFollowing(1,37),false);
+  const failed=createApi('https://kite.example',async()=>json({},503));await assert.rejects(failed.isFollowing(1,37));
+  const wrong=createApi('https://kite.example',async()=>json({data:{fid:1,type:5,linkBody:{type:'follow',targetFid:38}}}));await assert.rejects(wrong.isFollowing(1,37));
+});
+test('accepted profile changes update cached profile reads without another node request',async()=>{
+  let calls=0;const api=createApi('https://kite.example',async()=>{calls++;return json({messages:[{data:{userDataBody:{type:2,value:'Before'}}}]});});
+  await api.profile(1);api.rememberProfile(1,{name:'After',avatar:'https://example.com/pfp.gif'});const updated=await api.profile(1);assert.equal(updated.name,'After');assert.equal(updated.avatar,'https://example.com/pfp.gif');assert.equal(calls,1);
+});
+
 test('server configuration accepts only credential-free HTTPS origins',()=>{
   assert.equal(normalizeServer(' https://kite.example/ '),'https://kite.example');
   for(const value of ['http://kite.example','file:///tmp/key','https://user:pass@kite.example','https://kite.example/api','https://kite.example/?token=private','https://kite.example/#private']) assert.throws(()=>normalizeServer(value));

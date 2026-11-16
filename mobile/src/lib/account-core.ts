@@ -8,6 +8,7 @@ import type {Api} from './api';
 import {type Cast,isFid,isHash} from './model';
 import {castSdk} from './cast-sdk';
 import {type CastInput,castBody,publishedCast} from './composer';
+import {profileChanges,profileFields,type ProfileChanges} from './profile-edit';
 
 export type PreparedCast={bytes:string;cast:Cast};
 export type AccountSession={fid:number;key:string;address:string};
@@ -23,6 +24,8 @@ function validApprovalLink(value:unknown):value is string{
 }
 export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatus'|'submit'>,storage:AccountStorage,random:(size:number)=>Promise<Uint8Array>,now=Date.now){
   let saved:Stored|null=null,restored=false,tail:Promise<unknown>=Promise.resolve();
+  const lastProfileWrites=new Map<string,number>();
+  function mutationTimestamp(key:string,now:number){const value=Math.max(now,(lastProfileWrites.get(key)||0)+1);if(value>now+300)throw new Error('Please wait a moment before trying again.');return value;}
   function exclusive<T>(run:()=>Promise<T>):Promise<T>{const value=tail.then(run);tail=value.catch(()=>{});return value;}
   function snapshot():AccountSnapshot{return {session:saved?.phase==='active'?{fid:saved.fid!,key:saved.key,address:saved.address!}:null,pending:saved?.phase==='pending'?{deepLinkUrl:saved.deepLinkUrl!,appFid:saved.appFid!,expiresAt:saved.expiresAt!}:null,hasSavedKey:!!saved||!restored,...(saved?.push?{pushEnabled:!!saved.push.enabled&&!!saved.pushConfirmed}:{})};}
   async function persist(value:Stored){await storage.set(JSON.stringify(value));saved=value;}
@@ -123,6 +126,33 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
       if(saved?.phase==='active'&&saved.push?.enabled)await sendPush(saved,{...saved.push,enabled:false});
       await storage.remove();saved=null;restored=true;return snapshot();}),
     cast:(input:CastInput)=>exclusive(async()=>{const prepared=await prepareCast(input);await api.submit(hexToBytes(prepared.bytes.slice(2)));return prepared.cast;}),
+    follow:(targetFid:number,remove:boolean)=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      if(!isFid(targetFid)||targetFid===saved.fid||typeof remove!=='boolean')throw new Error('Invalid follow target.');
+      const sdk=await castSdk(),secret=hexToBytes(saved.privateKey.slice(2));
+      try{
+        const key=`${saved.fid}:follow:${targetFid}`,timestamp=mutationTimestamp(key,sdk.getFarcasterTime()._unsafeUnwrap());
+        const result=await(remove?sdk.makeLinkRemove:sdk.makeLinkAdd)({type:'follow',targetFid},{fid:saved.fid!,network:sdk.FarcasterNetwork.MAINNET,timestamp},new sdk.NobleEd25519Signer(secret));
+        if(result.isErr())throw new Error(result.error.message);
+        await api.submit(sdk.Message.encode(result.value).finish());
+        lastProfileWrites.set(key,timestamp);
+      }finally{secret.fill(0);}
+    }),
+    updateProfile:(changes:ProfileChanges,onSaved:(changes:ProfileChanges)=>void=()=>{})=>exclusive(async()=>{
+      if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
+      const fields=profileChanges(changes),sdk=await castSdk(),secret=hexToBytes(saved.privateKey.slice(2));
+      try{
+        // Validate and sign every field before submitting any profile changes.
+        const messages=[];
+        for(const [field,value] of fields){
+          const key=`${saved.fid}:profile:${field}`,timestamp=mutationTimestamp(key,sdk.getFarcasterTime()._unsafeUnwrap());
+          const result=await sdk.makeUserDataAdd({type:profileFields[field].type,value},{fid:saved.fid!,network:sdk.FarcasterNetwork.MAINNET,timestamp},new sdk.NobleEd25519Signer(secret));
+          if(result.isErr())throw new Error(result.error.message);
+          messages.push({field,value,key,timestamp,bytes:sdk.Message.encode(result.value).finish()});
+        }
+        for(const message of messages){await api.submit(message.bytes);lastProfileWrites.set(message.key,message.timestamp);onSaved({[message.field]:message.value});}
+      }finally{secret.fill(0);}
+    }),
     prepareReplacement:(cast:Cast,input:CastInput)=>exclusive(async()=>{
       if(saved?.phase!=='active'||cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only edit your own casts.');
       return prepareCast(input,cast.data.timestamp+1);
