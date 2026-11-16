@@ -7,6 +7,7 @@ import {castRoute,isFid,isHash} from '../../../lib/model';
 import {editKey,readEditAttempt,readEditDraft} from '../../../lib/cast-edit';
 import {CastComposer} from '../../../components/CastComposer';
 import {Button,Loading,Notice} from '../../../components/ui';
+import {isArticle} from '../../../lib/articles';
 
 export default function EditCastRoute(){
   const {fid,hash}=useLocalSearchParams<{fid:string;hash:string}>(),{api,account}=useApp();
@@ -16,6 +17,7 @@ export default function EditCastRoute(){
     const attempt=await readEditAttempt(AsyncStorage,editKey(api.origin,author,hash),session,hash);
     const cast=attempt?.source||await api.resolveCast(fid,hash,signal);
     if(cast.data.fid!==session.fid)throw new Error('You can only edit your own casts.');
+    if(isArticle(cast))throw new Error('Articles are read-only in Kite. Edit the article in Farcaster.');
     if(attempt?.accepted)api.rememberCast(attempt.prepared.cast);
     return {cast,initial:await readEditDraft(attempt?.prepared.cast||cast,api),attempt};
   },[api,author,hash,session?.fid,session?.key]);

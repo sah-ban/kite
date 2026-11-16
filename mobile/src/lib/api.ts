@@ -4,6 +4,7 @@ import {imageEmbeds} from '../../../cast.mjs';
 import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 import {createAttribution} from './attribution';
 import {xHandle} from '../../../src/lib/x-handle';
+import {articleChain,assembleArticle} from './articles';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
@@ -125,6 +126,19 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     return value;
   }
   return {
+    article:async(cast:Cast,signal?:AbortSignal)=>{
+      const chain=articleChain(cast);
+      const root=chain?.root?await resolveCast(String(chain.root.fid),chain.root.hash,signal):cast;
+      if(!articleChain(root))return {...assembleArticle(root,[]),searchLimited:false};
+      let cursor='';const seen=new Set<string>(),candidates:Cast[]=[];
+      for(let index=0;index<20;index++){
+        const result=page(await hub<NodePage>('castsByFid',{fid:root.data.fid,startTimestamp:root.data.timestamp,pageSize:100,...(cursor?{pageToken:cursor}:{})},signal));
+        candidates.push(...result.items);
+        if(!result.next||seen.has(result.next)){cursor='';break;}
+        seen.add(result.next);cursor=result.next;
+      }
+      return {...assembleArticle(root,candidates),searchLimited:!!cursor};
+    },
     origin:server,request,profile,resolveProfile,resolveCast,reactions,activity,accountPost,signerRequester,
     rememberCast:(cast:Cast)=>{if(!isCast(cast))throw new Error('Invalid published cast.');published.set(`${cast.data.fid}:${cast.hash.toLowerCase()}`,{cast,expires:Date.now()+120000});if(published.size>100)published.delete(published.keys().next().value!);},
     proExpiry:async(fid:number,signal?:AbortSignal)=>proSubscriptionExpiry(await hub('storageLimitsByFid',{fid},signal)),

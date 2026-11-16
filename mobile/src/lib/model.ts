@@ -7,6 +7,8 @@ export type Cast = {
     parentUrl?:string;
     embeds?: {url?: string; castId?: {fid: number; hash: string}}[];
     embedsDeprecated?: string[];
+    formatVersion?:number;
+    chain?:{root?:{fid:number;hash:string};index:number;count:number};
   }};
 };
 export type Profile = {fid: number; name: string; username: string; avatar: string; bio: string; banner: string; website: string;twitterUsername?:string};

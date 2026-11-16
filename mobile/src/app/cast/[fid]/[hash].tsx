@@ -1,4 +1,4 @@
-import {useLocalSearchParams} from 'expo-router';
+import {Stack,useLocalSearchParams} from 'expo-router';
 import {useState} from 'react';
 import {Pressable,ScrollView,Text,View} from 'react-native';
 import {type Cast,castKey,isFid,isHash,mergeCasts} from '../../../lib/model';
@@ -7,19 +7,25 @@ import {useCastPage,useQuery} from '../../../lib/hooks';
 import {CastCard,Person} from '../../../components/CastCard';
 import {CastList} from '../../../components/CastList';
 import {Button,Loading,Notice} from '../../../components/ui';
+import {articleChain,isArticle} from '../../../lib/articles';
+import {ArticleReader} from '../../../components/ArticleReader';
 
 export default function Conversation(){
   const {fid,hash}=useLocalSearchParams<{fid:string;hash:string}>(),{api,deletedCasts}=useApp();const author=Number(fid);
   const valid=isFid(author)&&isHash(hash);
-  const cast=useQuery(signal=>valid?api.resolveCast(String(author),hash,signal):Promise.reject(new Error('This cast link is invalid.')),[api,author,hash,valid]);
+  const cast=useQuery(async signal=>{
+    if(!valid)throw new Error('This cast link is invalid.');
+    const value=await api.resolveCast(String(author),hash,signal),root=isArticle(value)?articleChain(value)?.root:undefined;
+    return root?api.resolveCast(String(root.fid),root.hash,signal):value;
+  },[api,author,hash,valid]);
   if(valid&&deletedCasts.has(castKey({data:{fid:author},hash})))return <Notice title="Cast deleted">Your cast has been deleted.</Notice>;
   return cast.loading?<Loading/>:cast.error?<Notice title="Cast unavailable" retry={cast.reload}>{cast.error}</Notice>:cast.value?<Thread cast={cast.value}/>:null;
 }
 function Thread({cast}:{cast:Cast}){
   const {api,colors,published}=useApp();const [tab,setTab]=useState<'replies'|'likes'|'recasts'>('replies');
   const page=useCastPage((cursor,signal)=>api.replies(cast,cursor,signal),[api,cast.hash,cast.data.fid]);
-  const replies={...page,items:mergeCasts(page.items,published.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())).sort((a,b)=>a.data.timestamp-b.data.timestamp)};
-  const header=<View><CastCard cast={cast} expanded/><View style={{flexDirection:'row',borderBottomWidth:1,borderColor:colors.line}}>{(['replies','likes','recasts'] as const).map(value=><Pressable key={value} accessibilityRole="tab" accessibilityState={{selected:tab===value}} onPress={()=>setTab(value)} style={{flex:1,minHeight:44,alignItems:'center',justifyContent:'center',paddingHorizontal:12,paddingVertical:10,borderBottomWidth:2,borderBottomColor:tab===value?colors.accent:'transparent'}}><Text style={{color:tab===value?colors.ink:colors.muted,fontWeight:'600'}}>{value==='recasts'?'Reposts':value[0].toUpperCase()+value.slice(1)}</Text></Pressable>)}</View></View>;
+  const replies={...page,items:mergeCasts(page.items,published.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())).filter(reply=>{const chain=articleChain(reply);return !isArticle(cast)||chain?.root?.fid!==cast.data.fid||chain.root.hash.toLowerCase()!==cast.hash.toLowerCase();}).sort((a,b)=>a.data.timestamp-b.data.timestamp)};
+  const header=<View><Stack.Screen options={{title:isArticle(cast)?'Article':'Conversation'}}/>{isArticle(cast)?<ArticleReader cast={cast}/>:<CastCard cast={cast} expanded/>}<View style={{flexDirection:'row',borderBottomWidth:1,borderColor:colors.line}}>{(['replies','likes','recasts'] as const).map(value=><Pressable key={value} accessibilityRole="tab" accessibilityState={{selected:tab===value}} onPress={()=>setTab(value)} style={{flex:1,minHeight:44,alignItems:'center',justifyContent:'center',paddingHorizontal:12,paddingVertical:10,borderBottomWidth:2,borderBottomColor:tab===value?colors.accent:'transparent'}}><Text style={{color:tab===value?colors.ink:colors.muted,fontWeight:'600'}}>{value==='recasts'?'Reposts':value[0].toUpperCase()+value.slice(1)}</Text></Pressable>)}</View></View>;
   return tab==='replies'?<CastList page={replies} header={header} empty="No replies yet"/>:<ScrollView>{header}<Reactions key={tab} cast={cast} kind={tab}/></ScrollView>;
 }
 function Reactions({cast,kind}:{cast:Cast;kind:'likes'|'recasts'}){

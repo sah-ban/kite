@@ -16,6 +16,7 @@ import {MiniAppEmbed} from './MiniAppEmbed';
 import {miniAppLaunchURL} from '../lib/miniapp';
 import {TweetEmbed} from './TweetEmbed';
 import {xPostLink} from '../lib/x-post';
+import {isArticle} from '../lib/articles';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
@@ -88,7 +89,7 @@ export function Quote({fid,hash}:{fid:number;hash:string}){
     {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:embeds.length===1?<View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View><View style={{flex:1,minWidth:0}}>{text}</View></View>:<>{text}{embeds.length>1&&<View style={{flexDirection:'row',gap:6}}>{embeds.map((embed,index)=><View key={`${index}:${embed.url||embed.castId?.hash}`} style={{flex:1,minWidth:0,maxWidth:96,aspectRatio:1}}><QuoteThumbnail embed={embed}/></View>)}</View>}</>}
   </Pressable>;
 }
-function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
+export function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['data']['castAddBody']['embeds']>;visible:boolean;gutter:number}){
   const [width,setWidth]=useState(0),[offset,setOffset]=useState(0);
   const [itemWidths,setItemWidths]=useState<Record<string,number>>({});
   const items=embeds.slice(0,4);
@@ -118,7 +119,7 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
     {!expanded&&<View style={{position:'absolute',left:14,top:8,width:40,height:40,zIndex:1}}><AuthorAvatar fid={cast.data.fid}/></View>}
     <View style={{minWidth:0,paddingLeft:expanded?0:48,gap:expanded?4:2}}>
     <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
-    {!!(body.text||body.mentions?.length)&&(expanded?<CastText cast={cast} compact/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact expansion={canExpand?{expanded:textExpanded,onPress:()=>setTextExpanded(value=>!value)}:undefined}/></Pressable>)}
+    {isArticle(cast)&&!expanded?<View style={{gap:4}}><Text style={{color:colors.muted,fontSize:12}}>Article</Text><Text numberOfLines={3} style={{color:colors.ink,fontSize:21,lineHeight:27,fontWeight:'700'}}>{body.text.split('\n')[0]}</Text><Text style={{color:colors.accent,fontSize:13}}>Read article →</Text></View>:!!(body.text||body.mentions?.length)&&(expanded?<CastText cast={cast} compact/>:<Pressable onPress={event=>{event.stopPropagation();route();}} accessibilityRole="link" accessibilityLabel="Open conversation"><CastText cast={cast} limit={textExpanded?Infinity:500} compact expansion={canExpand?{expanded:textExpanded,onPress:()=>setTextExpanded(value=>!value)}:undefined}/></Pressable>)}
     {embeds.length>0&&<CastEmbeds embeds={embeds} visible={loadActivity} gutter={expanded?0:48}/>}
     {expanded&&<View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',columnGap:8,rowGap:2,marginTop:2}}>
       <Text style={{fontSize:12,lineHeight:18,color:colors.muted}}>{castDate(cast.data.timestamp).toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</Text>
