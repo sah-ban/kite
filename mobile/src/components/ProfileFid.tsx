@@ -10,7 +10,7 @@ export function ProfileFid({fid}:{fid:number}){
   async function copy(){
     try{if(!await Clipboard.setStringAsync(String(fid)))throw new Error('Copy failed');setStatus('copied');}catch{setStatus('error');}
   }
-  return <Pressable accessibilityRole="button" accessibilityLabel={`Copy FID ${fid}`} onPress={()=>void copy()} style={({pressed})=>({marginLeft:'auto',minHeight:44,paddingLeft:6,flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:5,opacity:pressed?.65:1})}>
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Copy FID ${fid}`} onPress={()=>void copy()} hitSlop={8} style={({pressed})=>({marginLeft:'auto',minHeight:28,paddingLeft:6,flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:5,opacity:pressed?.65:1})}>
     <Text accessibilityLiveRegion="polite" style={{color:status==='error'?colors.danger:status==='copied'?colors.accent:colors.muted,fontSize:12}}>{status==='copied'?'Copied':status==='error'?'Copy failed':`FID ${fid}`}</Text><Icon name={status==='copied'?'check':'copy'} size={12} color={status==='error'?colors.danger:colors.muted}/>
   </Pressable>;
 }
