@@ -1,5 +1,6 @@
 import {Image} from 'expo-image';
-import {useLocalSearchParams} from 'expo-router';
+import {router,useLocalSearchParams} from 'expo-router';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useState} from 'react';
 import {Pressable,Text,View} from 'react-native';
 import {useApp} from '../../lib/state';
@@ -12,8 +13,11 @@ import {ProfileAction} from '../../components/ProfileAction';
 import {ProfileBio} from '../../components/ProfileBio';
 
 export default function ProfileScreen(){
-  const params=useLocalSearchParams<{fid:string}>();const fid=Number(params.fid);if(!isFid(fid))return <Notice title="Profile not found">This link has an invalid FID.</Notice>;
-  return <Profile key={fid} fid={fid}/>;
+  const params=useLocalSearchParams<{fid:string}>(),insets=useSafeAreaInsets(),{colors}=useApp();const fid=Number(params.fid);
+  return <View style={{flex:1,paddingTop:insets.top,backgroundColor:colors.background}}>
+    {isFid(fid)?<Profile key={fid} fid={fid}/>:<Notice title="Profile not found">This link has an invalid FID.</Notice>}
+    <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/')} style={({pressed})=>({position:'absolute',top:insets.top+8,left:14,width:40,height:40,borderRadius:20,backgroundColor:pressed?'#00000099':'#00000066',alignItems:'center',justifyContent:'center',zIndex:10})}><Icon name="arrow-left" size={21} color="#fff"/></Pressable>
+  </View>;
 }
 function Profile({fid}:{fid:number}){
   const {api,colors,published,profileRevision}=useApp();const [tab,setTab]=useState<'posts'|'replies'>('posts');
