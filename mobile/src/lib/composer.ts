@@ -9,6 +9,7 @@ export type OriginalEmbed={url?:string;castId?:CastRef};
 export type Draft={text:string;mentions:DraftMention[];images:string[];links:string[];suppressed:string[];quote?:CastRef;originalEmbeds?:OriginalEmbed[];parentUrl?:string};
 export type CastInput={text:string;mentions:number[];mentionsPositions:number[];images:string[];links:string[];parent?:CastRef;quote?:CastRef;embeds?:OriginalEmbed[];parentUrl?:string};
 export const emptyDraft=():Draft=>({text:'',mentions:[],images:[],links:[],suppressed:[]});
+export const hasDraftContent=(draft:Draft)=>!!(draft.text.trim()||draft.mentions.length||draft.images.length||draft.links.length||draft.quote||draft.originalEmbeds?.length);
 export const validRef=(value:CastRef)=>isFid(value.fid)&&isHash(value.hash);
 export function draftKey(fid:number,origin:string,parent?:CastRef,quote?:CastRef){return `kite.draft.v1:${encodeURIComponent(origin)}:${fid}:${parent?`${parent.fid}:${parent.hash.toLowerCase()}`:'post'}${quote?`:quote:${quote.fid}:${quote.hash.toLowerCase()}`:''}`;}
 export function draftLinks(draft:Draft):{urls:string[];overflow:number}{return resolveLinks(draft.text,draft.links,[...draft.images,...(draft.originalEmbeds||[]).flatMap(embed=>embed.url?[embed.url]:[])],draft.suppressed,4-draft.images.length-(draft.quote?1:0)-(draft.originalEmbeds?.length||0));}
@@ -60,11 +61,11 @@ export function restoreDraft(raw:string|null):Draft{
   }catch{return emptyDraft();}
 }
 export function makeDraftStore(storage:{getItem:(key:string)=>Promise<string|null>;setItem:(key:string,value:string)=>Promise<void>;removeItem:(key:string)=>Promise<void>},key:string,initial:Draft=emptyDraft()){
-  let tail:Promise<unknown>=Promise.resolve(),cleared=false;
+  let tail:Promise<unknown>=Promise.resolve(),cleared=false,clearing=false;
   return {
     load:async(preferInitial=false)=>{if(preferInitial)return initial;const raw=await storage.getItem(key);return raw===null?(cleared?emptyDraft():initial):restoreDraft(raw);},
-    save:(draft:Draft)=>{if(cleared)return Promise.resolve();const serialized=JSON.stringify(draft);const result=tail.catch(()=>{}).then(()=>storage.setItem(key,serialized));tail=result;return result;},
-    clear:()=>{cleared=true;const result=tail.catch(()=>{}).then(()=>storage.removeItem(key));tail=result;return result;},
+    save:(draft:Draft)=>{if(cleared)return Promise.resolve();if(clearing)return tail;const serialized=JSON.stringify({...draft,updatedAt:Date.now()});const result=tail.catch(()=>{}).then(()=>hasDraftContent(draft)?storage.setItem(key,serialized):storage.removeItem(key));tail=result;return result;},
+    clear:()=>{clearing=true;const result=tail.catch(()=>{}).then(()=>storage.removeItem(key)).then(()=>{cleared=true;}).finally(()=>{clearing=false;});tail=result;return result;},
   };
 }
 export function publishedCast(fid:number,key:string,hash:string,timestamp:number,input:CastInput):Cast{
