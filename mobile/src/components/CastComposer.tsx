@@ -92,11 +92,13 @@ export function CastComposer({fid,parent,quote,edit,storageKey}:{fid:number;stor
         <ComposerTool label="Add image" icon="image" disabled={attachmentsDisabled} onPress={()=>void photos()}/>
         <ComposerTool label="Choose a GIF" disabled={attachmentsDisabled} onPress={()=>{Keyboard.dismiss();setGifOpen(true);}}/>
         <ComposerTool label="Attach link" icon="link" selected={linkOpen} disabled={attachmentsDisabled} onPress={()=>setLinkOpen(value=>!value)}/>
-        <View style={{flex:1,alignItems:'flex-end',gap:5}}>
-          <View accessible accessibilityRole="progressbar" accessibilityLabel="Cast text limit" accessibilityValue={{min:0,max:maxBytes,now:Math.min(state.bytes,maxBytes),text:`${state.bytes.toLocaleString()} of ${maxBytes.toLocaleString()} text bytes`}} style={{width:96,height:4,borderRadius:2,backgroundColor:colors.line,overflow:'hidden'}}>
-            <View style={{width:`${Math.min(100,state.bytes/maxBytes*100)}%`,height:4,borderRadius:2,backgroundColor:state.bytes>=maxBytes*.9?colors.danger:colors.accent}}/>
+        <View style={{flex:1,alignItems:'flex-end'}}>
+          <View style={{gap:5}}>
+            <View accessible accessibilityRole="progressbar" accessibilityLabel="Cast text limit" accessibilityValue={{min:0,max:maxBytes,now:Math.min(state.bytes,maxBytes),text:`${state.bytes.toLocaleString()} of ${maxBytes.toLocaleString()} text bytes`}} style={{height:4,borderRadius:2,backgroundColor:colors.line,overflow:'hidden'}}>
+              <View style={{width:`${Math.min(100,state.bytes/maxBytes*100)}%`,height:4,borderRadius:2,backgroundColor:state.bytes>=maxBytes*.9?colors.danger:colors.accent}}/>
+            </View>
+            <Text accessibilityLabel={`${state.embeds} of 4 embeds used`} style={{fontSize:11,color:state.embeds>=4?colors.accent:colors.muted}}>{state.embeds}/4 embeds</Text>
           </View>
-          <Text accessibilityLabel={`${state.embeds} of 4 embeds used`} style={{fontSize:11,color:state.embeds>=4?colors.accent:colors.muted}}>{state.embeds}/4 embeds</Text>
         </View>
       </View>
     </View>
