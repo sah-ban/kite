@@ -8,9 +8,10 @@ import { AppHeader } from './AppHeader';
 import { AppLoading } from './AppLoading';
 import { PageMetadata } from './PageMetadata';
 import {Endorsements} from './Endorsements';
-import {isGuidePath,isEndorsementsPath} from './lib/routes';
+import {isGuidePath,isEndorsementsPath,legalPage,type LegalRoute} from './lib/routes';
+import {LegalPage} from './LegalPage';
 const Client = lazy(()=>import('./Client').then(m=>({default:m.Client})));
-const currentPage = ():'guide'|'client'|'endorsements' => isGuidePath(location.pathname) ? 'guide' : isEndorsementsPath(location.pathname)?'endorsements':'client';
+const currentPage = ():'guide'|'client'|'endorsements'|LegalRoute => legalPage(location.pathname)|| (isGuidePath(location.pathname) ? 'guide' : isEndorsementsPath(location.pathname)?'endorsements':'client');
 function App(){
   const [page,setPage]=useState(currentPage),[config,setConfig]=useState<Config|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
   useEffect(()=>{
@@ -28,6 +29,6 @@ function App(){
     window.dispatchEvent(new PopStateEvent('popstate'));window.scrollTo(0,0);
   }
   const loading=<AppLoading error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/>;
-  return <><PageMetadata page={page}/>{page==='endorsements'?<><AppHeader onHome={()=>navigate('client')}/><Endorsements config={config} error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/></>:page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading}</>;
+  return <><PageMetadata page={page}/>{page==='privacy'||page==='terms'||page==='community-guidelines'||page==='data-deletion'?<><AppHeader onHome={()=>navigate('client')}/><LegalPage page={page}/></>:page==='endorsements'?<><AppHeader onHome={()=>navigate('client')}/><Endorsements config={config} error={error} onRetry={()=>setAttempt(value=>value+1)} onGuide={()=>navigate('guide')}/></>:page==='guide'?<><AppHeader onHome={()=>navigate('client')}/><Guide openClient={()=>navigate('client')}/></>:config?<Suspense fallback={loading}><Client config={config} openGuide={()=>navigate('guide')}/></Suspense>:loading}</>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

@@ -1,8 +1,9 @@
 import {useEffect} from 'react';
 // @ts-expect-error Metadata is shared with the production HTML handler.
 import {pageMetadata} from '../page-metadata.mjs';
+import type {LegalRoute} from './lib/routes';
 
-export function PageMetadata({page}:{page:'client'|'guide'|'endorsements'}){
+export function PageMetadata({page}:{page:'client'|'guide'|'endorsements'|LegalRoute}){
   useEffect(()=>{
     const update=()=>{
       const meta=pageMetadata(location.pathname,location.origin);

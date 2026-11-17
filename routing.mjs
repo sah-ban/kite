@@ -1,6 +1,7 @@
 // Shared by the client router and production server so page status stays consistent.
 export const isGuidePath=pathname=>/^\/guide\/?$/.test(pathname);
 export const isEndorsementsPath=pathname=>/^\/endorsements\/?$/.test(pathname);
+export const legalPagePath=pathname=>pathname.match(/^\/(privacy|terms|community-guidelines|data-deletion)\/?$/)?.[1];
 export function parseClientRoute(pathname,search=''){
   if(/^\/settings\/?$/.test(pathname))return {kind:'settings'};
   if(/^\/search\/?$/.test(pathname))return {kind:'search'};
@@ -21,4 +22,4 @@ export function parseClientRoute(pathname,search=''){
   const feedFid=selected&&/^\d+$/.test(selected)&&Number.isSafeInteger(Number(selected))&&Number(selected)>0?Number(selected):undefined;
   return {...(feedFid?{feedFid}:{}),kind:following?'following':'home'};
 }
-export const isPagePath=pathname=>isGuidePath(pathname)||isEndorsementsPath(pathname)||parseClientRoute(pathname).kind!=='not-found';
+export const isPagePath=pathname=>isGuidePath(pathname)||isEndorsementsPath(pathname)||!!legalPagePath(pathname)||parseClientRoute(pathname).kind!=='not-found';

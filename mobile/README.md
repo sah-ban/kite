@@ -97,6 +97,8 @@ Opening `kite://cast/FID/FULL_HASH` and `kite://profile/FID` uses Expo Router. H
 
 ## Release status
 
+Settings links to the website’s `/privacy`, `/terms`, `/community-guidelines`, and `/data-deletion` pages. Privacy, deletion, and moderation requests use `kite@sahban.dev`. Deploy those web routes before distributing a build that links to them. The guidelines distinguish decentralized protocol behavior from client-level moderation; in-app reporting and personal user blocking remain unimplemented.
+
 This is an Android test build, not a Play Store release. Before submission, complete device testing, remaining account actions, accessibility checks, the privacy policy, Play Data Safety disclosures and applicable user-generated-content requirements. In-app notifications and Android push delivery are implemented. Remote push requires Firebase/Expo credentials, the updated API and worker, and testing in an installed Android build; see the setup below.
 
 ## Push notifications

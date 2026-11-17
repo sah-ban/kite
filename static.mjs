@@ -1,7 +1,8 @@
 import {readFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
-import {isPagePath} from './routing.mjs';
+import {isPagePath,legalPagePath} from './routing.mjs';
 import {metadataOrigin,renderPageMetadata} from './page-metadata.mjs';
+import {renderLegalContent} from './legal.mjs';
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2'};
 export function staticFiles(directory,config={}){
   const root=resolve(directory);
@@ -28,6 +29,8 @@ export function staticFiles(directory,config={}){
       const extension=extname(file);if(extension==='.html'){
         res.setHeader('Cache-Control','no-cache');
         if(page)content=renderPageMetadata(content.toString(),routePath,metadataOrigin(req,config));
+        const legal=legalPagePath(routePath);
+        if(legal)content=content.replace('<div id="root"></div>',()=>`<div id="root"><header class="site-header app-header"><a class="brand" href="/" aria-label="Kite home">kite</a></header>${renderLegalContent(legal)}</div>`);
       }
       return send(200,content,types[extension]||'application/octet-stream');
     }catch{return send(500,'Unable to load this page');}
