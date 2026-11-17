@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import {router} from 'expo-router';
-import {useEffect,useRef,useState,type ComponentProps} from 'react';
-import {ActivityIndicator,Linking,Modal,Pressable,ScrollView,Share,Text,View} from 'react-native';
+import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
+import {ActivityIndicator,Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Share,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {type Cast,castRoute} from '../lib/model';
 import {useApp} from '../lib/state';
@@ -28,11 +28,34 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
   const {api,colors}=useApp(),insets=useSafeAreaInsets();
   const xDraft=useQuery(()=>own?postOnXIntent(cast,api):Promise.resolve(undefined),[api,own,cast.data.fid,cast.hash]);
   const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const lock=useRef(false);
+  const lock=useRef(false),closing=useRef(false),sheetHeight=useRef(400),scrollTop=useRef(0),startsAtTop=useRef(true);
+  const [dragY]=useState(()=>new Animated.Value(0));
+  useEffect(()=>()=>dragY.stopAnimation(),[dragY]);
   const link=`https://kite.sahban.dev${castRoute(cast)}`;
-  const close=()=>{if(!busy)onClose();};
+  const close=useCallback(()=>{
+    if(lock.current||closing.current)return;
+    closing.current=true;
+    Animated.timing(dragY,{toValue:sheetHeight.current+24,duration:180,useNativeDriver:Platform.OS!=='web'}).start(({finished})=>{if(finished)onClose();});
+  },[dragY,onClose]);
+  const restore=useCallback(()=>{if(!closing.current)Animated.spring(dragY,{toValue:0,speed:24,bounciness:0,useNativeDriver:Platform.OS!=='web'}).start();},[dragY]);
+  const pan=useMemo(()=>{
+    const movement={
+    onPanResponderGrant:()=>dragY.stopAnimation(),
+    onPanResponderMove:(_:unknown,gesture:{dy:number})=>{if(!lock.current&&!closing.current)dragY.setValue(Math.max(0,gesture.dy));},
+    onPanResponderRelease:(_:unknown,gesture:{dy:number;vy:number})=>{if(gesture.dy>Math.min(120,sheetHeight.current*.25)||gesture.dy>24&&gesture.vy>.7)close();else restore();},
+    onPanResponderTerminate:restore,
+    onPanResponderTerminationRequest:()=>false,
+    };
+    const canDrag=(gesture:{numberActiveTouches:number;dy:number;dx:number})=>!lock.current&&!closing.current&&gesture.numberActiveTouches===1&&gesture.dy>8&&gesture.dy>Math.abs(gesture.dx)*1.25;
+    return {
+      // eslint-disable-next-line react-hooks/refs -- PanResponder stores these callbacks for gesture events.
+      sheet:PanResponder.create({...movement,onStartShouldSetPanResponderCapture:()=>{startsAtTop.current=scrollTop.current<=1;return false;},onMoveShouldSetPanResponderCapture:(_,gesture)=>startsAtTop.current&&scrollTop.current<=1&&canDrag(gesture)}),
+      // eslint-disable-next-line react-hooks/refs -- PanResponder stores these callbacks for gesture events.
+      handle:PanResponder.create({...movement,onMoveShouldSetPanResponderCapture:(_,gesture)=>canDrag(gesture)}),
+    };
+  },[close,dragY,restore]);
   async function run(action:'copy'|'share'|'farcaster'|'delete'|'x'){
-    if(lock.current)return;lock.current=true;setBusy(true);setError('');
+    if(lock.current||closing.current)return;lock.current=true;setBusy(true);setError('');
     try{
       if(action==='copy'){const copied=await Clipboard.setStringAsync(link);if(!copied)throw new Error('Couldn’t copy the link. Please try again.');onCopied();}
       if(action==='share'){await Share.share({message:link});onClose();}
@@ -44,12 +67,13 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
   }
 
   return <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={close}>
-    <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'#00000066'}}>
+    <View style={{flex:1,justifyContent:'flex-end'}}>
+      <Animated.View pointerEvents="none" style={{position:'absolute',inset:0,backgroundColor:'#000',opacity:dragY.interpolate({inputRange:[0,300],outputRange:[.4,0],extrapolate:'clamp'})}}/>
       <Pressable accessibilityRole="button" accessibilityLabel="Close cast options" disabled={busy} onPress={close} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>
-      <View accessibilityViewIsModal style={{maxHeight:'85%',backgroundColor:colors.surface,borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:10,paddingBottom:Math.max(insets.bottom,12),paddingHorizontal:8}}>
-        <View style={{width:36,height:4,borderRadius:2,backgroundColor:colors.line,alignSelf:'center',marginBottom:12}}/>
-        <ScrollView keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={{fontSize:18,fontWeight:'700',color:colors.ink,paddingHorizontal:18,paddingBottom:12}}>{confirm?'Delete this cast?':'Cast options'}</Text>
+      <Animated.View {...pan.sheet.panHandlers} testID="cast-options-sheet" accessibilityViewIsModal accessibilityLabel="Cast actions" onAccessibilityEscape={close} onLayout={event=>{sheetHeight.current=event.nativeEvent.layout.height;}} style={{maxHeight:'85%',backgroundColor:colors.surface,borderTopLeftRadius:24,borderTopRightRadius:24,paddingBottom:Math.max(insets.bottom,12),paddingHorizontal:8,transform:[{translateY:dragY}]}}>
+        <View {...pan.handle.panHandlers}><Pressable accessibilityRole="button" accessibilityLabel="Dismiss cast menu" accessibilityHint="Swipe down or activate to close" disabled={busy} onPress={close} style={{height:44,alignItems:'center',justifyContent:'center'}}><View style={{width:36,height:4,borderRadius:2,backgroundColor:colors.line}}/></Pressable></View>
+        <ScrollView keyboardShouldPersistTaps="handled" onScroll={event=>{scrollTop.current=Math.max(0,event.nativeEvent.contentOffset.y);}} scrollEventThrottle={16}>
+          {confirm&&<Text accessibilityRole="header" style={{fontSize:18,fontWeight:'700',color:colors.ink,paddingHorizontal:18,paddingBottom:12}}>Delete this cast?</Text>}
           {confirm?<><Text style={{fontSize:15,lineHeight:22,color:colors.muted,paddingHorizontal:18,paddingBottom:12}}>This permanently deletes your cast. It can’t be undone.</Text><MenuItem label={busy?'Deleting…':'Delete cast'} icon="trash-2" disabled={busy||accountBusy} danger onPress={()=>void run('delete')}/><MenuItem label="Cancel" icon="x" disabled={busy} onPress={()=>{setConfirm(false);setError('');}}/></>:<>
             <MenuItem label="Copy link" icon="link" disabled={busy} onPress={()=>void run('copy')}/>
             <MenuItem label="Share cast" icon="share" disabled={busy} onPress={()=>void run('share')}/>
@@ -62,7 +86,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
           {busy&&<ActivityIndicator accessibilityLabel={confirm?'Deleting cast':'Working'} color={colors.accent} style={{padding:12}}/>}
           {!!error&&<Text accessibilityRole="alert" style={{color:colors.danger,fontSize:14,lineHeight:20,padding:18}}>{error}</Text>}
         </ScrollView>
-      </View>
+      </Animated.View>
     </View>
   </Modal>;
 }
