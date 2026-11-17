@@ -4,7 +4,7 @@ import {Image} from 'expo-image';
 import {router} from 'expo-router';
 import {memo,useCallback,useMemo,useState} from 'react';
 import {Linking,ScrollView,Text,View} from 'react-native';
-import {castTextParts} from '../../../src/lib/mentions';
+import {castTextLinkParts} from '../lib/text-links';
 import {type Cast,castDate,castKey,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
@@ -34,9 +34,9 @@ function AuthorAvatar({fid}:{fid:number}){
 function Mention({fid}:{fid:number}){const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();feedback('selection');router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
 export function CastText({cast,limit=Infinity,compact=false,numberOfLines,expansion}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number;expansion?:{expanded:boolean;onPress:()=>void}}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
-  const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
+  const parts=useMemo(()=>castTextLinkParts(body.text,body.mentions,body.mentionsPositions,limit),[body.text,body.mentions,body.mentionsPositions,limit]);
   // Keep clamped previews non-selectable so Android can draw the trailing ellipsis.
-  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();feedback('selection');expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
+  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.url?<Text key={index} accessibilityRole="link" accessibilityLabel={part.text} style={{color:colors.accent,textDecorationLine:'underline'}} onPress={event=>{event.stopPropagation();feedback('selection');void openLink(part.url!);}}>{part.text}</Text>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();feedback('selection');expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
 }
 const ImageEmbed=memo(function ImageEmbed({url,source,gallery,width,height,onError}:{url:string;source:string;gallery:string;width?:number;height?:number;onError:()=>void}){
   const {colors}=useApp();

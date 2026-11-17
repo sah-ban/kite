@@ -1,4 +1,24 @@
 import {safeLink} from './model';
+import {castTextParts} from '../../../src/lib/mentions';
+
+export type LinkedCastPart={text:string;url?:string;fid?:never}|{fid:number;text?:never;url?:never};
+
+export function castTextLinkParts(text:string,mentions:readonly number[]=[],positions:readonly number[]=[],limit=Infinity):LinkedCastPart[]{
+  const {parts}=castTextParts(text,mentions,positions);
+  const linked:LinkedCastPart[]=[];let offset=0;
+  for(const part of parts){
+    if('fid' in part){if(offset<=limit)linked.push(part);continue;}
+    // Find destinations before shortening the display text, so a clipped URL
+    // still opens the original URL rather than a different, partial address.
+    for(const link of textLinkParts(part.text)){
+      const characters=Array.from(link.text),remaining=Math.max(0,limit-offset);
+      if(remaining>0)linked.push({...link,text:characters.slice(0,remaining).join('')});
+      offset+=characters.length;
+    }
+  }
+  if(offset>limit)linked.push({text:'…'});
+  return linked;
+}
 
 export function textLinkParts(text:string):{text:string;url?:string}[]{
   const parts:{text:string;url?:string}[]=[];let cursor=0;

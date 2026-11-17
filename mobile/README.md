@@ -10,6 +10,8 @@ Each feed loads on its first visit and keeps its loaded casts, pagination, and s
 
 Search accepts exact usernames, FIDs, and Kite or Farcaster profile/cast links, with a clipboard paste action. The eight most recent successful lookups are saved on the device for each account and server. Tap one to reopen it, remove individual entries, or clear the list.
 
+Cast text and profile bios support tappable HTTP(S) links, www addresses, and bare domains. Cast mentions open profiles, and shortened feed links retain their full destination.
+
 Conversations show parent casts above the selected cast. Earlier context loads in batches as you scroll up, preserving your position; Load earlier casts is also available. Missing parents leave the selected cast and any loaded context visible, with a retry action.
 
 Cast actions show reply, repost, and like counts. A `+` means more results are available; `—` means the count is not yet available. Reply counts include locally published replies and exclude casts deleted on this device.
