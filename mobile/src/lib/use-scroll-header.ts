@@ -16,5 +16,5 @@ export function useScrollHeader(){
     if(next.hidden!==scroll.current.hidden)setHidden(next.hidden);
     scroll.current=next;
   },[]);
-  return {hidden,headerY,onScroll};
+  return {hidden,headerY,onScroll,isAtTop:()=>scroll.current.offset<=4};
 }

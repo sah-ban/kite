@@ -1,4 +1,4 @@
-import {useCallback,useRef,useState,type ReactElement} from 'react';
+import {useCallback,useRef,useState,type ReactElement,type RefObject} from 'react';
 import {FlatList,RefreshControl,Text,View,useWindowDimensions,type NativeSyntheticEvent,type NativeScrollEvent} from 'react-native';
 import type {Cast} from '../lib/model';
 import {useApp} from '../lib/state';
@@ -22,9 +22,9 @@ function FeedSkeleton({height}:{height:number}){
   </View>;
 }
 
-export function CastList({page,header,beforeHeader,onNearTop,empty='No casts yet',autoLoadMore=false,onScroll,contentTopInset=0}:{page:ReturnType<typeof useCastPage>;header?:ReactElement;beforeHeader?:ReactElement;onNearTop?:()=>void;empty?:string;autoLoadMore?:boolean;onScroll?:(event:NativeSyntheticEvent<NativeScrollEvent>)=>void;contentTopInset?:number}){
+export function CastList({page,header,beforeHeader,onNearTop,empty='No casts yet',autoLoadMore=false,onScroll,contentTopInset=0,listRef}:{page:ReturnType<typeof useCastPage>;header?:ReactElement;beforeHeader?:ReactElement;onNearTop?:()=>void;empty?:string;autoLoadMore?:boolean;onScroll?:(event:NativeSyntheticEvent<NativeScrollEvent>)=>void;contentTopInset?:number;listRef?:RefObject<FlatList<Cast>|null>}){
   const {colors}=useApp();
-  const list=useRef<FlatList<Cast>>(null),anchor=usePrependAnchor(offset=>list.current?.scrollToOffset({offset,animated:false}),onNearTop);
+  const localList=useRef<FlatList<Cast>>(null),list=listRef||localList,anchor=usePrependAnchor(offset=>list.current?.scrollToOffset({offset,animated:false}),onNearTop);
   const [viewportHeight,setViewportHeight]=useState(0);
   const [visible,setVisible]=useState<Set<string>>(()=>new Set());
   const onViewableItemsChanged=useCallback(({viewableItems}:{viewableItems:{isViewable:boolean;item:Cast}[]})=>setVisible(new Set(viewableItems.filter(item=>item.isViewable).map(({item})=>`${item.data.fid}:${item.hash}`))),[]);
