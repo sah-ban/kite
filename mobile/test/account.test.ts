@@ -1,11 +1,14 @@
-import test from 'node:test';
+import test,{before} from 'node:test';
 import assert from 'node:assert/strict';
 import {ed25519} from '@noble/curves/ed25519';
 import {bytesToHex,hexToBytes} from '@noble/hashes/utils';
-import {Message,validations} from '@farcaster/core';
+import {castSdk} from '../src/lib/cast-sdk';
 import {createAccount,type AccountStorage} from '../src/lib/account-core';
 import {pushClaim} from '../../push-proof.mjs';
 import {mobileClaim} from '../../mobile-proof.mjs';
+
+let Message:Awaited<ReturnType<typeof castSdk>>['Message'],validations:Awaited<ReturnType<typeof castSdk>>['validations'];
+before(async()=>{({Message,validations}=await castSdk());});
 
 const origin='https://kite.example',address='0x'+'11'.repeat(20),now=1700000000000;
 const target={hash:'0x'+'22'.repeat(20),signer:'public',data:{fid:37,timestamp:1,castAddBody:{text:'Fixture'}}};

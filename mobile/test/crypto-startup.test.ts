@@ -8,15 +8,17 @@ import {build} from 'esbuild';
 import {installRandomValues} from '../src/lib/install-crypto';
 
 test('Farcaster cold-starts in a native-like runtime after secure randomness is initialized',async()=>{
-  const sdk=createRequire(resolve('package.json')).resolve('@farcaster/core').replace(/\.js$/,'.mjs');
-  const result=await build({entryPoints:[sdk],bundle:true,platform:'browser',conditions:['react-native','browser'],format:'iife',globalName:'Farcaster',target:'es2022',write:false,logLevel:'silent'});
+  const require=createRequire(resolve('package.json'));
+  const result=await build({entryPoints:[resolve('src/lib/cast-sdk.ts')],bundle:true,platform:'browser',conditions:['react-native','browser'],format:'iife',globalName:'Farcaster',target:'es2022',write:false,logLevel:'silent',plugins:[{name:'native-faker-locale',setup(builder){builder.onResolve({filter:/^@faker-js\/faker$/},()=>({path:require.resolve('@faker-js/faker/locale/en')}));}}]});
   const source=result.outputFiles[0].text;
   const runtime=()=>({TextEncoder,TextDecoder,URL,URLSearchParams,AbortController,Uint8Array,Uint16Array,Uint32Array,Int8Array,Int16Array,Int32Array,ArrayBuffer,DataView,setTimeout,clearTimeout});
-  assert.throws(()=>runInNewContext(source,runtime(),{timeout:10000}),/crypto.getRandomValues must be defined/);
+  const uninitialized=runtime();runInNewContext(source,uninitialized,{timeout:10000});
+  await assert.rejects(runInNewContext('Farcaster.castSdk()',uninitialized),/crypto.getRandomValues must be defined/);
   const native=runtime();
   installRandomValues(native as typeof native&{crypto?:object},webcrypto.getRandomValues.bind(webcrypto));
   runInNewContext(source,native,{timeout:10000});
-  assert.equal(runInNewContext('typeof Farcaster.makeReactionAdd',native),'function');
+  const sdk=await runInNewContext('Farcaster.castSdk()',native);
+  assert.equal(typeof sdk.makeReactionAdd,'function');assert.equal(typeof sdk.makeCastAdd,'function');
 });
 
 test('crypto initialization preserves an existing provider and unrelated crypto APIs',()=>{

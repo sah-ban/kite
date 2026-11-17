@@ -1,6 +1,5 @@
 import {ed25519} from '@noble/curves/ed25519';
 import {bytesToHex,hexToBytes} from '@noble/hashes/utils';
-import {FarcasterNetwork,Message,NobleEd25519Signer,ReactionType,makeCastRemove,makeReactionAdd,makeReactionRemove} from '@farcaster/core';
 // Public ownership claim shared with the Node gateway.
 import {pushClaim,validPushRegistration} from '../../../push-proof.mjs';
 import {mobileClaim} from '../../../mobile-proof.mjs';
@@ -162,6 +161,7 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
     deleteCast:(cast:Cast)=>exclusive(async()=>{
       if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
       if(cast.data.fid!==saved.fid||!isHash(cast.hash))throw new Error('You can only delete your own casts.');
+      const {FarcasterNetwork,Message,NobleEd25519Signer,makeCastRemove}=await castSdk();
       const secret=hexToBytes(saved.privateKey.slice(2));
       try{
         const result=await makeCastRemove({targetHash:hexToBytes(cast.hash.slice(2))},{fid:saved.fid!,network:FarcasterNetwork.MAINNET},new NobleEd25519Signer(secret));
@@ -172,6 +172,7 @@ export function createAccount(api:Pick<Api,'origin'|'accountPost'|'approvalStatu
     react:(cast:Cast,kind:'likes'|'recasts',remove:boolean)=>exclusive(async()=>{
       if(saved?.phase!=='active')throw new Error('Sign in to Kite first.');
       if(!isFid(cast.data.fid)||!isHash(cast.hash)||!['likes','recasts'].includes(kind)||typeof remove!=='boolean')throw new Error('Invalid reaction target.');
+      const {FarcasterNetwork,Message,NobleEd25519Signer,ReactionType,makeReactionAdd,makeReactionRemove}=await castSdk();
       const secret=hexToBytes(saved.privateKey.slice(2));
       try{
         const result=await(remove?makeReactionRemove:makeReactionAdd)({type:kind==='likes'?ReactionType.LIKE:ReactionType.RECAST,targetCastId:{fid:cast.data.fid,hash:hexToBytes(cast.hash.slice(2))}},{fid:saved.fid!,network:FarcasterNetwork.MAINNET},new NobleEd25519Signer(secret));
