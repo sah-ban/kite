@@ -1,0 +1,8 @@
+Tool: built-in image_gen (edit, transparent background).
+Reference: public/kite-mark-transparent.png.
+Applied exports: mobile/assets/adaptive-icon.png (transparent master),
+mobile/assets/kite-mark.png (128 px UI mark), mobile/assets/icon.png (white background).
+Export sizes and backgrounds prepared with the installed Expo image utilities.
+
+Prompt:
+Use case: precise-object-edit. Edit target: the attached existing Kite app logo. Change ONLY the panel colors: make every interior kite panel and the curved tail one identical perfectly flat solid light lime green (#CEFF8D). Remove ALL gradients, shading, lighting, texture, highlights, and differences between panels. Keep the existing very dark forest green (#003C2E) outer outline and two internal curved ribs as crisp uniform dark strokes. Preserve the exact recognizable silhouette, orientation, relative proportions, curved tail, rib curves, stroke thickness, and centered square composition of the reference. This is a faithful recolor, not a redesign. Clean flat vector-like edges at high resolution. The surrounding background must be truly transparent with an alpha channel, no shadow, no background shape, no text, no added elements. Keep the full logo visible without cropping.
