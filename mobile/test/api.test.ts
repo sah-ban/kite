@@ -72,7 +72,7 @@ test('caller cancellation aborts the in-flight gateway request',async()=>{
   const request=api.publicFeed('',signal.signal);signal.abort();await assert.rejects(request,/aborted/);
 });
 
-test('reaction summaries coalesce duplicate reads, cache results and limit request concurrency',async()=>{
+test('activity summaries coalesce duplicate reads, cache results and limit request concurrency',async()=>{
   let active=0,peak=0,calls=0;
   const api=createApi('https://kite.example',async()=>{
     calls++;active++;peak=Math.max(peak,active);
@@ -80,13 +80,30 @@ test('reaction summaries coalesce duplicate reads, cache results and limit reque
     return json({messages:[]});
   });
   const [first,duplicate]=await Promise.all([api.activity(cast),api.activity(cast),...Array.from({length:5},(_,index)=>api.activity({...cast,hash:'0x'+String(index+1).padStart(40,'0')}))]);
-  assert.deepEqual(first,duplicate);assert.equal(calls,12);assert.ok(peak<=3);
-  await api.activity(cast);assert.equal(calls,12);assert.deepEqual(first.likes,{items:[],next:''});
+  assert.deepEqual(first,duplicate);assert.equal(calls,18);assert.ok(peak<=3);
+  await api.activity(cast);assert.equal(calls,18);assert.deepEqual(first.likes,{items:[],next:''});
 });
 test('a failed reaction count stays unknown without hiding a successful count or its pagination',async()=>{
   const api=createApi('https://kite.example',async input=>new URL(String(input)).searchParams.get('reaction_type')==='Like'?json({messages:[{data:{fid:37,type:3,reactionBody:{type:1,targetCastId:{fid:cast.data.fid,hash}}}}],nextPageToken:'more-likes'}):json({},503));
   const result=await api.activity(cast);
   assert.deepEqual(result.likes,{items:[37],next:'more-likes'});assert.equal(result.recasts,null);
+});
+
+test('reply summaries count distinct direct replies and retain pagination',async()=>{
+  const reply:Cast={...cast,hash:'0x1746cf1f74735f808c28b8c34bf93d2ffab9a0f2',data:{...cast.data,castAddBody:{...cast.data.castAddBody,parentCastId:{fid:cast.data.fid,hash}}}};
+  let replyCalls=0;
+  const api=createApi('https://kite.example',async input=>{
+    const url=new URL(String(input));
+    if(url.pathname.endsWith('castsByParent')){replyCalls++;assert.equal(url.searchParams.get('pageSize'),'100');assert.equal(url.searchParams.get('fid'),String(cast.data.fid));assert.equal(url.searchParams.get('hash'),hash);return json({messages:[reply,reply,cast,{hash:'bad'}],nextPageToken:'more-replies'});}
+    return json({messages:[]});
+  });
+  const [first,duplicate]=await Promise.all([api.activity(cast),api.activity(cast)]);
+  assert.deepEqual(first.replies,{items:[reply],next:'more-replies'});assert.deepEqual(duplicate.replies,first.replies);assert.equal(replyCalls,1);
+});
+test('reply failures remain unknown while successful reaction counts and zero replies stay distinct',async()=>{
+  const failed=createApi('https://kite.example',async input=>new URL(String(input)).pathname.endsWith('castsByParent')?json({},503):json({messages:[]}));
+  const partial=await failed.activity(cast);assert.equal(partial.replies,null);assert.deepEqual(partial.likes,{items:[],next:''});assert.deepEqual(partial.recasts,{items:[],next:''});
+  const empty=createApi('https://kite.example',async()=>json({messages:[]}));assert.deepEqual((await empty.activity(cast)).replies,{items:[],next:''});
 });
 
 test('a freshly published signed cast opens locally without a read-after-submit lookup',async()=>{

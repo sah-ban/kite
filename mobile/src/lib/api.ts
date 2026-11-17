@@ -9,6 +9,7 @@ import type {ProfileChanges} from './profile-edit';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
+type CastActivity = {likes:Page<number>|null;recasts:Page<number>|null;replies:Page<Cast>|null};
 const FIFTEEN_SECONDS = 15000;
 export class ApiError extends Error {
   constructor(public status:number,message:string,public notFound=false){super(message);}
@@ -17,7 +18,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profiles = new Map<number, Promise<Profile>>();
   const profileOverrides=new Map<number,ProfileChanges>();
   const published=new Map<string,{cast:Cast;expires:number}>();
-  const activityCache = new Map<string,{expires:number;value:Promise<{likes:Page<number>|null;recasts:Page<number>|null}>}>();
+  const activityCache = new Map<string,{expires:number;value:Promise<CastActivity>}>();
   let activeActivity = 0;
   const activityQueue:(()=>void)[]=[];
   async function queuedActivity<T>(load:()=>Promise<T>):Promise<T>{
@@ -109,13 +110,17 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       });
       return {items:[...new Set(fids)],next:typeof value.nextPageToken==='string'?value.nextPageToken:''};
   }
+  async function replyPage(cast:Cast,cursor='',signal?:AbortSignal,pageSize=30){
+    const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
+    return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
+  }
   function activity(cast:Cast){
     const key=`${cast.data.fid}:${cast.hash.toLowerCase()}`;
     const saved=activityCache.get(key);if(saved&&saved.expires>Date.now())return saved.value;
-    const entry={expires:Infinity,value:Promise.resolve<{likes:Page<number>|null;recasts:Page<number>|null}>({likes:null,recasts:null})};
-    entry.value=Promise.allSettled([queuedActivity(()=>reactions(cast,'likes')),queuedActivity(()=>reactions(cast,'recasts'))]).then(([likes,recasts])=>{
-      entry.expires=Date.now()+(likes.status==='fulfilled'&&recasts.status==='fulfilled'?30000:3000);
-      return {likes:likes.status==='fulfilled'?likes.value:null,recasts:recasts.status==='fulfilled'?recasts.value:null};
+    const entry={expires:Infinity,value:Promise.resolve<CastActivity>({likes:null,recasts:null,replies:null})};
+    entry.value=Promise.allSettled([queuedActivity(()=>reactions(cast,'likes')),queuedActivity(()=>reactions(cast,'recasts')),queuedActivity(()=>replyPage(cast,'',undefined,100))]).then(([likes,recasts,replies])=>{
+      entry.expires=Date.now()+(likes.status==='fulfilled'&&recasts.status==='fulfilled'&&replies.status==='fulfilled'?30000:3000);
+      return {likes:likes.status==='fulfilled'?likes.value:null,recasts:recasts.status==='fulfilled'?recasts.value:null,replies:replies.status==='fulfilled'?replies.value:null};
     });
     activityCache.set(key,entry);if(activityCache.size>200)activityCache.delete(activityCache.keys().next().value!);
     return entry.value;
@@ -215,10 +220,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       }
       return {items,next:typeof result.nextPageToken==='string'?result.nextPageToken:''};
     },
-    replies:async(cast:Cast,cursor='',signal?:AbortSignal)=>{
-      const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize:30,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
-      return {...result,items:result.items.filter(reply=>reply.data.castAddBody.parentCastId?.fid===cast.data.fid&&reply.data.castAddBody.parentCastId.hash.toLowerCase()===cast.hash.toLowerCase())};
-    },
+    replies:(cast:Cast,cursor='',signal?:AbortSignal)=>replyPage(cast,cursor,signal),
     counts:(fid:number,signal?:AbortSignal)=>request<{followerCount?:number;followingCount?:number;followers?:number;following?:number}>('/api/profile/counts',{fid},signal),
     embed:(url:string,signal?:AbortSignal)=>request<{kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;miniapp?:import('./miniapp').MiniAppEmbed;tweet?:import('./x-post').XPost}>('/api/embed',{url},signal),
   };
