@@ -105,6 +105,18 @@ test('reply failures remain unknown while successful reaction counts and zero re
   const partial=await failed.activity(cast);assert.equal(partial.replies,null);assert.deepEqual(partial.likes,{items:[],next:''});assert.deepEqual(partial.recasts,{items:[],next:''});
   const empty=createApi('https://kite.example',async()=>json({messages:[]}));assert.deepEqual((await empty.activity(cast)).replies,{items:[],next:''});
 });
+test('exhausted shard cursors do not report more replies, reactions or feed pages',async()=>{
+  const exhausted=Buffer.from(JSON.stringify([null,null])).toString('base64');
+  const api=createApi('https://kite.example',async()=>json({messages:[],nextPageToken:exhausted}));
+  const activity=await api.activity(cast);
+  assert.equal(activity.replies?.next,'');assert.equal(activity.likes?.next,'');assert.equal(activity.recasts?.next,'');assert.equal((await api.publicFeed()).next,'');
+});
+test('active shard and opaque cursors remain available for pagination',async()=>{
+  for(const cursor of [Buffer.from(JSON.stringify([null,'active-shard'])).toString('base64'),'opaque+/=',Buffer.from('[]').toString('base64')]){
+    const api=createApi('https://kite.example',async()=>json({messages:[],nextPageToken:cursor}));
+    const activity=await api.activity(cast);assert.equal(activity.replies?.next,cursor);assert.equal(activity.likes?.next,cursor);
+  }
+});
 
 test('a freshly published signed cast opens locally without a read-after-submit lookup',async()=>{
   let calls=0;const api=createApi('https://kite.example',async()=>{calls++;throw Error('No node request expected');});api.rememberCast(cast);assert.deepEqual(await api.resolveCast(String(cast.data.fid),cast.hash),cast);assert.equal(calls,0);

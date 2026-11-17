@@ -11,6 +11,14 @@ type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
 type CastActivity = {likes:Page<number>|null;recasts:Page<number>|null;replies:Page<Cast>|null};
 const FIFTEEN_SECONDS = 15000;
+function nextPageToken(value:unknown):string{
+  if(typeof value!=='string'||!value)return '';
+  try{
+    const shards:unknown=JSON.parse(atob(value));
+    if(Array.isArray(shards)&&shards.length>0&&shards.every(cursor=>cursor===null))return '';
+  }catch{/* Other cursors remain opaque. */}
+  return value;
+}
 export class ApiError extends Error {
   constructor(public status:number,message:string,public notFound=false){super(message);}
 }
@@ -54,7 +62,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   const signerRequester=createAttribution(hub);
   const page = (value:NodePage): Page<Cast> => {
     if (!Array.isArray(value.messages)) throw new Error('Could not load casts. Please try again.');
-    return {items:mergeCasts([],value.messages.filter(isCast)),next:typeof value.nextPageToken==='string'?value.nextPageToken:''};
+    return {items:mergeCasts([],value.messages.filter(isCast)),next:nextPageToken(value.nextPageToken)};
   };
   async function profile(fid:number):Promise<Profile> {
     if (!isFid(fid)) throw new Error('Invalid profile FID.');
@@ -108,7 +116,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
         const target=data?.reactionBody?.targetCastId;
         return data&&isFid(data.fid)&&(data.type===3||data.type==='MESSAGE_TYPE_REACTION_ADD')&&[kind==='likes'?1:2,kind==='likes'?'REACTION_TYPE_LIKE':'REACTION_TYPE_RECAST'].includes(data.reactionBody?.type??'')&&target?.fid===cast.data.fid&&target.hash?.toLowerCase()===cast.hash.toLowerCase()?[data.fid]:[];
       });
-      return {items:[...new Set(fids)],next:typeof value.nextPageToken==='string'?value.nextPageToken:''};
+      return {items:[...new Set(fids)],next:nextPageToken(value.nextPageToken)};
   }
   async function replyPage(cast:Cast,cursor='',signal?:AbortSignal,pageSize=30){
     const result=page(await hub<NodePage>('castsByParent',{fid:cast.data.fid,hash:cast.hash,pageSize,reverse:'false',...(cursor?{pageToken:cursor}:{})},signal));
