@@ -6,6 +6,15 @@ import {CONNECTION_UNAVAILABLE,CONNECTION_TIMEOUT,connectionNotice} from '../src
 
 const hash='0x572549b948717ab9302a492c197121b0b844e7c8';
 const cast:Cast={hash,signer:'public-key',data:{fid:1059075,timestamp:100,castAddBody:{text:'Hello Kite',mentions:[],mentionsPositions:[],embeds:[]}}};
+
+test('embed previews are shared across rows without one cancelled row poisoning the cache',async()=>{
+  let calls=0,finish!:(response:Response)=>void;
+  const api=createApi('https://kite.example',async()=>{calls++;return new Promise<Response>(resolve=>finish=resolve);});
+  const a=new AbortController(),b=new AbortController(),url='https://example.com/preview';
+  const first=api.embed(url,a.signal),second=api.embed(url,b.signal);
+  await Promise.resolve();a.abort();await assert.rejects(first);finish(json({kind:'link',url,title:'Cached preview'}));
+  assert.equal((await second).title,'Cached preview');assert.equal((await api.embed(url)).title,'Cached preview');assert.equal(calls,1);
+});
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
 
 test('native DNS and fetch failures use safe connection copy across reads and account/write requests',async()=>{

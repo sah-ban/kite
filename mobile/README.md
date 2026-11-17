@@ -67,6 +67,18 @@ npx expo export --platform android
 
 ## Android builds
 
+Run the local release checks before building:
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npx expo install --check
+npx expo export --platform android --max-workers 2 --output-dir dist
+```
+
+The export verifies the production JavaScript and Hermes bytecode locally; it does not create an APK/AAB or upload a release. Test an installed preview build for scrolling, media playback, signing, and push delivery before the Play Store build. Feed media is released when its screen loses focus, and embed previews share a bounded five-minute in-memory cache. Signing actions share one lazily loaded Farcaster SDK.
+
 The checked-in Expo project belongs to the Kite maintainers. For a fork, change `owner`, `slug`, `android.package` and `extra.eas.projectId` in `app.config.ts` to your own identity, then link your project with `npx eas-cli@latest init`. EAS commands run from this directory. The repository-root `.easignore` uploads only mobile sources and explicitly shared public helpers for mentions, cast/URL validation, Pro status and key-ownership claims, excluding server configuration and credentials.
 
 ```sh

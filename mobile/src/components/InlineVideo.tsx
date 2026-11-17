@@ -1,7 +1,7 @@
 import {HapticPressable as Pressable} from './HapticControls';
 import {useEvent,useEventListener} from 'expo';
 import {Image} from 'expo-image';
-import {useFocusEffect} from 'expo-router';
+import {useFocusEffect,useIsFocused} from 'expo-router';
 import {useVideoPlayer,VideoView} from 'expo-video';
 import {useCallback,useEffect,useRef,useState,type ComponentRef} from 'react';
 import {ActivityIndicator,AppState,Platform,Text,View} from 'react-native';
@@ -13,10 +13,11 @@ import {Icon} from './ui';
 const playback=createVideoPlayback();
 export function InlineVideo({url,contentType,poster,autoPlay=false,height=224}:{url:string;contentType?:string;poster?:string;autoPlay?:boolean;height?:number}){
   const {colors}=useApp();
+  const focused=useIsFocused();
   const [started,setStarted]=useState(autoPlay),[revision,setRevision]=useState(0),[posterFailed,setPosterFailed]=useState(false);
   const source=videoSource(url,contentType);if(!source)return null;
   return <Pressable accessible={false} focusable={false} onPress={event=>event.stopPropagation()} style={{height,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:'#000'}}>
-    {started?<Playback key={revision} source={source} retry={()=>setRevision(value=>value+1)}/>:<Pressable accessibilityRole="button" accessibilityLabel="Play video" onPress={event=>{event.stopPropagation();setStarted(true);}} style={{flex:1,alignItems:'center',justifyContent:'center'}}>
+    {started&&focused?<Playback key={revision} source={source} retry={()=>setRevision(value=>value+1)}/>:<Pressable accessibilityRole="button" accessibilityLabel="Play video" onPress={event=>{event.stopPropagation();setStarted(true);}} style={{flex:1,alignItems:'center',justifyContent:'center'}}>
       {poster&&!posterFailed&&<Image source={{uri:poster}} onError={()=>setPosterFailed(true)} style={{position:'absolute',width:'100%',height:'100%'}} contentFit="cover"/>}
       <View pointerEvents="none" style={{width:54,height:54,borderRadius:27,backgroundColor:'#00000099',alignItems:'center',justifyContent:'center'}}><Icon name="play" size={25} color="#fff"/></View>
     </Pressable>}

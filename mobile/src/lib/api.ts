@@ -7,10 +7,12 @@ import {articleChain,assembleArticle} from './articles';
 import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 import type {ProfileChanges} from './profile-edit';
 import {CONNECTION_UNAVAILABLE,CONNECTION_TIMEOUT} from './connection-errors';
+import {createRequestCache} from './request-cache';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
 type CastActivity = {likes:Page<number>|null;recasts:Page<number>|null;replies:Page<Cast>|null};
+type EmbedPreview={kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;miniapp?:import('./miniapp').MiniAppEmbed;tweet?:import('./x-post').XPost};
 const FIFTEEN_SECONDS = 15000;
 function nextPageToken(value:unknown):string{
   if(typeof value!=='string'||!value)return '';
@@ -38,6 +40,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
   const profileOverrides=new Map<number,ProfileChanges>();
   const published=new Map<string,{cast:Cast;expires:number}>();
   const activityCache = new Map<string,{expires:number;value:Promise<CastActivity>}>();
+  const embedCache=createRequestCache<string,EmbedPreview>(128,300000);
   let activeActivity = 0;
   const activityQueue:(()=>void)[]=[];
   async function queuedActivity<T>(load:()=>Promise<T>):Promise<T>{
@@ -244,7 +247,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     },
     replies:(cast:Cast,cursor='',signal?:AbortSignal)=>replyPage(cast,cursor,signal),
     counts:(fid:number,signal?:AbortSignal)=>request<{followerCount?:number;followingCount?:number;followers?:number;following?:number}>('/api/profile/counts',{fid},signal),
-    embed:(url:string,signal?:AbortSignal)=>request<{kind:'image'|'video'|'link';url:string;title?:string;description?:string;site?:string;image?:string;poster?:string;contentType?:string;miniapp?:import('./miniapp').MiniAppEmbed;tweet?:import('./x-post').XPost}>('/api/embed',{url},signal),
+    embed:(url:string,signal?:AbortSignal)=>embedCache(url,shared=>request<EmbedPreview>('/api/embed',{url},shared),signal),
   };
 }
 export type Api = ReturnType<typeof createApi>;
