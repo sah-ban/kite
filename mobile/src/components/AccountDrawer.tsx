@@ -2,7 +2,7 @@ import {router,type Href} from 'expo-router';
 import Constants from 'expo-constants';
 import {Image} from 'expo-image';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
-import {Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Switch,Text,View,useWindowDimensions} from 'react-native';
+import {Alert,Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Switch,Text,View,useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
 import type {Profile} from '../lib/model';
@@ -37,6 +37,13 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
     if(signingOut||accountBusy)return;setSigningOut(true);setError('');
     try{await signOut();onClose();}catch(error){setError(error instanceof Error?error.message:'Could not sign out. Please try again.');}finally{setSigningOut(false);}
   }
+  function confirmSignOut(){
+    if(signingOut||accountBusy||changingTheme||closing.current)return;
+    Alert.alert('Sign out of Kite?','You’ll need to approve Kite again to sign back in on this device.',[
+      {text:'Cancel',style:'cancel'},
+      {text:'Sign out',style:'destructive',onPress:()=>void disconnect()},
+    ],{cancelable:true});
+  }
   return <Modal transparent visible animationType="none" statusBarTranslucent navigationBarTranslucent onShow={show} onRequestClose={()=>close()}>
     <View style={{flex:1}}>
       <Animated.View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#000',opacity:progress.interpolate({inputRange:[0,1],outputRange:[0,.45]})}}/>
@@ -53,7 +60,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
             <DrawerItem label="Settings" icon="settings" onPress={()=>go('/settings')}/>
             <View style={{minHeight:50,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:14}}><Icon name={dark?'moon':'sun'} size={21}/><Text style={{flex:1,color:colors.ink,fontSize:16,fontWeight:'500'}}>Dark theme</Text><Switch accessibilityLabel="Dark theme" value={dark} disabled={changingTheme||signingOut} onTouchStart={()=>{themeTouch.current=true;}} onTouchEnd={()=>{themeTouch.current=false;}} onTouchCancel={()=>{themeTouch.current=false;}} onValueChange={value=>void changeTheme(value)} trackColor={{false:colors.line,true:colors.accent}}/></View>
             <DrawerItem label="GitHub" icon="github" external onPress={()=>external('https://github.com/sah-ban/kite')}/>
-            {!!fid&&<DrawerItem label={signingOut?'Signing out…':'Sign out'} icon="log-out" danger disabled={signingOut||accountBusy||changingTheme} onPress={()=>void disconnect()}/>}
+            {!!fid&&<DrawerItem label={signingOut?'Signing out…':'Sign out'} icon="log-out" danger disabled={signingOut||accountBusy||changingTheme} onPress={confirmSignOut}/>}
             <Text style={{paddingTop:14,textAlign:'center',fontSize:11,color:colors.muted}}>Version {Constants.expoConfig?.version??'—'}</Text>
           </View>
         </ScrollView>
