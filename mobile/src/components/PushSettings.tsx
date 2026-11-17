@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable,HapticSwitch as Switch} from './HapticControls';
 import {router} from 'expo-router';
-import {ActivityIndicator,Pressable,Switch,Text,View} from 'react-native';
+import {ActivityIndicator,Text,View} from 'react-native';
 import {useApp} from '../lib/state';
 import {usePush} from '../lib/push-state';
 import {Icon} from './ui';

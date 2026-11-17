@@ -1,8 +1,9 @@
+import {HapticPressable as Pressable} from '../../components/HapticControls';
 import {Image} from 'expo-image';
 import {router,useLocalSearchParams} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useCallback,useRef,useState} from 'react';
-import {Pressable,Text,View} from 'react-native';
+import {Text,View} from 'react-native';
 import {useApp} from '../../lib/state';
 import {isFid,safeLink,mergeCasts} from '../../lib/model';
 import {useCastPage,useQuery} from '../../lib/hooks';

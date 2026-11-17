@@ -1,3 +1,4 @@
+import {feedback} from '../lib/haptics';
 import {Fragment,type ReactNode} from 'react';
 import {Linking,ScrollView,Text,View} from 'react-native';
 import {castTextParts} from '../../../src/lib/mentions';
@@ -22,7 +23,7 @@ function Inline({text,depth=0}:{text:string;depth?:number}){
     if(match[5]&&/[\p{L}\p{N}]/u.test(text[index-1]||'')&&/[\p{L}\p{N}]/u.test(text[index+match[0].length]||''))continue;
     nodes.push(text.slice(end,index));end=index+match[0].length;
     if(match[1])nodes.push(match[1]);
-    else if(match[2]){const url=safeLink(match[3]);nodes.push(url?<Text key={index} accessibilityRole="link" style={{color:colors.accent}} onPress={()=>void Linking.openURL(url).catch(()=>{})}><Inline text={match[2]} depth={depth+1}/></Text>:match[2]);}
+    else if(match[2]){const url=safeLink(match[3]);nodes.push(url?<Text key={index} accessibilityRole="link" style={{color:colors.accent}} onPress={()=>{feedback('selection');void Linking.openURL(url).catch(()=>{});}}><Inline text={match[2]} depth={depth+1}/></Text>:match[2]);}
     else nodes.push(<Text key={index} style={match[4]?{fontWeight:'700'}:match[5]?{fontStyle:'italic'}:match[6]?{textDecorationLine:'line-through'}:match[7]?{textDecorationLine:'underline'}:{fontFamily:'monospace',backgroundColor:colors.soft}}>{match[8]||<Inline text={match[4]||match[5]||match[6]||match[7]} depth={depth+1}/>}</Text>);
   }
   nodes.push(text.slice(end));return <>{nodes}</>;

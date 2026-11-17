@@ -1,7 +1,9 @@
+import {feedback} from '../../lib/haptics';
+import {HapticPressable as Pressable} from '../../components/HapticControls';
 import {router,Tabs,useFocusEffect} from 'expo-router';
 import {memo,useCallback,useMemo,useRef,useState,type ReactNode} from 'react';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AppState,FlatList,Pressable,RefreshControl,ScrollView,Text,View} from 'react-native';
+import {AppState,FlatList,RefreshControl,ScrollView,Text,View} from 'react-native';
 import {useApp} from '../../lib/state';
 import {useNotifications} from '../../lib/notification-state';
 import {hasMoreNotifications,indexedNotifications,mergeNotifications,readNotifications,type IndexedNotificationPage,type NotificationItem,type NotificationKind,type NotificationPage} from '../../lib/notifications';
@@ -89,7 +91,7 @@ function NotificationFeed(){
   }
   const filtered=useMemo(()=>mode==='legacy'?items.filter(item=>filter==='all'||item.kind===filter):items,[mode,items,filter]);
   const canScroll=!!fid&&(mode==='indexed'||mode==='legacy');
-  const frame=(content:ReactNode)=><View style={{flex:1,overflow:'hidden'}}>{content}<ScrollHeader title="Notifications" hidden={canScroll&&motion.hidden} headerY={canScroll?motion.headerY:0} refreshing={refreshing} disabled={!canScroll||busy} onRefresh={refresh} refreshLabel="Refresh notifications" testID="notifications-header"/></View>;
+  const frame=(content:ReactNode)=><View style={{flex:1,overflow:'hidden'}}>{content}<ScrollHeader title="Notifications" hidden={canScroll&&motion.hidden} headerY={canScroll?motion.headerY:0} refreshing={refreshing} disabled={!canScroll||busy} onRefresh={()=>{feedback('light');refresh();}} refreshLabel="Refresh notifications" testID="notifications-header"/></View>;
   if(!fid)return frame(<View style={{flex:1,paddingTop:SCROLL_HEADER_HEIGHT,justifyContent:'center'}}><Notice title="Your activity, in one place." icon="bell">Sign in to see mentions, replies, likes, recasts and follows.</Notice><View style={{paddingHorizontal:28}}><Button label="Sign in" onPress={()=>router.push('/sign-in')}/></View></View>);
   if(mode==='loading')return frame(<View style={{paddingTop:SCROLL_HEADER_HEIGHT}}><Loading/></View>);
   if(mode==='error')return frame(<View style={{paddingTop:SCROLL_HEADER_HEIGHT}}><Notice title="Couldn’t prepare notifications" icon="bell" retry={retrySetup}>{setupError}</Notice></View>);

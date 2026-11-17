@@ -1,6 +1,7 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {router} from 'expo-router';
 import {useState} from 'react';
-import {ActivityIndicator,Linking,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,Linking,Text,View} from 'react-native';
 import {type Cast,type Page,castKey,mergeCasts} from '../lib/model';
 import {reactionKey,useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';

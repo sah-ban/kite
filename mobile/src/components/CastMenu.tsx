@@ -1,7 +1,9 @@
+import {feedback} from '../lib/haptics';
+import {HapticPressable as Pressable} from './HapticControls';
 import * as Clipboard from 'expo-clipboard';
 import {router} from 'expo-router';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
-import {ActivityIndicator,Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Share,Text,View} from 'react-native';
+import {ActivityIndicator,Animated,Linking,Modal,PanResponder,Platform,ScrollView,Share,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {type Cast,castRoute} from '../lib/model';
 import {useApp} from '../lib/state';
@@ -34,7 +36,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
   const link=`https://kite.sahban.dev${castRoute(cast)}`;
   const close=useCallback(()=>{
     if(lock.current||closing.current)return;
-    closing.current=true;
+    closing.current=true;feedback('light');
     Animated.timing(dragY,{toValue:sheetHeight.current+24,duration:180,useNativeDriver:Platform.OS!=='web'}).start(({finished})=>{if(finished)onClose();});
   },[dragY,onClose]);
   const restore=useCallback(()=>{if(!closing.current)Animated.spring(dragY,{toValue:0,speed:24,bounciness:0,useNativeDriver:Platform.OS!=='web'}).start();},[dragY]);
@@ -57,12 +59,12 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
   async function run(action:'copy'|'share'|'farcaster'|'delete'|'x'){
     if(lock.current||closing.current)return;lock.current=true;setBusy(true);setError('');
     try{
-      if(action==='copy'){const copied=await Clipboard.setStringAsync(link);if(!copied)throw new Error('Couldn’t copy the link. Please try again.');onCopied();}
+      if(action==='copy'){const copied=await Clipboard.setStringAsync(link);if(!copied)throw new Error('Couldn’t copy the link. Please try again.');feedback('success');onCopied();}
       if(action==='share'){await Share.share({message:link});onClose();}
       if(action==='farcaster'){await Linking.openURL(`https://farcaster.xyz/~/conversations/${cast.hash}`);onClose();}
       if(action==='x'){if(!own||!xDraft.value)throw new Error('Could not prepare the X draft. Please try again.');await Linking.openURL(xDraft.value);onClose();}
       if(action==='delete'){if(!own||!confirm)throw new Error('You can only delete your own casts.');await onDelete();onClose();}
-    }catch(error){setError(error instanceof Error?error.message:'Could not complete this action. Please try again.');}
+    }catch(error){if(action!=='delete')feedback('error');setError(error instanceof Error?error.message:'Could not complete this action. Please try again.');}
     finally{lock.current=false;setBusy(false);}
   }
 
@@ -93,5 +95,5 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
 
 function MenuItem({label,icon,onPress,disabled,danger=false}:{label:string;icon:ComponentProps<typeof Icon>['name']|'brand-x';onPress:()=>void;disabled:boolean;danger?:boolean}){
   const {colors}=useApp();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} accessibilityState={{disabled}} onPress={onPress} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',gap:14,alignItems:'center',borderRadius:12,opacity:disabled?.45:1,backgroundColor:pressed?colors.soft:'transparent'})}>{icon==='brand-x'?<XIcon/>:<Icon name={icon} size={20} color={danger?colors.danger:colors.ink}/>}<Text style={{color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:danger?'600':'500'}}>{label}</Text></Pressable>;
+  return <Pressable haptic={danger?'warning':'selection'} accessibilityRole="button" accessibilityLabel={label} disabled={disabled} accessibilityState={{disabled}} onPress={onPress} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',gap:14,alignItems:'center',borderRadius:12,opacity:disabled?.45:1,backgroundColor:pressed?colors.soft:'transparent'})}>{icon==='brand-x'?<XIcon/>:<Icon name={icon} size={20} color={danger?colors.danger:colors.ink}/>}<Text style={{color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:danger?'600':'500'}}>{label}</Text></Pressable>;
 }

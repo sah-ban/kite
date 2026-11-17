@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {Image} from 'expo-image';
-import {Pressable,Text,View} from 'react-native';
+import {Text,View} from 'react-native';
 import {type Draft,draftLinks,removeLink} from '../lib/composer';
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';

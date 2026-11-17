@@ -1,6 +1,7 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {Image} from 'expo-image';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentRef} from 'react';
-import {Keyboard,KeyboardAvoidingView,Modal,Pressable,ScrollView,Text,View} from 'react-native';
+import {Keyboard,KeyboardAvoidingView,Modal,ScrollView,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
 import {Field,Icon,Loading,Notice,space} from './ui';

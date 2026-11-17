@@ -1,8 +1,10 @@
+import {feedback} from '../lib/haptics';
+import {HapticPressable as Pressable,HapticSwitch as Switch} from './HapticControls';
 import {router,type Href} from 'expo-router';
 import Constants from 'expo-constants';
 import {Image} from 'expo-image';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
-import {Alert,Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Switch,Text,View,useWindowDimensions} from 'react-native';
+import {Alert,Animated,Linking,Modal,PanResponder,Platform,ScrollView,Text,View,useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
 import type {Profile} from '../lib/model';
@@ -16,7 +18,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
   useEffect(()=>()=>progress.stopAnimation(),[progress]);
   const show=useCallback(()=>{if(!closing.current)Animated.timing(progress,{toValue:1,duration:220,useNativeDriver:Platform.OS!=='web'}).start();},[progress]);
   const close=useCallback((after?:()=>void)=>{
-    if(closing.current)return;closing.current=true;
+    if(closing.current)return;closing.current=true;feedback('light');
     Animated.timing(progress,{toValue:0,duration:180,useNativeDriver:Platform.OS!=='web'}).start(({finished})=>{if(finished){onClose();after?.();}});
   },[onClose,progress]);
   // eslint-disable-next-line react-hooks/refs -- PanResponder stores callbacks; creating it does not invoke gesture handlers.
@@ -31,7 +33,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
   const external=(url:string)=>close(()=>{void Linking.openURL(url).catch(()=>{});});
   async function changeTheme(value:boolean){
     if(changingTheme)return;setChangingTheme(true);setError('');
-    try{await setTheme(value?'dark':'light');}catch{setError('Could not save your theme. Please try again.');}finally{setChangingTheme(false);}
+    try{await setTheme(value?'dark':'light');}catch{feedback('error');setError('Could not save your theme. Please try again.');}finally{setChangingTheme(false);}
   }
   async function disconnect(){
     if(signingOut||accountBusy)return;setSigningOut(true);setError('');
@@ -41,7 +43,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
     if(signingOut||accountBusy||changingTheme||closing.current)return;
     Alert.alert('Sign out of Kite?','You’ll need to approve Kite again to sign back in on this device.',[
       {text:'Cancel',style:'cancel'},
-      {text:'Sign out',style:'destructive',onPress:()=>void disconnect()},
+      {text:'Sign out',style:'destructive',onPress:()=>{feedback('warning');void disconnect();}},
     ],{cancelable:true});
   }
   return <Modal transparent visible animationType="none" statusBarTranslucent navigationBarTranslucent onShow={show} onRequestClose={()=>close()}>
@@ -71,5 +73,5 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
 
 function DrawerItem({label,icon,onPress,external=false,danger=false,disabled=false}:{label:string;icon:ComponentProps<typeof Icon>['name'];onPress:()=>void;external?:boolean;danger?:boolean;disabled?:boolean}){
   const {colors}=useApp();
-  return <Pressable accessibilityRole={external?'link':'button'} accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={({pressed})=>({minHeight:50,paddingHorizontal:14,borderRadius:12,flexDirection:'row',alignItems:'center',gap:14,backgroundColor:pressed?colors.soft:'transparent',opacity:disabled?.5:1})}><Icon name={icon} size={21} color={danger?colors.danger:colors.ink}/><Text style={{flex:1,color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:'500'}}>{label}</Text>{external&&<Icon name="arrow-up-right" size={16} color={colors.muted}/>}</Pressable>;
+  return <Pressable haptic={danger?'warning':'selection'} accessibilityRole={external?'link':'button'} accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={({pressed})=>({minHeight:50,paddingHorizontal:14,borderRadius:12,flexDirection:'row',alignItems:'center',gap:14,backgroundColor:pressed?colors.soft:'transparent',opacity:disabled?.5:1})}><Icon name={icon} size={21} color={danger?colors.danger:colors.ink}/><Text style={{flex:1,color:danger?colors.danger:colors.ink,fontSize:16,fontWeight:'500'}}>{label}</Text>{external&&<Icon name="arrow-up-right" size={16} color={colors.muted}/>}</Pressable>;
 }

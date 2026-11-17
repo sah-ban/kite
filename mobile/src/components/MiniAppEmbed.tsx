@@ -1,6 +1,7 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {Image} from 'expo-image';
 import {useState} from 'react';
-import {Linking,Pressable,Text,View} from 'react-native';
+import {Linking,Text,View} from 'react-native';
 import {type MiniAppEmbed as MiniApp,miniAppLaunchURL} from '../lib/miniapp';
 import {safeLink} from '../lib/model';
 import {useApp} from '../lib/state';

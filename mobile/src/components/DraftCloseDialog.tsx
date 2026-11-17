@@ -1,4 +1,5 @@
-import {Modal,Pressable,Text,View} from 'react-native';
+import {HapticPressable as Pressable} from './HapticControls';
+import {Modal,Text,View} from 'react-native';
 import {useApp} from '../lib/state';
 import {Button,Icon} from './ui';
 

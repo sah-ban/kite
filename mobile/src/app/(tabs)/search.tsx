@@ -1,8 +1,10 @@
+import {feedback} from '../../lib/haptics';
+import {HapticPressable as Pressable} from '../../components/HapticControls';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import {router,Tabs} from 'expo-router';
 import {useEffect,useRef,useState,type ComponentRef} from 'react';
-import {ActivityIndicator,Keyboard,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Keyboard,ScrollView,Text,TextInput,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../../lib/state';
 import {parseSearch,castRoute} from '../../lib/model';
@@ -38,7 +40,7 @@ function SearchScreen({storageKey}:{storageKey:string}){
   }
   async function search(value=query){
     if(pending.current||!value.trim()||!ready)return;
-    changeQuery(value);Keyboard.dismiss();const controller=new AbortController();pending.current=controller;setBusy(true);
+    feedback('light');changeQuery(value);Keyboard.dismiss();const controller=new AbortController();pending.current=controller;setBusy(true);
     try{
       const entry=searchEntry(value),target=parseSearch(entry.query);
       const path=target.kind==='profile'?`/profile/${await api.resolveProfile(target.value,controller.signal)}` as const:castRoute(await api.resolveCast(target.author,target.hash,controller.signal));

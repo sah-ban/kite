@@ -1,9 +1,10 @@
+import {HapticPressable as Pressable} from '../components/HapticControls';
 import {useEvent} from 'expo';
 import {router,Stack,useFocusEffect,useLocalSearchParams} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import {useVideoPlayer,VideoView,type VideoSource} from 'expo-video';
 import {useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,AppState,Platform,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,AppState,Platform,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {videoSource} from '../lib/video-source';
 import {Icon} from '../components/ui';

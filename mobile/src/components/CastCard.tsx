@@ -1,7 +1,9 @@
+import {feedback} from '../lib/haptics';
+import {HapticPressable as Pressable} from './HapticControls';
 import {Image} from 'expo-image';
 import {router} from 'expo-router';
 import {memo,useCallback,useMemo,useState} from 'react';
-import {Linking,Pressable,ScrollView,Text,View} from 'react-native';
+import {Linking,ScrollView,Text,View} from 'react-native';
 import {castTextParts} from '../../../src/lib/mentions';
 import {type Cast,castDate,castKey,castRoute,isFid,relativeTime,safeLink} from '../lib/model';
 import {useApp} from '../lib/state';
@@ -23,18 +25,18 @@ export async function openLink(value:string){const url=safeLink(value);if(url)aw
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
   const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);
   const Container=profileLink?Pressable:View;
-  return <Container {...(profileLink?{onPress:(event:import('react-native').GestureResponderEvent)=>{event.stopPropagation();router.push(`/profile/${fid}`);},accessibilityRole:'link' as const,accessibilityLabel:`View ${value?.name||`FID ${fid}`}`}:{})} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Container>;
+  return <Container {...(profileLink?{onPress:(event:import('react-native').GestureResponderEvent)=>{event.stopPropagation();feedback('selection');router.push(`/profile/${fid}`);},accessibilityRole:'link' as const,accessibilityLabel:`View ${value?.name||`FID ${fid}`}`}:{})} style={[space.row,{flex:1,minHeight:compact?32:dense?40:52}]}>{showAvatar&&<Avatar url={value?.avatar} size={compact?32:dense?40:42}/>}<View style={space.grow}><Text numberOfLines={1} style={{color:colors.ink,fontSize:compact?14:16,fontWeight:'600'}}>{usernameOnly?(value?.username?`@${value.username}`:`FID ${fid}`):value?.name||`FID ${fid}`}</Text>{!compact&&!usernameOnly&&!!value?.username&&<Text numberOfLines={1} style={{color:colors.muted,fontSize:dense?12:13}}>@{value.username}</Text>}</View></Container>;
 }
 function AuthorAvatar({fid}:{fid:number}){
   const {api,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={{width:40,alignSelf:'flex-start'}}><Avatar url={value?.avatar} size={40}/></Pressable>;
+  return <Pressable onPress={event=>{event.stopPropagation();feedback('selection');router.push(`/profile/${fid}`);}} accessibilityRole="link" accessibilityLabel={`View ${value?.name||`FID ${fid}`}`} style={{width:40,alignSelf:'flex-start'}}><Avatar url={value?.avatar} size={40}/></Pressable>;
 }
-function Mention({fid}:{fid:number}){const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
+function Mention({fid}:{fid:number}){const {api,colors,profileRevision}=useApp(),{value}=useQuery(()=>api.profile(fid),[api,fid,profileRevision]);return <Text style={{color:colors.accent,fontWeight:'500'}} onPress={event=>{event.stopPropagation();feedback('selection');router.push(`/profile/${fid}`);}}>@{value?.username||fid}</Text>;}
 export function CastText({cast,limit=Infinity,compact=false,numberOfLines,expansion}:{cast:Cast;limit?:number;compact?:boolean;numberOfLines?:number;expansion?:{expanded:boolean;onPress:()=>void}}) {
   const {colors}=useApp();const body=cast.data.castAddBody;
   const {parts}=castTextParts(body.text,body.mentions,body.mentionsPositions,limit);
   // Keep clamped previews non-selectable so Android can draw the trailing ellipsis.
-  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
+  return <Text selectable={numberOfLines===undefined} numberOfLines={numberOfLines} ellipsizeMode="tail" style={{fontSize:16,lineHeight:compact?21:22,color:colors.ink}}>{parts.map((part,index)=>'fid' in part&&isFid(part.fid)?<Mention key={index} fid={part.fid}/>:part.text)}{expansion&&<>{' '}<Text accessibilityRole="button" accessibilityLabel={expansion.expanded?'Show less':'Show more'} accessibilityState={{expanded:expansion.expanded}} onPress={event=>{event.stopPropagation();feedback('selection');expansion.onPress();}} style={{color:colors.accent,fontSize:14,fontWeight:'600'}}>{expansion.expanded?'Show\u00a0less':'Show\u00a0more'}</Text></>}</Text>;
 }
 const ImageEmbed=memo(function ImageEmbed({url,source,gallery,width,height,onError}:{url:string;source:string;gallery:string;width?:number;height?:number;onError:()=>void}){
   const {colors}=useApp();
@@ -45,7 +47,7 @@ const ImageEmbed=memo(function ImageEmbed({url,source,gallery,width,height,onErr
   },[]);
   const imageRatio=ratio||1;
   const imageWidth=Math.min(width||300,((height||200)-2)*imageRatio+2);
-  return <Pressable onPress={event=>{event.stopPropagation();router.push({pathname:'/image',params:{url,source,embeds:gallery}});}} accessibilityRole="link" accessibilityLabel="View image" style={{width:imageWidth,height:(imageWidth-2)/imageRatio+2,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
+  return <Pressable onPress={event=>{event.stopPropagation();feedback('selection');router.push({pathname:'/image',params:{url,source,embeds:gallery}});}} accessibilityRole="link" accessibilityLabel="View image" style={{width:imageWidth,height:(imageWidth-2)/imageRatio+2,borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.soft}}>
     <Image source={imageSource} onLoad={loaded} onError={onError} style={{width:'100%',height:'100%'}} contentFit="contain" transition={0}/>
   </Pressable>;
 });
@@ -91,7 +93,7 @@ export function Quote({fid,hash,initialCast}:{fid:number;hash:string;initialCast
   const attachments:QuoteEmbed[]=body?.embeds?.length?body.embeds:(body?.embedsDeprecated||[]).map(url=>({url}));
   const embeds=attachments.filter(embed=>embed.castId||embed.url&&safeLink(embed.url)).slice(0,4);
   const text=value&&!!(body?.text||body?.mentions?.length)?<CastText cast={value} limit={280} numberOfLines={5} compact/>:null;
-  return <Pressable onPress={event=>{event.stopPropagation();router.push(`/cast/${value?.data.fid||fid}/${value?.hash||hash}`);}} accessibilityRole="link" accessibilityLabel={article?'Read quoted article':'Open quoted cast'} style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
+  return <Pressable onPress={event=>{event.stopPropagation();feedback('selection');router.push(`/cast/${value?.data.fid||fid}/${value?.hash||hash}`);}} accessibilityRole="link" accessibilityLabel={article?'Read quoted article':'Open quoted cast'} style={{padding:10,borderRadius:14,borderWidth:1,borderColor:colors.line,gap:6}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Person fid={fid} compact usernameOnly profileLink={false}/>{value&&<Text style={{fontSize:11,color:colors.muted,flexShrink:0}}>{relativeTime(value.data.timestamp)}</Text>}</View>
     {!value?<Text style={{color:colors.muted}}>{error?'Quoted cast unavailable':'Loading quoted cast…'}</Text>:article?<View style={{flexDirection:'row',alignItems:'flex-start',gap:10}}>
       {!!embeds[0]&&<View style={{width:76,height:76,flexShrink:0}}><QuoteThumbnail embed={embeds[0]}/></View>}

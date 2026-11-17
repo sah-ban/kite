@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {type ComponentProps,type ReactNode} from 'react';
-import {Pressable,Text,View} from 'react-native';
+import {Text,View} from 'react-native';
 import {useApp} from '../lib/state';
 import {Icon} from './ui';
 

@@ -7,6 +7,7 @@ import {AppState,Linking,Platform} from 'react-native';
 import type * as Notifications from 'expo-notifications';
 import {pushRoute} from './push-routing';
 import {useApp} from './state';
+import {feedback} from './haptics';
 
 type PushState={supported:boolean;busy:boolean;enabled:boolean;error:string;enable:()=>void;disable:()=>void;openSettings:()=>void};
 const Context=createContext<PushState|null>(null);
@@ -48,8 +49,8 @@ export function PushProvider({children}:{children:ReactNode}){
       if(!projectId)throw new Error('Push notifications aren’t available in this app version. Please update Kite.');
       const token=(await n.getExpoPushTokenAsync({projectId})).data;
       const id=await installationId();
-      if(current.current===fid)await setPush({installationId:id,token,enabled:true});
-    }catch(error){if(current.current===fid)setError(error instanceof Error?(/Firebase|native module|ExpoPushTokenManager|ExpoNotifications/i.test(error.message)?'Push notifications aren’t available in this app version. Please update Kite.':error.message):'Could not enable notifications. Please try again.');}
+      if(current.current===fid){await setPush({installationId:id,token,enabled:true});if(prompt)feedback('success');}
+    }catch(error){if(current.current===fid){if(prompt)feedback('error');setError(error instanceof Error?(/Firebase|native module|ExpoPushTokenManager|ExpoNotifications/i.test(error.message)?'Push notifications aren’t available in this app version. Please update Kite.':error.message):'Could not enable notifications. Please try again.');}}
     finally{lock.current=false;setBusy(false);}
   },[api,fid,getPush,setPush]);
   useEffect(()=>{
@@ -83,8 +84,8 @@ export function PushProvider({children}:{children:ReactNode}){
   },[ready,nav?.key]);
   async function disable(){
     if(lock.current||!fid)return;lock.current=true;setBusy(true);setError('');
-    try{const previous=await getPush();if(previous)await setPush({...previous,enabled:false});const n=await loadNotifications();await n.dismissAllNotificationsAsync();}
-    catch(error){setError(error instanceof Error?error.message:'Could not disable notifications. Please try again.');}
+    try{const previous=await getPush();if(previous)await setPush({...previous,enabled:false});const n=await loadNotifications();await n.dismissAllNotificationsAsync();feedback('success');}
+    catch(error){feedback('error');setError(error instanceof Error?error.message:'Could not disable notifications. Please try again.');}
     finally{lock.current=false;setBusy(false);}
   }
   return <Context.Provider value={{supported,busy,enabled,error,enable:()=>void sync(true),disable:()=>void disable(),openSettings:()=>{void Linking.openSettings().catch(()=>setError('Could not open phone settings.'));}}}>{children}</Context.Provider>;

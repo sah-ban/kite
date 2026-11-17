@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {router} from 'expo-router';
-import {Pressable,Text,View} from 'react-native';
+import {Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
 import {castRoute} from '../lib/model';

@@ -1,7 +1,8 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import Feather from '@expo/vector-icons/Feather';
 import {Image} from 'expo-image';
 import {useState,type ComponentProps,type ReactNode} from 'react';
-import {ActivityIndicator,Pressable,StyleSheet,Text,TextInput,View,type TextInputProps} from 'react-native';
+import {ActivityIndicator,StyleSheet,Text,TextInput,View,type TextInputProps} from 'react-native';
 import {useApp} from '../lib/state';
 import {safeLink} from '../lib/model';
 import {connectionNotice} from '../lib/connection-errors';

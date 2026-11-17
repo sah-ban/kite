@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {useEffect,useRef,useState,type ComponentRef} from 'react';
-import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Text,TextInput,View} from 'react-native';
 import {mentionQuery,editMentions} from '../../../src/lib/mentions';
 import {type Draft,changeText} from '../lib/composer';
 import {useApp} from '../lib/state';

@@ -1,8 +1,10 @@
+import {feedback} from '../lib/haptics';
+import {HapticPressable as Pressable} from '../components/HapticControls';
 import {Image} from 'expo-image';
 import {router,Stack,useLocalSearchParams} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import {useRef,useState} from 'react';
-import {ActivityIndicator,FlatList,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,FlatList,Text,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {safeLink} from '../lib/model';
 import {galleryEmbeds,resolveGallery} from '../lib/image-gallery';
@@ -28,8 +30,8 @@ function ImageViewer({images,selected,loadingGallery}:{images:string[];selected?
   function close(){if(router.canGoBack())router.back();else router.replace('/');}
   async function download(){
     if(!url||downloadLock.current)return;downloadLock.current=true;setDownloading(true);setNotice('');
-    try{setNotice(await downloadImage(url));}
-    catch(error){if(!(error instanceof ImageSaveCancelledError))setNotice(error instanceof ImageSavePermissionError?error.message:'Couldn’t download this image. Please try again.');}
+    try{setNotice(await downloadImage(url));feedback('success');}
+    catch(error){if(!(error instanceof ImageSaveCancelledError)){feedback('error');setNotice(error instanceof ImageSavePermissionError?error.message:'Couldn’t download this image. Please try again.');}}
     finally{downloadLock.current=false;setDownloading(false);}
   }
   function go(next:number){list.current?.scrollToIndex({index:next,animated:true});setIndex(next);setNotice('');}

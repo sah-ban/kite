@@ -1,6 +1,7 @@
+import {HapticPressable as Pressable} from '../../../components/HapticControls';
 import {Stack,useLocalSearchParams} from 'expo-router';
 import {useRef,useState,type ComponentRef} from 'react';
-import {Pressable,ScrollView,Text,View} from 'react-native';
+import {ScrollView,Text,View} from 'react-native';
 import {type Cast,castKey,isFid,isHash,mergeCasts} from '../../../lib/model';
 import {useApp} from '../../../lib/state';
 import {useCastPage,useQuery} from '../../../lib/hooks';

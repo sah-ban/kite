@@ -1,5 +1,6 @@
+import {HapticPressable as Pressable} from './HapticControls';
 import {useState} from 'react';
-import {Pressable} from 'react-native';
+
 import {useApp} from '../lib/state';
 import {useQuery} from '../lib/hooks';
 import {Avatar} from './ui';

@@ -1,7 +1,8 @@
+import {HapticPressable as Pressable} from '../components/HapticControls';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Stack,router,useFocusEffect} from 'expo-router';
 import {useCallback,useState} from 'react';
-import {FlatList,Pressable,Text,View} from 'react-native';
+import {FlatList,Text,View} from 'react-native';
 import {Image} from 'expo-image';
 import {useApp} from '../lib/state';
 import {listSavedDrafts,type SavedDraft} from '../lib/drafts';

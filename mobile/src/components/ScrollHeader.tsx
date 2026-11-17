@@ -1,4 +1,5 @@
-import {ActivityIndicator,Animated,Pressable,Text,View} from 'react-native';
+import {HapticPressable as Pressable} from './HapticControls';
+import {ActivityIndicator,Animated,Text,View} from 'react-native';
 import {Image} from 'expo-image';
 import {useApp} from '../lib/state';
 import {SCROLL_HEADER_HEIGHT} from '../lib/scroll-header';
