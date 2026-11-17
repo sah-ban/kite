@@ -4,6 +4,7 @@ import {useApp} from '../lib/state';
 import {Avatar} from './ui';
 
 const logos:Record<ClientLogo,number>={
+  terminus:require('../../assets/clients/terminus.jpg'),
   neynar:require('../../assets/clients/neynar.png'),
   warpcast:require('../../assets/clients/warpcast.png'),
   firefly:require('../../assets/clients/firefly.png'),
