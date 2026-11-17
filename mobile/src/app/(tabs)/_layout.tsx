@@ -16,6 +16,5 @@ function TabNavigator(){
     <Tabs.Screen name="index" options={{title:'Home',tabBarIcon:({focused})=><Icon name="home" color={focused?colors.accent:colors.muted}/>}}/>
     <Tabs.Screen name="search" options={{title:'Search',tabBarIcon:({focused})=><Icon name="search" color={focused?colors.accent:colors.muted}/>}}/>
     <Tabs.Screen name="notifications" options={{title:'Notifications',tabBarBadge:unread?unread>99?'99+':unread:undefined,tabBarBadgeStyle:{backgroundColor:colors.accent,color:colors.background},tabBarIcon:({focused})=><Icon name="bell" color={focused?colors.accent:colors.muted}/>}}/>
-    <Tabs.Screen name="settings" options={{title:'Settings',tabBarIcon:({focused})=><Icon name="sliders" color={focused?colors.accent:colors.muted}/>}}/>
   </Tabs>;
 }

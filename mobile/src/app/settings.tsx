@@ -1,9 +1,9 @@
 import {useState} from 'react';
 import {ScrollView,Text,View} from 'react-native';
-import {useApp} from '../../lib/state';
-import {Button,space} from '../../components/ui';
-import {openLink} from '../../components/CastCard';
-import {PushSettings} from '../../components/PushSettings';
+import {useApp} from '../lib/state';
+import {Button,space} from '../components/ui';
+import {openLink} from '../components/CastCard';
+import {PushSettings} from '../components/PushSettings';
 
 export default function Settings(){
   const {theme,setTheme,colors}=useApp();
