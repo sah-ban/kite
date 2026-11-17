@@ -1,25 +1,21 @@
 import {useState} from 'react';
-import {ScrollView,Text,View} from 'react-native';
+import {router} from 'expo-router';
+import {ActivityIndicator,ScrollView,Switch,Text,View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useApp} from '../lib/state';
-import {Button,space} from '../components/ui';
-import {openLink} from '../components/CastCard';
 import {PushSettings} from '../components/PushSettings';
+import {SettingsRow,SettingsSection} from '../components/SettingsSection';
 
 export default function Settings(){
-  const {theme,setTheme,colors}=useApp();
-  const [error,setError]=useState('');
-  return <ScrollView contentContainerStyle={space.content}>
-    <Text style={[space.title,{color:colors.ink}]}>Make it yours.</Text>
+  const {theme,setTheme,colors,dark}=useApp(),insets=useSafeAreaInsets();
+  const [error,setError]=useState(''),[saving,setSaving]=useState(false);
+  async function changeSystem(value:boolean){
+    if(saving)return;setSaving(true);setError('');
+    try{await setTheme(value?'system':dark?'dark':'light');}catch{setError('Could not save your theme. Please try again.');}finally{setSaving(false);}
+  }
+  return <ScrollView style={{backgroundColor:colors.background}} contentContainerStyle={{paddingHorizontal:16,paddingTop:20,paddingBottom:Math.max(insets.bottom,20),gap:22}}>
     <PushSettings/>
-    <View style={{gap:12}}>
-      <Text style={[space.heading,{color:colors.ink}]}>Appearance</Text>
-      <Button label={theme==='system'?'Following system theme':'Follow system theme'} icon="smartphone" quiet={theme!=='system'} disabled={theme==='system'} onPress={()=>{setError('');void setTheme('system').catch(()=>setError('Could not save your theme. Please try again.'));}}/>
-      {!!error&&<Text accessibilityRole="alert" style={{color:colors.danger}}>{error}</Text>}
-    </View>
-    <View style={{height:1,backgroundColor:colors.line,marginVertical:4}}/>
-    <View style={{gap:12}}>
-      <Text style={[space.heading,{color:colors.ink}]}>About Kite</Text>
-      <Button label="Kite on Farcaster" quiet icon="at-sign" onPress={()=>void openLink('https://kite.sahban.dev/profile/925685')}/>
-    </View>
+    <SettingsSection title="Appearance"><SettingsRow icon="smartphone" title="Follow system theme" description={theme==='system'?'Match your phone’s light or dark mode.':`Using ${dark?'dark':'light'} theme. Change it in the account drawer.`} control={<View style={{flexDirection:'row',alignItems:'center',gap:6}}>{saving&&<ActivityIndicator size="small" color={colors.accent}/>}<Switch accessibilityLabel="Follow system theme" value={theme==='system'} disabled={saving} onValueChange={value=>void changeSystem(value)} trackColor={{false:colors.line,true:colors.accent}}/></View>}/>{!!error&&<Text accessibilityRole="alert" style={{paddingHorizontal:14,paddingBottom:14,color:colors.danger,fontSize:13,lineHeight:19}}>{error}</Text>}</SettingsSection>
+    <SettingsSection title="About"><SettingsRow icon="at-sign" title="Kite on Farcaster" description="@kiteapp" onPress={()=>router.push('/profile/925685')}/></SettingsSection>
   </ScrollView>;
 }
