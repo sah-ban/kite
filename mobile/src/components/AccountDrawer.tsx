@@ -10,7 +10,7 @@ import {Avatar,Icon} from './ui';
 export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>void}){
   const {colors,account,accountBusy,dark,setTheme,signOut}=useApp(),fid=account.session?.fid;
   const [signingOut,setSigningOut]=useState(false),[changingTheme,setChangingTheme]=useState(false),[error,setError]=useState('');
-  const insets=useSafeAreaInsets(),{width}=useWindowDimensions(),drawerWidth=Math.min(320,width*.86);
+  const insets=useSafeAreaInsets(),{width}=useWindowDimensions(),drawerWidth=Math.min(320,width*.66);
   const [progress]=useState(()=>new Animated.Value(0));const closing=useRef(false),themeTouch=useRef(false);
   useEffect(()=>()=>progress.stopAnimation(),[progress]);
   const show=useCallback(()=>{if(!closing.current)Animated.timing(progress,{toValue:1,duration:220,useNativeDriver:Platform.OS!=='web'}).start();},[progress]);
