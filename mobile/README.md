@@ -6,6 +6,8 @@ The header avatar opens a left account drawer. Tap the avatar, display name, or 
 
 Signed-in Home has **Following** and **All** tabs, defaulting to Following for the connected account. Following uses the same indexed feed enrollment as notifications; All shows the public indexed timeline. Guests see All without the feed tabs. Both timelines exclude replies. The feed tabs hide and return with the header, and tapping Kite scrolls to the top or refreshes the selected feed when already at the top.
 
+Each feed loads on its first visit and keeps its loaded casts, pagination, and scroll position when switching tabs. Refresh the selected feed to fetch new casts. Hidden feeds stop video playback and automatic pagination; account changes clear both feed views.
+
 Search accepts exact usernames, FIDs, and Kite or Farcaster profile/cast links, with a clipboard paste action. The eight most recent successful lookups are saved on the device for each account and server. Tap one to reopen it, remove individual entries, or clear the list.
 
 Conversations show parent casts above the selected cast. Earlier context loads in batches as you scroll up, preserving your position; Load earlier casts is also available. Missing parents leave the selected cast and any loaded context visible, with a retry action.
