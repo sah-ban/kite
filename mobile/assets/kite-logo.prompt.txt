@@ -1,7 +1,11 @@
 Tool: built-in image_gen (edit, transparent background).
 Reference: public/kite-mark-transparent.png.
-Applied exports: mobile/assets/adaptive-icon.png (transparent master),
-mobile/assets/kite-mark.png (128 px UI mark), mobile/assets/icon.png (white background).
+Master: mobile/assets/kite-logo.png (original transparent recolor).
+Applied exports: mobile/assets/adaptive-icon.png (1024 px transparent foreground,
+centered inside the 66 dp safe circle of Android's 108 dp adaptive-icon canvas),
+mobile/assets/kite-mark.png (128 px UI mark), mobile/assets/icon.png (1024 px opaque
+white background, centered logo at 80% of the canvas height).
+Launcher exports trim transparent margins and near-transparent edge noise.
 Export sizes and backgrounds prepared with the installed Expo image utilities.
 
 Prompt:
