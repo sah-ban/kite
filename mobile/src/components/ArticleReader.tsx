@@ -9,6 +9,7 @@ import {CastEmbeds,Person} from './CastCard';
 import {CastActions} from './CastActions';
 import {CastMenu} from './CastMenu';
 import {Loading,Notice} from './ui';
+import {ThreadConnector} from './ThreadConnector';
 
 function Inline({text,depth=0}:{text:string;depth?:number}){
   const {colors}=useApp();
@@ -56,14 +57,15 @@ function ArticlePart({cast,first}:{cast:Cast;first:boolean}){
     {embeds.filter((_,index)=>!used.has(index)).map((embed,index)=><CastEmbeds key={`extra:${index}`} embeds={[embed]} visible gutter={0}/>)}
   </View>;
 }
-export function ArticleReader({cast}:{cast:Cast}){
+export function ArticleReader({cast,threadBefore=false}:{cast:Cast;threadBefore?:boolean}){
   const {api,colors}=useApp();
   const result=useQuery(signal=>api.article(cast,signal),[api,cast.hash,cast.data.fid]);
   if(result.loading)return <Loading/>;
   if(result.error||!result.value)return <Notice title="Article unavailable" retry={result.reload}>{result.error}</Notice>;
   const {root,parts,missing,growing,searchLimited}=result.value;
   return <View style={{padding:16,gap:18,borderBottomWidth:1,borderColor:colors.line}}>
-    <View style={{flexDirection:'row',gap:8,alignItems:'center'}}><Person fid={root.data.fid} dense/><CastMenu cast={root}/></View>
+    {threadBefore&&<ThreadConnector before avatarTop={16}/>}
+    <View style={{flexDirection:'row',gap:8,alignItems:'center',marginLeft:threadBefore?-2:0}}><Person fid={root.data.fid} dense/><CastMenu cast={root}/></View>
     <Text style={{fontSize:12,color:colors.muted}}>{castDate(root.data.timestamp).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})} · Article</Text>
     {parts.map((part,index)=><Fragment key={part.hash}>{index>0&&part.data.castAddBody.chain!.index!==parts[index-1].data.castAddBody.chain!.index+1&&<Text style={{color:colors.muted}}>Some article content is unavailable.</Text>}<ArticlePart cast={part} first={index===0}/></Fragment>)}
     {!!missing.length&&<Notice title="Article incomplete" retry={result.reload}>{missing.length} part(s) are missing or have been removed.</Notice>}

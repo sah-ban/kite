@@ -17,6 +17,7 @@ import {miniAppLaunchURL} from '../lib/miniapp';
 import {TweetEmbed} from './TweetEmbed';
 import {xPostLink} from '../lib/x-post';
 import {articleChain,isArticle} from '../lib/articles';
+import {ThreadConnector} from './ThreadConnector';
 
 export async function openLink(value:string){const url=safeLink(value);if(url)await Linking.openURL(url).catch(()=>{});}
 export function Person({fid,compact=false,dense=false,showAvatar=true,usernameOnly=false,profileLink=true}:{fid:number;compact?:boolean;dense?:boolean;showAvatar?:boolean;usernameOnly?:boolean;profileLink?:boolean}) {
@@ -116,7 +117,7 @@ export function CastEmbeds({embeds,visible,gutter}:{embeds:NonNullable<Cast['dat
     {previews.map((embed,index)=><View key={`${index}:${embed.castId?.hash||embed.url}`} style={{marginLeft:gutter}}>{embed.castId?<Quote {...embed.castId}/>:embed.url?<UrlEmbed url={embed.url} castUrls={urls} visible={visible}/>:null}</View>)}
   </View>;
 }
-export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=true}:{cast:Cast;expanded?:boolean;loadActivity?:boolean}){
+export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=true,threadBefore=false,threadAfter=false}:{cast:Cast;expanded?:boolean;loadActivity?:boolean;threadBefore?:boolean;threadAfter?:boolean}){
   const {colors,deletedCasts}=useApp();const body=cast.data.castAddBody;
   const [textExpanded,setTextExpanded]=useState(false);
   if(deletedCasts.has(castKey(cast)))return null;
@@ -125,6 +126,7 @@ export const CastCard=memo(function CastCard({cast,expanded=false,loadActivity=t
   const canExpand=!expanded&&Array.from(body.text).length>500;
   const Container=expanded?View:Pressable;
   return <Container accessible={false} focusable={false} {...(expanded?{}:{onPress:route})} style={{borderBottomWidth:1,borderColor:colors.line,paddingHorizontal:14,paddingTop:expanded?10:8,paddingBottom:2,flexDirection:'column',backgroundColor:colors.surface}}>
+    {(threadBefore||threadAfter)&&<ThreadConnector before={threadBefore} after={threadAfter} avatarTop={expanded?10:8}/>}
     {!expanded&&<View style={{position:'absolute',left:14,top:8,width:40,height:40,zIndex:1}}><AuthorAvatar fid={cast.data.fid}/></View>}
     <View style={{minWidth:0,paddingLeft:expanded?0:48,gap:expanded?4:2}}>
     <View style={[space.row,{gap:6}]}><Person fid={cast.data.fid} dense showAvatar={expanded}/>{!expanded&&<Text style={{color:colors.muted,fontSize:12}}>{relativeTime(cast.data.timestamp)}</Text>}<CastMenu cast={cast}/></View>
