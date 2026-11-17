@@ -91,7 +91,7 @@ npm run build:preview
 npm run build:production
 ```
 
-The production profile creates an AAB, while the preview profile creates an installable APK. Signing credentials stay outside Git and are managed through the Expo project. Production builds can also be generated locally using Expo/Android tooling; see [Expo's local release guide](https://docs.expo.dev/guides/local-app-production/).
+The production profile creates an AAB, while the preview profile creates an installable APK. EAS manages Android version codes remotely and increments them for production builds; the visible app version remains in `app.config.ts`. Signing credentials stay outside Git and are managed through the Expo project. Production builds can also be generated locally using Expo/Android tooling; see [Expo's local release guide](https://docs.expo.dev/guides/local-app-production/).
 
 Opening `kite://cast/FID/FULL_HASH` and `kite://profile/FID` uses Expo Router. HTTPS Android App Links require the release certificate fingerprint and an `assetlinks.json` on the website; they are not registered yet. Until then, paste HTTPS links into Search.
 
