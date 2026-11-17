@@ -46,10 +46,10 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
           <Pressable accessibilityRole={fid?'link':undefined} accessibilityLabel={fid?'Open your profile':undefined} disabled={!fid} onPress={()=>{if(fid)go(`/profile/${fid}`);}} style={{paddingHorizontal:10,paddingBottom:20,gap:12}}><Avatar url={profile?.avatar} size={56}/><View style={{gap:4}}><Text numberOfLines={2} style={{fontSize:20,lineHeight:25,fontWeight:'700',color:colors.ink}}>{fid?profile?.name||`FID ${fid}`:'Welcome to Kite'}</Text><Text numberOfLines={1} style={{fontSize:14,color:colors.muted}}>{fid?profile?.username?`@${profile.username}`:`FID ${fid}`:'Connect your Farcaster account'}</Text></View></Pressable>
           <View style={{height:1,backgroundColor:colors.line,marginBottom:8}}/>
           {!fid&&<DrawerItem label="Sign in" icon="log-in" onPress={()=>go('/sign-in')}/>}
-          <DrawerItem label="Settings" icon="sliders" onPress={()=>go('/settings')}/>
           <View style={{marginTop:'auto',paddingTop:20}}>
             {!!error&&<Text accessibilityRole="alert" style={{paddingHorizontal:14,paddingBottom:8,fontSize:13,lineHeight:19,color:colors.danger}}>{error}</Text>}
             <View style={{height:1,backgroundColor:colors.line,marginBottom:8}}/>
+            <DrawerItem label="Settings" icon="settings" onPress={()=>go('/settings')}/>
             <View style={{minHeight:50,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:14}}><Icon name={dark?'moon':'sun'} size={21}/><Text style={{flex:1,color:colors.ink,fontSize:16,fontWeight:'500'}}>Dark theme</Text><Switch accessibilityLabel="Dark theme" value={dark} disabled={changingTheme||signingOut} onTouchStart={()=>{themeTouch.current=true;}} onTouchEnd={()=>{themeTouch.current=false;}} onTouchCancel={()=>{themeTouch.current=false;}} onValueChange={value=>void changeTheme(value)} trackColor={{false:colors.line,true:colors.accent}}/></View>
             <DrawerItem label="GitHub" icon="github" external onPress={()=>external('https://github.com/sah-ban/kite')}/>
             {!!fid&&<DrawerItem label={signingOut?'Signing out…':'Sign out'} icon="log-out" danger disabled={signingOut||accountBusy||changingTheme} onPress={()=>void disconnect()}/>}
