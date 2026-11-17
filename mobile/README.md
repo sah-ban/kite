@@ -2,7 +2,7 @@
 
 A native React Native / Expo app, built alongside the Kite web client. Android application ID: `dev.sahban.kite`. The source is MIT licensed; see the repository license. The Expo starter license is retained in `LICENSE`.
 
-The header avatar opens a left account drawer. Tap the avatar, display name, or username inside it to open the connected profile. Settings opens from the drawer; the bottom bar contains Home, Search, Post, and Notifications. Post opens the composer over the current screen, or Sign in for guests. The theme toggle, GitHub link, and Sign out action sit at the bottom; guests get Sign in instead. Saved drafts remain accessible from the composer.
+The header avatar opens a left account drawer. Tap the avatar, display name, or username inside it to open the connected profile. Settings opens from the drawer; the bottom bar contains Home, Post, and Notifications. Search opens from the icon at the top right of Home. Post opens the composer over the current screen, or Sign in for guests. The theme toggle, GitHub link, and Sign out action sit at the bottom; guests get Sign in instead. Saved drafts remain accessible from the composer.
 
 Signed-in Home has **Following** and **All** tabs, defaulting to Following for the connected account. Following uses the same indexed feed enrollment as notifications; All shows the public indexed timeline. Guests see All without the feed tabs. Both timelines exclude replies. The feed tabs hide and return with the header, and tapping Kite scrolls to the top or refreshes the selected feed when already at the top.
 

@@ -1,16 +1,15 @@
-import {feedback} from '../../lib/haptics';
-import {HapticPressable as Pressable} from '../../components/HapticControls';
+import {feedback} from '../lib/haptics';
+import {HapticPressable as Pressable} from '../components/HapticControls';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import {router,Tabs} from 'expo-router';
+import {router,Stack} from 'expo-router';
 import {useEffect,useRef,useState,type ComponentRef} from 'react';
 import {ActivityIndicator,Keyboard,ScrollView,Text,TextInput,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useApp} from '../../lib/state';
-import {parseSearch,castRoute} from '../../lib/model';
-import {readSearchHistory,rememberSearch,searchEntry} from '../../lib/search-history';
-import {AccountButton} from '../../components/AccountButton';
-import {Icon} from '../../components/ui';
+import {useApp} from '../lib/state';
+import {parseSearch,castRoute} from '../lib/model';
+import {readSearchHistory,rememberSearch,searchEntry} from '../lib/search-history';
+import {Icon} from '../components/ui';
 
 export default function Search(){
   const {api,account}=useApp(),scope=`kite.mobile.search.v1:${api.origin}:${account.session?.fid||0}`;
@@ -51,8 +50,8 @@ function SearchScreen({storageKey}:{storageKey:string}){
   let hint='Enter an exact username, FID, or paste a profile or cast link.';
   if(query.trim())try{hint=searchEntry(query).kind==='cast'?'Open this cast and its conversation.':'Open this Farcaster profile.';}catch{hint='Use an exact username, FID, or a Kite or Farcaster link.';}
   return <View style={{flex:1,paddingTop:insets.top,backgroundColor:colors.surface}}>
-    <Tabs.Screen options={{headerShown:false}}/>
-    <View style={{height:56,flexDirection:'row',alignItems:'center'}}><AccountButton side="left"/><View pointerEvents="none" style={{position:'absolute',left:70,right:70,alignItems:'center'}}><Text style={{color:colors.ink,fontSize:22,fontWeight:'700',letterSpacing:-.6}}>Search</Text></View></View>
+    <Stack.Screen options={{headerShown:false}}/>
+    <View style={{height:56,flexDirection:'row',alignItems:'center'}}><Pressable accessibilityRole="button" accessibilityLabel="Back from search" onPress={()=>router.canGoBack()?router.back():router.replace('/')} style={{width:44,height:44,marginLeft:12,alignItems:'center',justifyContent:'center'}}><Icon name="arrow-left" size={22}/></Pressable><View pointerEvents="none" style={{position:'absolute',left:70,right:70,alignItems:'center'}}><Text style={{color:colors.ink,fontSize:22,fontWeight:'700',letterSpacing:-.6}}>Search</Text></View></View>
     <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{paddingHorizontal:16,paddingTop:10,paddingBottom:24,gap:24}}>
       <View style={{gap:9}}>
         <View style={{flexDirection:'row',alignItems:'center',paddingLeft:14,paddingRight:4,minHeight:54,borderRadius:16,borderWidth:1,borderColor:focused?colors.accent:colors.line,backgroundColor:colors.soft}}>
