@@ -15,18 +15,18 @@ import {postOnXIntent} from '../lib/post-on-x';
 import {isArticle} from '../lib/articles';
 
 
-export function CastMenu({cast}:{cast:Cast}){
+export function CastMenu({cast,conversation=false}:{cast:Cast;conversation?:boolean}){
   const {colors,account,accountBusy,deleteCast}=useApp();
   const [open,setOpen]=useState(false),[notice,setNotice]=useState('');
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),2500);return()=>clearTimeout(timer);},[notice]);
   return <View>
     <Pressable accessibilityRole="button" accessibilityLabel="Cast options" accessibilityState={{expanded:open}} onPress={event=>{event.stopPropagation();setNotice('');setOpen(true);}} hitSlop={4} style={({pressed})=>({width:36,height:40,alignItems:'center',justifyContent:'center',borderRadius:18,backgroundColor:pressed?colors.soft:'transparent'})}><Icon name="more-horizontal" size={20} color={colors.muted}/></Pressable>
     {!!notice&&<Text accessibilityRole="alert" style={{position:'absolute',right:0,top:38,minWidth:92,padding:8,borderRadius:10,backgroundColor:colors.soft,color:colors.ink,fontSize:12,zIndex:1}}>{notice}</Text>}
-    {open&&<CastOptionsSheet cast={cast} own={account.session?.fid===cast.data.fid} accountBusy={accountBusy} onClose={()=>setOpen(false)} onCopied={()=>{setNotice('Link copied');setOpen(false);}} onDelete={()=>deleteCast(cast)}/>}
+    {open&&<CastOptionsSheet cast={cast} conversation={conversation} own={account.session?.fid===cast.data.fid} accountBusy={accountBusy} onClose={()=>setOpen(false)} onCopied={()=>{setNotice('Link copied');setOpen(false);}} onDelete={()=>deleteCast(cast)}/>}
   </View>;
 }
 
-export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,onDelete}:{cast:Cast;own:boolean;accountBusy?:boolean;onClose:()=>void;onCopied:()=>void;onDelete:()=>Promise<void>}){
+export function CastOptionsSheet({cast,own,conversation=false,accountBusy=false,onClose,onCopied,onDelete}:{cast:Cast;own:boolean;conversation?:boolean;accountBusy?:boolean;onClose:()=>void;onCopied:()=>void;onDelete:()=>Promise<void>}){
   const {api,colors}=useApp(),insets=useSafeAreaInsets();
   const xDraft=useQuery(()=>own?postOnXIntent(cast,api):Promise.resolve(undefined),[api,own,cast.data.fid,cast.hash]);
   const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -81,7 +81,7 @@ export function CastOptionsSheet({cast,own,accountBusy=false,onClose,onCopied,on
             <MenuItem label="Share cast" icon="share" disabled={busy} onPress={()=>void run('share')}/>
             {own&&<MenuItem label={xDraft.loading?'Post on X…':xDraft.error?'Retry Post on X':'Post on X'} icon="brand-x" disabled={busy||xDraft.loading} onPress={()=>xDraft.error?xDraft.reload():void run('x')}/>}
             {own&&!isArticle(cast)&&<MenuItem label="Edit cast" icon="edit-2" disabled={busy||accountBusy} onPress={()=>{api.rememberCast(cast);onClose();router.push(`/edit/${cast.data.fid}/${cast.hash}`);}}/>}
-            <Pressable accessibilityRole="button" accessibilityLabel="Open in Farcaster" disabled={busy} onPress={()=>void run('farcaster')} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',alignItems:'center',gap:14,borderRadius:12,backgroundColor:pressed?colors.soft:'transparent',opacity:busy?.45:1})}><FarcasterIcon/><Text style={{fontSize:16,fontWeight:'500',color:colors.ink}}>Open in Farcaster</Text></Pressable>
+            {!conversation&&<Pressable accessibilityRole="button" accessibilityLabel="Open in Farcaster" disabled={busy} onPress={()=>void run('farcaster')} style={({pressed})=>({minHeight:54,paddingHorizontal:18,flexDirection:'row',alignItems:'center',gap:14,borderRadius:12,backgroundColor:pressed?colors.soft:'transparent',opacity:busy?.45:1})}><FarcasterIcon/><Text style={{fontSize:16,fontWeight:'500',color:colors.ink}}>Open in Farcaster</Text></Pressable>}
             {own&&<MenuItem label="Delete cast" icon="trash-2" disabled={busy||accountBusy} danger onPress={()=>{setConfirm(true);setError('');}}/>}
             <MenuItem label="Cancel" icon="x" disabled={busy} onPress={close}/>
           </>}
