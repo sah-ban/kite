@@ -1,5 +1,6 @@
 import {router,type Href} from 'expo-router';
 import Constants from 'expo-constants';
+import {Image} from 'expo-image';
 import {useCallback,useEffect,useMemo,useRef,useState,type ComponentProps} from 'react';
 import {Animated,Linking,Modal,PanResponder,Platform,Pressable,ScrollView,Switch,Text,View,useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -41,7 +42,7 @@ export function AccountDrawer({profile,onClose}:{profile?:Profile;onClose:()=>vo
       <Animated.View pointerEvents="none" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#000',opacity:progress.interpolate({inputRange:[0,1],outputRange:[0,.45]})}}/>
       <Pressable accessibilityRole="button" accessibilityLabel="Dismiss account drawer" onPress={()=>close()} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>
       <Animated.View {...pan.panHandlers} accessibilityViewIsModal accessibilityLabel="Account menu" style={{width:drawerWidth,flex:1,backgroundColor:colors.surface,paddingTop:insets.top+8,transform:[{translateX:progress.interpolate({inputRange:[0,1],outputRange:[-drawerWidth,0]})}]}}>
-        <View style={{paddingLeft:22,paddingRight:10,height:48,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontSize:23,fontWeight:'700',letterSpacing:-.6,color:colors.ink}}>Kite</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account menu" onPress={()=>close()} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="x" size={23}/></Pressable></View>
+        <View style={{paddingLeft:22,paddingRight:10,height:48,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><View style={{flexDirection:'row',alignItems:'center',gap:8}}><Image source={require('../../assets/kite-mark.png')} contentFit="contain" accessible={false} style={{width:25,height:25}}/><Text style={{fontSize:23,fontWeight:'700',letterSpacing:-.6,color:colors.ink}}>Kite</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close account menu" onPress={()=>close()} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="x" size={23}/></Pressable></View>
         <ScrollView contentContainerStyle={{flexGrow:1,paddingHorizontal:12,paddingTop:12,paddingBottom:Math.max(insets.bottom,16)}}>
           <Pressable accessibilityRole={fid?'link':undefined} accessibilityLabel={fid?'Open your profile':undefined} disabled={!fid} onPress={()=>{if(fid)go(`/profile/${fid}`);}} style={{paddingHorizontal:10,paddingBottom:20,gap:12}}><Avatar url={profile?.avatar} size={56}/><View style={{gap:4}}><Text numberOfLines={2} style={{fontSize:20,lineHeight:25,fontWeight:'700',color:colors.ink}}>{fid?profile?.name||`FID ${fid}`:'Welcome to Kite'}</Text><Text numberOfLines={1} style={{fontSize:14,color:colors.muted}}>{fid?profile?.username?`@${profile.username}`:`FID ${fid}`:'Connect your Farcaster account'}</Text></View></Pressable>
           <View style={{height:1,backgroundColor:colors.line,marginBottom:8}}/>
