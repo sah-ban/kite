@@ -14,3 +14,9 @@ test('small direction changes do not flicker the header and returning to the top
   assert.equal(scrollHeader(state,0).hidden,false);assert.deepEqual(scrollHeader(state,-30),initialScrollHeader);
   assert.equal(scrollHeader(state,NaN),state);
 });
+test('a header with Home feed tabs hides and returns as one taller unit',()=>{
+  let state=scrollHeader(initialScrollHeader,80,100);assert.equal(state.hidden,false);
+  state=scrollHeader(state,120,100);assert.equal(state.hidden,true);
+  state=scrollHeader(state,108,100);assert.equal(state.hidden,false);
+  assert.equal(scrollHeader(state,0,100).hidden,false);
+});

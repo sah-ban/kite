@@ -213,6 +213,10 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     config: (signal?:AbortSignal)=>request<{indexedFeedEnabled:boolean}>('/api/config',{},signal),
     status: (signal?:AbortSignal)=>request<{available:boolean;syncDelaySeconds:number|null}>('/api/node/status',{},signal),
     publicFeed:async(cursor='',signal?:AbortSignal)=>page(await request<NodePage>('/api/feed/public',{order:'newest',...(cursor?{cursor}:{})},signal)),
+    followingFeed:async(fid:number,cursor='',signal?:AbortSignal)=>{
+      if(!isFid(fid))throw new Error('Sign in to view your Following feed.');
+      return page(await request<NodePage>('/api/feed/following',{fid,order:'newest',...(cursor?{cursor}:{})},signal));
+    },
     profileCasts:async(fid:number,cursor='',signal?:AbortSignal)=>page(await hub<NodePage>('castsByFid',{fid,pageSize:30,reverse:'true',...(cursor?{pageToken:cursor}:{})},signal)),
     profileLikes:async(fid:number,cursor='',signal?:AbortSignal):Promise<Page<Cast>>=>{
       if(!isFid(fid))throw new Error('Invalid profile FID.');

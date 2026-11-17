@@ -58,6 +58,14 @@ test('feed requests use the selected gateway, preserve cursors and discard remov
   assert.equal(urls[1].origin,'https://kite.example');assert.equal(urls[1].pathname,'/api/feed/public');assert.equal(urls[1].searchParams.get('cursor'),'opaque+/=');
   assert.equal(mergeCasts(first.items,[cast]).length,1);
 });
+test('Following requests use the connected viewer and preserve the feed cursor',async()=>{
+  const urls:URL[]=[];
+  const api=createApi('https://kite.example',async input=>{urls.push(new URL(String(input)));return json({messages:[cast],nextPageToken:'following+/='});});
+  const first=await api.followingFeed(37);assert.deepEqual(first.items,[cast]);
+  await api.followingFeed(37,first.next);
+  assert.equal(urls[0].pathname,'/api/feed/following');assert.equal(urls[0].searchParams.get('fid'),'37');assert.equal(urls[0].searchParams.get('order'),'newest');assert.equal(urls[1].searchParams.get('cursor'),'following+/=');
+  await assert.rejects(api.followingFeed(0),/Sign in/);assert.equal(urls.length,2);
+});
 test('full cast lookup validates the returned author and hash',async()=>{
   const api=createApi('https://kite.example',async()=>json(cast));
   assert.deepEqual(await api.resolveCast('1059075',hash),cast);
