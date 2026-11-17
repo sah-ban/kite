@@ -4,14 +4,12 @@ import {useApp} from '../../lib/state';
 import {Button,space} from '../../components/ui';
 import {openLink} from '../../components/CastCard';
 import {PushSettings} from '../../components/PushSettings';
-import {PendingCastEdits} from '../../components/PendingCastEdits';
 
 export default function Settings(){
-  const {theme,setTheme,colors,account}=useApp();
+  const {theme,setTheme,colors}=useApp();
   const [error,setError]=useState('');
   return <ScrollView contentContainerStyle={space.content}>
     <Text style={[space.title,{color:colors.ink}]}>Make it yours.</Text>
-    <PendingCastEdits key={account.session?`${account.session.fid}:${account.session.key}`:'signed-out'}/>
     <PushSettings/>
     <View style={{gap:12}}>
       <Text style={[space.heading,{color:colors.ink}]}>Appearance</Text>

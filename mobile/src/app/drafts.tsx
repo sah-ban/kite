@@ -7,13 +7,15 @@ import {useApp} from '../lib/state';
 import {listSavedDrafts,type SavedDraft} from '../lib/drafts';
 import {usage} from '../lib/composer';
 import {Button,Icon,Loading,Notice,space} from '../components/ui';
+import {PendingCastEdits} from '../components/PendingCastEdits';
 
 export default function DraftsRoute(){
   const {account,api}=useApp(),fid=account.session?.fid;
   return <DraftsList key={`${api.origin}:${fid||0}`} fid={fid}/>;
 }
 function DraftsList({fid}:{fid?:number}){
-  const {api,colors}=useApp();
+  const {api,colors,account}=useApp();
+  const [hasPending,setHasPending]=useState<boolean|null>(null);
   const [items,setItems]=useState<SavedDraft[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[remove,setRemove]=useState(''),[deleting,setDeleting]=useState(false),[revision,setRevision]=useState(0);
   useFocusEffect(useCallback(()=>{
     let active=true;
@@ -36,8 +38,8 @@ function DraftsList({fid}:{fid?:number}){
   return <View style={{flex:1,backgroundColor:colors.background}}>
     <Stack.Screen options={{title:'Saved drafts',headerRight:()=>fid?<Pressable accessibilityRole="button" accessibilityLabel="Write a new cast" onPress={()=>router.push('/compose')} style={{width:44,height:44,alignItems:'center',justifyContent:'center',marginRight:8}}><Icon name="edit-3" color={colors.accent}/></Pressable>:null}}/>
     {!fid?<Notice title="Sign in to view drafts">Your drafts are saved on this device for each account.</Notice>:loading?<Loading/>:<FlatList data={items} keyExtractor={item=>item.key} contentContainerStyle={{padding:16,gap:12,flexGrow:1}}
-      ListHeaderComponent={<View style={{gap:8,paddingBottom:8}}><Text style={{fontSize:14,lineHeight:21,color:colors.muted}}>Your unfinished casts, ready when you are.</Text>{!!error&&<Text accessibilityRole="alert" style={{color:colors.danger,fontSize:14,lineHeight:21}}>{error}</Text>}{!!error&&<Button label="Retry" quiet onPress={()=>setRevision(value=>value+1)}/>}</View>}
-      ListEmptyComponent={!error?<Notice icon="file-text" title="No saved drafts">Save a cast as a draft and finish it here later.</Notice>:undefined}
+      ListHeaderComponent={<View style={{gap:12,paddingBottom:8}}><Text style={{fontSize:14,lineHeight:21,color:colors.muted}}>Your unfinished casts, ready when you are.</Text><PendingCastEdits key={account.session?.key||'signed-out'} onLoaded={setHasPending}/>{!!error&&<Text accessibilityRole="alert" style={{color:colors.danger,fontSize:14,lineHeight:21}}>{error}</Text>}{!!error&&<Button label="Retry" quiet onPress={()=>setRevision(value=>value+1)}/>}</View>}
+      ListEmptyComponent={!error&&hasPending===false?<Notice icon="file-text" title="No saved drafts">Save a cast as a draft and finish it here later.</Notice>:undefined}
       renderItem={({item})=>{
         const embeds=usage(item.draft,10000).embeds;
         return <View style={{padding:16,borderRadius:18,borderWidth:1,borderColor:colors.line,backgroundColor:colors.surface,gap:12}}>
