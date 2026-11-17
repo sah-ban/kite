@@ -6,6 +6,7 @@ import {xHandle} from '../../../src/lib/x-handle';
 import {articleChain,assembleArticle} from './articles';
 import {proSubscriptionExpiry} from '../../../pro-subscription.mjs';
 import type {ProfileChanges} from './profile-edit';
+import {CONNECTION_UNAVAILABLE,CONNECTION_TIMEOUT} from './connection-errors';
 
 type Fetcher = typeof fetch;
 type NodePage = {messages?: unknown[]; nextPageToken?: string};
@@ -23,6 +24,16 @@ export class ApiError extends Error {
   constructor(public status:number,message:string,public notFound=false){super(message);}
 }
 export function createApi(server: string, fetcher: Fetcher = fetch) {
+  async function safeFetch(input:Parameters<Fetcher>[0],init?:Parameters<Fetcher>[1]){
+    try{return await fetcher(input,init);}
+    catch(error){
+      if(init?.signal?.aborted){
+        if(init.signal.reason?.name==='TimeoutError')throw new Error(CONNECTION_TIMEOUT);
+        throw error;
+      }
+      throw new Error(CONNECTION_UNAVAILABLE);
+    }
+  }
   const profiles = new Map<number, Promise<Profile>>();
   const profileOverrides=new Map<number,ProfileChanges>();
   const published=new Map<string,{cast:Cast;expires:number}>();
@@ -41,7 +52,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     const timeout = setTimeout(cancel, FIFTEEN_SECONDS);
     try {
       const query = new URLSearchParams(Object.entries(params).map(([key,value]) => [key,String(value)]));
-      const response = await fetcher(`${server}${path}${query.size ? `?${query}` : ''}`, {signal:controller.signal, redirect:'error', credentials:'omit'});
+      const response = await safeFetch(`${server}${path}${query.size ? `?${query}` : ''}`, {signal:controller.signal, redirect:'error', credentials:'omit'});
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         if (response.status === 404 || (response.status === 400 && typeof body?.error_detail === 'string' && /^status:\s*NotFound\b/.test(body.error_detail))) throw new ApiError(response.status,'This item is unavailable or has been removed.',true);
@@ -51,8 +62,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       return body as T;
     } catch(error) {
       if (signal?.aborted) throw error;
-      if (controller.signal.aborted) throw new Error('The request timed out. Check your connection and try again.');
-      if (error instanceof TypeError) throw new Error('Could not connect to Kite. Check your internet connection.');
+      if (controller.signal.aborted) throw new Error(CONNECTION_TIMEOUT);
       throw error;
     } finally {clearTimeout(timeout); signal?.removeEventListener('abort',cancel);}
   }
@@ -134,7 +144,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     return entry.value;
   }
   async function accountPost<T>(path:'approval'|'verify'|'feed'|'push',body:unknown):Promise<T>{
-    const response=await fetcher(`${server}/api/mobile/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
+    const response=await safeFetch(`${server}/api/mobile/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
     const value=await response.json().catch(()=>null);
     if(!response.ok)throw new ApiError(response.status,typeof value?.error==='string'?value.error:'Could not connect your account. Please try again.');
     if(!value||typeof value!=='object')throw new Error('Could not connect your account. Please try again.');
@@ -169,7 +179,7 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
     uploadImage:async(bytes:Uint8Array,signal?:AbortSignal)=>{
       if(!bytes.length||bytes.length>MAX_IMAGE_BYTES)throw new Error('Images must be 10 MB or smaller.');
       const type=imageMime(bytes);
-      const response=await fetcher(`${server}/api/images/upload`,{method:'POST',headers:{'Content-Type':type,Origin:server},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:signal||AbortSignal.timeout(65000)});
+      const response=await safeFetch(`${server}/api/images/upload`,{method:'POST',headers:{'Content-Type':type,Origin:server},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:signal||AbortSignal.timeout(65000)});
       const result=await response.json().catch(()=>null);
       if(!response.ok)throw new Error(response.status===429?'Too many image uploads. Please try again later.':response.status===413?'Images must be 10 MB or smaller.':'Could not upload this image. Please try again.');
       return imageEmbeds([result?.url],false,4)[0].url as string;
@@ -181,14 +191,14 @@ export function createApi(server: string, fetcher: Fetcher = fetch) {
       return {items,next:typeof value.next==='string'&&value.next!==cursor?value.next:''};
     },
     approvalStatus:async(token:string)=>{
-      const response=await fetcher('https://api.farcaster.xyz/v2/signed-key-request?'+new URLSearchParams({token}),{redirect:'error',credentials:'omit',signal:AbortSignal.timeout(15000)});
+      const response=await safeFetch('https://api.farcaster.xyz/v2/signed-key-request?'+new URLSearchParams({token}),{redirect:'error',credentials:'omit',signal:AbortSignal.timeout(15000)});
       if(!response.ok)throw new Error('Could not check Farcaster approval. Please try again.');
       const value=(await response.json())?.result?.signedKeyRequest;
       if(typeof value?.state!=='string')throw new Error('Could not check Farcaster approval. Please try again.');
       return {state:value.state as string,userFid:value.userFid as unknown};
     },
     submit:async(bytes:Uint8Array)=>{
-      const response=await fetcher(`${server}/api/write/v1/submitMessage`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
+      const response=await safeFetch(`${server}/api/write/v1/submitMessage`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Uint8Array.from(bytes).buffer,credentials:'omit',redirect:'error',signal:AbortSignal.timeout(25000)});
       if(!response.ok)throw new ApiError(response.status,'Couldn’t submit this message. Check your connection and account access, then try again.');
       // A successful submission is final; do not poll the read node afterward.
     },

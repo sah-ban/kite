@@ -1,4 +1,5 @@
 import {type Cast,castKey,isFid,isHash} from './model';
+import {connectionNotice} from './connection-errors';
 
 export async function parentCastPage(cast:Cast,known:Cast[],resolve:(fid:string,hash:string,signal?:AbortSignal)=>Promise<Cast>,signal:AbortSignal,limit=5){
   const seen=new Set([cast,...known].map(castKey)),items:Cast[]=[];
@@ -14,7 +15,7 @@ export async function parentCastPage(cast:Cast,known:Cast[],resolve:(fid:string,
       seen.add(key);items.push(value);parent=value.data.castAddBody.parentCastId;
     }catch(error){
       if(signal.aborted)throw error;
-      return {items:items.reverse(),more:true,error:'Couldn’t load an earlier cast. It may have been deleted or be temporarily unavailable.'};
+      return {items:items.reverse(),more:true,error:connectionNotice(error instanceof Error?error.message:error)?.message||'Couldn’t load an earlier cast. It may have been deleted or be temporarily unavailable.'};
     }
   }
   return {items:items.reverse(),more:!!parent,error:''};

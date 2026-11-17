@@ -2,10 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createApi} from '../src/lib/api';
 import {normalizeServer,parseSearch,mergeCasts,type Cast} from '../src/lib/model';
+import {CONNECTION_UNAVAILABLE,CONNECTION_TIMEOUT,connectionNotice} from '../src/lib/connection-errors';
 
 const hash='0x572549b948717ab9302a492c197121b0b844e7c8';
 const cast:Cast={hash,signer:'public-key',data:{fid:1059075,timestamp:100,castAddBody:{text:'Hello Kite',mentions:[],mentionsPositions:[],embeds:[]}}};
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
+
+test('native DNS and fetch failures use safe connection copy across reads and account/write requests',async()=>{
+  const raw='fetch failed: java.net.UnknownHostException: Unable to resolve host "kite.sahban.dev": No address associated with hostname';
+  const api=createApi('https://kite.example',async()=>{throw new Error(raw);});
+  for(const operation of [()=>api.publicFeed(),()=>api.accountPost('approval',{}),()=>api.submit(new Uint8Array([1])),()=>api.approvalStatus('test'),()=>api.uploadImage(Uint8Array.from([255,216,255,1]))]){
+    await assert.rejects(operation(),error=>error instanceof Error&&error.message===CONNECTION_UNAVAILABLE);
+  }
+  assert.deepEqual(connectionNotice(raw),{title:'Can’t connect right now',message:CONNECTION_UNAVAILABLE,icon:'wifi-off'});
+  assert.equal(connectionNotice(CONNECTION_TIMEOUT)?.title,'Taking longer than expected');
+  assert.equal(connectionNotice('This item is unavailable or has been removed.'),undefined);
+});
+test('network TypeErrors are sanitized while server errors remain distinct',async()=>{
+  const offline=createApi('https://kite.example',async()=>{throw new TypeError('Network request failed');});
+  await assert.rejects(offline.publicFeed(),error=>error instanceof Error&&error.message===CONNECTION_UNAVAILABLE);
+  const failed=createApi('https://kite.example',async()=>json({},503));
+  await assert.rejects(failed.publicFeed(),error=>error instanceof Error&&connectionNotice(error.message)===undefined);
+});
 
 test('follow status distinguishes missing links from unavailable or malformed data',async()=>{
   const api=createApi('https://kite.example',async()=>json({data:{type:'MESSAGE_TYPE_LINK_ADD',fid:1,linkBody:{type:'follow',targetFid:37}}}));assert.equal(await api.isFollowing(1,37),true);
